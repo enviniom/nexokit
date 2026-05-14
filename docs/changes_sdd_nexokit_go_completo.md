@@ -14,7 +14,7 @@ NexoKit
 nexokit-go
 ```
 
-### CLI futuro sugerido
+### CLI sugerido
 
 ```bash
 nexokit new tienda-saas
@@ -26,11 +26,11 @@ nexokit permissions sync
 
 ### Descripción corta
 
-NexoKit es un framework starter modular en Go para construir APIs listas para SaaS con autenticación, RBAC, multitenancy, migraciones, cache, rate limiting, logging, testing y convenciones listas para producción.
+NexoKit es un framework starter modular y opinionado en Go para construir APIs listas para SaaS con autenticación, RBAC, multitenancy, migraciones, cache, rate limiting, logging, testing, CLI de generación de módulos y convenciones listas para producción.
 
 ### Descripción en inglés
 
-NexoKit is a modular Go framework starter for building SaaS-ready APIs with authentication, RBAC, multitenancy, migrations, caching, rate limiting, logging, testing and production-ready conventions.
+NexoKit is an opinionated modular Go framework starter for building SaaS-ready APIs with authentication, RBAC, multitenancy, migrations, caching, rate limiting, logging, testing, module-generation CLI and production-ready conventions.
 
 ---
 
@@ -54,7 +54,7 @@ La idea no es construir una API específica para una tienda, sino un framework s
 - Base de datos.
 - ORM con GORM.
 - Migraciones.
-- Autenticación.
+- Autenticación con PASETO.
 - Usuario root inicial.
 - Sistema de roles.
 - Un rol por usuario.
@@ -75,7 +75,7 @@ La idea no es construir una API específica para una tienda, sino un framework s
 - Seeds iniciales.
 - Testing.
 - CI básico.
-- Developer experience.
+- Developer experience y CLI para generación de módulos.
 - Documentación mínima.
 
 ---
@@ -91,7 +91,7 @@ ORM: GORM
 Base de datos inicial: PostgreSQL
 Cache: Redis o Valkey
 Migraciones: golang-migrate
-Autenticación: JWT access token + refresh token
+Autenticación: PASETO access token + refresh token opaco
 Roles: un solo rol por usuario
 Autorización: RBAC por permisos
 Multitenancy: company_id
@@ -108,15 +108,80 @@ Gin
 GORM
 PostgreSQL
 Goose (atlas o golang-migrate)
-JWT
+PASETO
 bcrypt o argon2id
 Redis/Valkey opcional
-uint como ID principal
+uint como ID interno y PublicID como ID externo
 Soft deletes
 Request ID
 Logger estructurado
 Lumberjack para rotación de logs
 ```
+
+## Estrategia de IDs
+
+NexoKit usará una estrategia de IDs duales para equilibrar rendimiento interno, seguridad y experiencia de API.
+
+### Regla base
+
+```txt
+ID interno: uint autoincremental, usado para primary keys, foreign keys, joins y lógica interna.
+PublicID externo: string único, usado en API, URLs, logs públicos, eventos y referencias externas.
+```
+
+Los endpoints públicos y privados de API deben recibir y devolver `public_id`, no el `id` interno de base de datos.
+
+En respuestas JSON, el `PublicID` puede exponerse como `id` para mantener una API limpia, mientras que el `ID` interno debe omitirse.
+
+### BaseModel sugerido
+
+```go
+type BaseModel struct {
+	ID        uint           `gorm:"primaryKey" json:"-"`
+	PublicID string         `gorm:"type:char(26);uniqueIndex;not null" json:"id"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+```
+
+### Formato del PublicID
+
+Por defecto, NexoKit puede usar ULID (`char(26)`) para la mayoría de entidades porque es compacto, ordenable y cómodo para APIs.
+
+Pero ULID codifica tiempo. Por eso no debe usarse cuando sea importante evitar inferir fecha, orden aproximado o secuencia de creación.
+
+Usar según el caso:
+
+```txt
+uint interno:
+- Todas las tablas principales.
+- Relaciones internas.
+- Joins y consultas eficientes.
+
+ULID:
+- Entidades públicas normales donde el orden temporal aproximado no sea sensible.
+- users, companies, roles, permissions, products, orders, etc., si el proyecto acepta esa exposición temporal.
+
+UUIDv4, nanoid o token random:
+- Recursos sensibles.
+- Invitaciones.
+- Password reset.
+- Verificación de email.
+- Tokens públicos.
+- Cualquier entidad donde no se quiera inferir tiempo, orden o volumen.
+```
+
+### Convención de rutas
+
+Las rutas deben nombrarse como si trabajaran con `id`, pero ese `id` representa el `PublicID` externo:
+
+```txt
+GET /api/users/:id
+GET /api/companies/:id
+```
+
+Internamente, los repositorios deben resolver `PublicID -> ID` cuando necesiten operar con relaciones o claves internas.
 
 ---
 
@@ -129,13 +194,13 @@ No conviene hacer un solo change gigante porque se mezclarían decisiones de arq
 Changes recomendados:
 
 1. Base del proyecto, configuración, GORM, migraciones y respuesta estándar.
-2. Auth, usuario root, usuarios, roles y refresh tokens.
-3. RBAC, permisos y autorización.
-4. Multitenancy por `company_id`.
-5. Utilidades API: DTOs, validaciones, paginación, filtros, errores y documentación.
-6. Infraestructura transversal: logger, log rotator, cache, rate limit y health checks.
-7. Testing, calidad y CI básico.
-8. CLI y developer experience para nuevos módulos.
+2. CLI mínimo y developer experience para nuevos módulos.
+3. Auth con PASETO, usuario root, usuarios, roles y refresh tokens.
+4. RBAC, permisos y autorización.
+5. Multitenancy por `company_id`.
+6. Utilidades API: DTOs, validaciones, paginación, filtros, errores y documentación.
+7. Infraestructura transversal: logger, log rotator, cache, rate limit y health checks.
+8. Testing, calidad y CI básico.
 
 ---
 
@@ -375,7 +440,185 @@ Este change se considera completo cuando:
 
 ---
 
-# Change 2: Auth, usuario root inicial, usuarios, roles y refresh tokens
+# Change 2: CLI y developer experience para nuevos módulos
+
+## Objetivo
+
+Agregar herramientas de developer experience para que NexoKit sea realmente útil al iniciar nuevos proyectos y al crear módulos repetibles.
+
+Este change no debe tratarse como accesorio tardío. El CLI es parte del valor central de NexoKit como framework starter, porque fija y automatiza las convenciones que luego usarán todos los módulos.
+
+## Alcance
+
+Implementar un CLI o comandos simples para:
+
+- Crear usuario root.
+- Ejecutar migraciones.
+- Revertir migraciones.
+- Crear migración.
+- Crear módulo base.
+- Crear seed.
+- Ver configuración actual.
+- Ver estado de la aplicación.
+
+## Opciones
+
+### Opción A: comandos dentro del binario principal
+
+Ejemplo:
+
+```txt
+go run cmd/api/main.go serve
+go run cmd/api/main.go create-root
+go run cmd/api/main.go migrate up
+go run cmd/api/main.go migrate down
+go run cmd/api/main.go make module products
+```
+
+### Opción B: CLI separado
+
+```txt
+cmd/cli/main.go
+```
+
+Ejemplo:
+
+```txt
+go run cmd/cli/main.go make module products
+```
+
+### Opción C: Makefile + scripts
+
+Ejemplo:
+
+```txt
+make dev
+make migrate-up
+make migrate-down
+make make-module name=products
+make create-root
+```
+
+## Recomendación
+
+Para la primera versión:
+
+- Usar Makefile para comandos de desarrollo frecuentes.
+- Crear CLI mínimo dentro del proyecto.
+- Incluir desde temprano `serve`, `create-root`, `migrate` y `make module`.
+- Evitar que la generación de módulos quede como mejora tardía, porque define la arquitectura real del framework.
+
+Comandos esperados para la primera versión:
+
+```bash
+nexokit new app-name
+nexokit make module products
+nexokit make migration create_products_table
+nexokit create-root
+nexokit permissions sync
+```
+
+## Generador de módulos
+
+El generador de módulos debe crear una estructura consistente con la arquitectura modular elegida:
+
+```txt
+internal/modules/products/
+  handler.go
+  service.go
+  repository.go
+  dto.go
+  model.go
+  routes.go
+  validation.go
+```
+
+Y debe poder generar opcionalmente:
+
+```txt
+migrations/YYYYMMDDHHMMSS_create_products_table.sql
+```
+
+### Contrato del generador de módulos
+
+El comando base será:
+
+```bash
+nexokit make module products
+```
+
+Flags sugeridos:
+
+```bash
+nexokit make module products --crud --migration --permissions --tenant
+```
+
+El generador debe poder crear:
+
+```txt
+Modelo con BaseModel.
+DTOs de create, update, response y filtros.
+Repository con búsqueda por PublicID.
+Service con reglas de negocio mínimas.
+Handler HTTP.
+Routes del módulo.
+Validaciones.
+Migración SQL.
+Permisos base del módulo.
+Tests base cuando aplique.
+Scope de tenant si se usa --tenant.
+```
+
+Permisos sugeridos por módulo:
+
+```txt
+products.read
+products.create
+products.update
+products.delete
+```
+
+El CLI no debe modificar lógica existente de forma silenciosa. Si necesita registrar rutas, permisos o migraciones en archivos globales, debe hacerlo de forma explícita, idempotente y documentada.
+
+## Makefile sugerido
+
+```txt
+make dev
+make build
+make test
+make test-unit
+make test-integration
+make test-coverage
+make migrate-up
+make migrate-down
+make migrate-create name=create_users_table
+make seed
+make create-root
+make lint
+make fmt
+```
+
+## Criterios de aceptación
+
+Este change se considera completo cuando:
+
+1. Existe Makefile funcional.
+2. Existe comando para correr la API en desarrollo.
+3. Existe comando para compilar.
+4. Existe comando para correr tests.
+5. Existe comando para crear migraciones.
+6. Existe comando para ejecutar migraciones.
+7. Existe comando para revertir migraciones.
+8. Existe comando seguro para crear root.
+9. Existe documentación de comandos.
+10. Existe generador básico de módulos.
+11. El generador puede crear módulo CRUD con migración opcional.
+12. El generador usa `BaseModel` con `ID` interno y `PublicID` externo.
+13. El generador puede crear permisos base del módulo.
+
+---
+
+# Change 3: Auth con PASETO, usuario root inicial, usuarios, roles y refresh tokens
 
 ## Objetivo
 
@@ -384,8 +627,8 @@ Implementar el sistema base de autenticación y gestión de usuarios de NexoKit.
 Este change debe dejar listo:
 
 - Login.
-- JWT access token.
-- Refresh token.
+- PASETO access token.
+- Refresh token opaco.
 - Logout.
 - Usuario root inicial.
 - Usuarios.
@@ -567,10 +810,10 @@ Inicialmente los roles pueden ser de solo lectura desde API para evitar que se d
   "success": true,
   "message": "Login exitoso",
   "data": {
-    "access_token": "jwt",
-    "refresh_token": "refresh",
+    "access_token": "paseto",
+    "refresh_token": "opaque-refresh-token",
     "user": {
-      "id": "uuid",
+      "id": "01HY7V8J3F8WQ9F6K2H4D1M5NP",
       "name": "Root User",
       "email": "root@example.com",
       "role": "root"
@@ -586,7 +829,7 @@ Inicialmente los roles pueden ser de solo lectura desde API para evitar que se d
 Incluir:
 
 - Password hashing con bcrypt o argon2id.
-- JWT firmado con secreto configurable.
+- PASETO con clave configurable.
 - Expiración corta para access token.
 - Expiración más larga para refresh token.
 - Refresh tokens guardados hasheados.
@@ -595,13 +838,41 @@ Incluir:
 - No revelar si falló email o contraseña individualmente.
 - No devolver contraseñas ni hashes en respuestas.
 
+## Decisión sobre tokens
+
+NexoKit usará PASETO en lugar de JWT para los access tokens.
+
+Recomendación inicial:
+
+```txt
+Access token: PASETO v4.local.
+Refresh token: token opaco random, guardado únicamente como hash.
+```
+
+PASETO evita varias clases de errores comunes de JWT, especialmente confusiones con algoritmos, validaciones incompletas y diferencias entre token firmado y token cifrado.
+
+El refresh token debe seguir siendo opaco porque necesita revocación, rotación y almacenamiento seguro del hash.
+
+Claims mínimos sugeridos para el access token:
+
+```txt
+sub: public_id del usuario
+role: slug del rol
+company_id: public_id de la company, si aplica
+token_type: access
+issued_at
+expires_at
+```
+
+No guardar datos sensibles dentro del token aunque se use PASETO local cifrado.
+
 ## Variables de entorno
 
 ```txt
-JWT_ACCESS_SECRET
-JWT_REFRESH_SECRET
-JWT_ACCESS_TTL_MINUTES
-JWT_REFRESH_TTL_HOURS
+PASETO_VERSION
+PASETO_LOCAL_KEY
+PASETO_ACCESS_TTL_MINUTES
+REFRESH_TOKEN_TTL_HOURS
 
 ROOT_USER_NAME
 ROOT_USER_EMAIL
@@ -629,7 +900,7 @@ Este change se considera completo cuando:
 
 ---
 
-# Change 3: RBAC, permisos y autorización
+# Change 4: RBAC, permisos y autorización
 
 ## Objetivo
 
@@ -778,7 +1049,7 @@ Este change se considera completo cuando:
 
 ---
 
-# Change 4: Multitenancy por company_id
+# Change 5: Multitenancy por company_id
 
 ## Objetivo
 
@@ -873,7 +1144,7 @@ TenantContext
 Crear helpers:
 
 ```go
-func WithCompany(db *gorm.DB, companyID uuid.UUID) *gorm.DB
+func WithCompany(db *gorm.DB, companyID uint) *gorm.DB
 func ApplyTenantScope(db *gorm.DB, ctx TenantContext) *gorm.DB
 ```
 
@@ -915,7 +1186,7 @@ Este change se considera completo cuando:
 
 ---
 
-# Change 5: Utilidades API: DTOs, validaciones, paginación, filtros, errores y documentación
+# Change 6: Utilidades API: DTOs, validaciones, paginación, filtros, errores y documentación
 
 ## Objetivo
 
@@ -1108,7 +1379,7 @@ Este change se considera completo cuando:
 
 ---
 
-# Change 6: Infraestructura transversal: logger, log rotator, cache, rate limit y health checks
+# Change 7: Infraestructura transversal: logger, log rotator, cache, rate limit y health checks
 
 ## Objetivo
 
@@ -1313,7 +1584,7 @@ Este change se considera completo cuando:
 
 ---
 
-# Change 7: Testing, calidad y CI básico
+# Change 8: Testing, calidad y CI básico
 
 ## Objetivo
 
@@ -1529,7 +1800,7 @@ pagination
 filters
 validators
 password hashing
-JWT generation/parsing
+PASETO generation/parsing
 RBAC permission checks
 tenant context
 cache interface noop
@@ -1670,139 +1941,6 @@ Este change se considera completo cuando:
 
 ---
 
-# Change 8: CLI y developer experience para nuevos módulos
-
-## Objetivo
-
-Agregar herramientas de developer experience para que NexoKit sea realmente útil al iniciar nuevos proyectos.
-
-Este change puede ser opcional para la primera versión, pero es muy valioso para acelerar desarrollo futuro.
-
-## Alcance
-
-Implementar un CLI o comandos simples para:
-
-- Crear usuario root.
-- Ejecutar migraciones.
-- Revertir migraciones.
-- Crear migración.
-- Crear módulo base.
-- Crear seed.
-- Ver configuración actual.
-- Ver estado de la aplicación.
-
-## Opciones
-
-### Opción A: comandos dentro del binario principal
-
-Ejemplo:
-
-```txt
-go run cmd/api/main.go serve
-go run cmd/api/main.go create-root
-go run cmd/api/main.go migrate up
-go run cmd/api/main.go migrate down
-go run cmd/api/main.go make module products
-```
-
-### Opción B: CLI separado
-
-```txt
-cmd/cli/main.go
-```
-
-Ejemplo:
-
-```txt
-go run cmd/cli/main.go make module products
-```
-
-### Opción C: Makefile + scripts
-
-Ejemplo:
-
-```txt
-make dev
-make migrate-up
-make migrate-down
-make make-module name=products
-make create-root
-```
-
-## Recomendación
-
-Para la primera versión:
-
-- Usar Makefile + scripts.
-- Crear comando interno para `create-root`.
-- Dejar generación de módulos como fase opcional.
-
-Para una versión más madura:
-
-```bash
-nexokit new app-name
-nexokit make module products
-nexokit make migration create_products_table
-nexokit create-root
-nexokit permissions sync
-```
-
-## Generador de módulos
-
-Si se implementa, debe generar:
-
-```txt
-internal/modules/products/
-  handler.go
-  service.go
-  repository.go
-  dto.go
-  model.go
-  routes.go
-  validation.go
-```
-
-Y opcionalmente:
-
-```txt
-migrations/YYYYMMDDHHMMSS_create_products_table.sql
-```
-
-## Makefile sugerido
-
-```txt
-make dev
-make build
-make test
-make test-unit
-make test-integration
-make test-coverage
-make migrate-up
-make migrate-down
-make migrate-create name=create_users_table
-make seed
-make create-root
-make lint
-make fmt
-```
-
-## Criterios de aceptación
-
-Este change se considera completo cuando:
-
-1. Existe Makefile funcional.
-2. Existe comando para correr la API en desarrollo.
-3. Existe comando para compilar.
-4. Existe comando para correr tests.
-5. Existe comando para crear migraciones.
-6. Existe comando para ejecutar migraciones.
-7. Existe comando para revertir migraciones.
-8. Existe comando seguro para crear root.
-9. Existe documentación de comandos.
-10. Opcionalmente existe generador básico de módulos.
-
----
-
 # Orden recomendado de implementación
 
 ## Orden recomendado para tu caso
@@ -1810,26 +1948,26 @@ Este change se considera completo cuando:
 Como NexoKit se usará para potenciar el desarrollo de la tienda SaaS, el orden recomendado es:
 
 1. Change 1: Base técnica.
-2. Change 2: Auth, root, usuarios y roles.
-3. Change 4: Multitenancy.
-4. Change 3: RBAC.
-5. Change 5: DTOs, paginación, filtros y errores.
-6. Change 6: Logger, cache, rate limit y health checks.
-7. Change 7: Testing, calidad y CI básico.
-8. Change 8: CLI y developer experience.
+2. Change 2: CLI y developer experience mínimo.
+3. Change 3: Auth con PASETO, root, usuarios y roles.
+4. Change 5: Multitenancy.
+5. Change 4: RBAC.
+6. Change 6: DTOs, paginación, filtros y errores.
+7. Change 7: Logger, cache, rate limit y health checks.
+8. Change 8: Testing, calidad y CI básico.
 
-La razón es que para la tienda SaaS necesitas `company_id` muy pronto. RBAC puede quedar inmediatamente después.
+La razón es que el CLI define temprano las convenciones del framework y evita escribir módulos a mano con estructuras inconsistentes. Después, para la tienda SaaS necesitas `company_id` muy pronto. RBAC puede quedar inmediatamente después.
 
 ## Orden ideal si se quiere máxima limpieza conceptual
 
 1. Change 1: Base técnica.
-2. Change 2: Auth, root, usuarios y roles.
-3. Change 3: RBAC.
-4. Change 4: Multitenancy.
-5. Change 5: DTOs, paginación, filtros y errores.
-6. Change 6: Logger, cache, rate limit y health checks.
-7. Change 7: Testing, calidad y CI básico.
-8. Change 8: CLI y developer experience.
+2. Change 2: CLI y developer experience mínimo.
+3. Change 3: Auth con PASETO, root, usuarios y roles.
+4. Change 4: RBAC.
+5. Change 5: Multitenancy.
+6. Change 6: DTOs, paginación, filtros y errores.
+7. Change 7: Logger, cache, rate limit y health checks.
+8. Change 8: Testing, calidad y CI básico.
 
 ---
 
@@ -1866,9 +2004,24 @@ Algunas de estas cosas pueden ser módulos opcionales después.
 
 # Cosas que sí conviene adicionar desde el inicio
 
-## UUIDs
+## IDs duales
 
-Usar UUID como ID principal en vez de enteros autoincrementales.
+Usar `uint` como ID interno y `PublicID` como identificador externo.
+
+Reglas:
+
+```txt
+ID interno:
+- uint.
+- Primary key.
+- Foreign keys.
+- Nunca exponer por API.
+
+PublicID externo:
+- ULID por defecto.
+- UUIDv4, nanoid o token random para recursos sensibles.
+- Se expone como `id` en JSON.
+```
 
 ## Soft deletes
 
@@ -1957,6 +2110,8 @@ Stack preferido:
 - Variables de entorno
 - Respuesta API estandarizada
 - Estructura modular
+- Estrategia de IDs duales: `uint` interno + `PublicID` externo
+- CLI temprano para comandos base y generación de módulos
 - Preparado para auth, RBAC y multitenancy en changes posteriores
 
 Necesito que analices este change y generes:
@@ -1988,7 +2143,7 @@ No implementes todavía. Primero genera el plan técnico detallado del Change 1.
 
 Estas preguntas no bloquean los changes, pero sí conviene responderlas antes de programar:
 
-1. ¿Confirmamos UUID como ID principal en todas las tablas?
+1. ¿Confirmamos `uint` como ID interno y `PublicID` como ID externo en las tablas principales?
 2. ¿Confirmamos Gin definitivamente?
 3. ¿Confirmamos Goose para migraciones?
 4. ¿Confirmamos PostgreSQL como única base soportada inicialmente?
@@ -1996,7 +2151,7 @@ Estas preguntas no bloquean los changes, pero sí conviene responderlas antes de
 6. ¿Prefieres bcrypt o argon2id para passwords?
 7. ¿Los permisos serán administrables desde API o solo seeds iniciales?
 8. ¿Quieres incluir auditoría básica con `created_by` y `updated_by`?
-9. ¿Quieres que el generador de módulos sea parte de la primera versión o mejora posterior?
+9. ¿Qué flags mínimos debe soportar `nexokit make module` en la primera versión?
 10. ¿Quieres Docker Compose para desarrollo local desde el inicio?
 11. ¿Quieres usar `testify` o solo `testing` estándar?
 12. ¿Quieres agregar GitHub Actions desde la primera versión?
