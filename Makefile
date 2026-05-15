@@ -1,4 +1,4 @@
-.PHONY: build run test migrate-up migrate-down migrate-create migrate-status fmt vet
+.PHONY: build run test migrate-up migrate-down migrate-create migrate-status fmt vet install-hooks uninstall-hooks check-env
 
 build:
 	go build -o bin/api ./cmd/api
@@ -27,3 +27,15 @@ fmt:
 
 vet:
 	go vet ./...
+
+install-hooks:
+	@cp scripts/pre-commit.sh .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "Pre-commit hook installed."
+
+uninstall-hooks:
+	@rm -f .git/hooks/pre-commit
+	@echo "Pre-commit hook removed."
+
+check-env:
+	@bash scripts/pre-commit.sh --check-env-only
