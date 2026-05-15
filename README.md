@@ -52,6 +52,33 @@ NexoKit is a modular Go starter framework for building SaaS APIs.
 | `make migrate-status` | Show migration status |
 | `make fmt` | Format all Go files |
 | `make vet` | Run go vet |
+| `make install-hooks` | Install Git pre-commit hook |
+| `make uninstall-hooks` | Remove Git pre-commit hook |
+| `make check-env` | Check `.env` / `.env.example` parity |
+
+## Pre-commit Hooks
+
+Install the local Git hook:
+
+```bash
+make install-hooks
+```
+
+The hook performs the following checks on staged files:
+
+| Check | Behavior |
+|-------|----------|
+| Binary files | Blocks the commit |
+| File size > 1MB | Warns but allows the commit |
+| `.env` / `.env.example` key drift | Warns but allows the commit |
+| `go vet ./...` | Blocks the commit on errors |
+| Unformatted Go files | Blocks the commit; run `make fmt` to fix |
+
+Bypass the hook when necessary:
+
+```bash
+git commit --no-verify
+```
 
 ## Log Files
 
