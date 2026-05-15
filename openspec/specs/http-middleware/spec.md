@@ -59,6 +59,17 @@ The system MUST log every request with method, path, status code, duration, and 
 - WHEN it completes with 200
 - THEN the log line contains `method=GET`, `path=/health`, `status=200`, `duration>0`, and `request_id`
 
+### Requirement: Message constants
+
+Middleware MUST use `internal/platform/messages/` constants for project-owned string values. Standard HTTP header names MAY remain literals.
+
+#### Scenario: Compile and vet pass after constant migration
+
+- GIVEN `messages.go` exports `MsgHTTPRequest`, `CtxRequestID`, `HeaderRequestID`, and CORS value constants
+- AND middleware files and `logger_test.go` reference those constants
+- WHEN `go vet ./...` runs
+- THEN exit code is 0
+
 ### Requirement: Middleware order
 
 The system MUST apply middleware in this order: RequestID → Logger → Recovery → CORS.
