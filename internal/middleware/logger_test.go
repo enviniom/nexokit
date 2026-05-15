@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/gin-gonic/gin"
 )
 
@@ -31,8 +32,8 @@ func TestLogger(t *testing.T) {
 	}
 
 	output := buf.String()
-	if !strings.Contains(output, "http request") {
-		t.Error("expected log output to contain 'http request'")
+	if !strings.Contains(output, messages.MsgHTTPRequest) {
+		t.Errorf("expected log output to contain %q", messages.MsgHTTPRequest)
 	}
 	if !strings.Contains(output, "GET") {
 		t.Error("expected log output to contain method GET")

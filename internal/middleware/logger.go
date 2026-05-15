@@ -3,6 +3,7 @@ package middleware
 import (
 	"time"
 
+	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/gin-gonic/gin"
 	"log/slog"
 )
@@ -23,14 +24,14 @@ func Logger(log *slog.Logger) gin.HandlerFunc {
 			path = path + "?" + raw
 		}
 
-		rid, _ := c.Get("request_id")
+		rid, _ := c.Get(messages.CtxRequestID)
 		ridStr := ""
 		if rid != nil {
 			ridStr = rid.(string)
 		}
 
-		log.Info("http request",
-			slog.String("request_id", ridStr),
+		log.Info(messages.MsgHTTPRequest,
+			slog.String(messages.CtxRequestID, ridStr),
 			slog.String("method", c.Request.Method),
 			slog.String("path", path),
 			slog.Int("status", status),

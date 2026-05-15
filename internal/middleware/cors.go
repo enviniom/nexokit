@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/enviniom/nexokit/internal/config"
+	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,9 +17,9 @@ func CORS(cfg *config.Config) gin.HandlerFunc {
 		}
 
 		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
-		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", messages.CORSAllowedMethods)
+		c.Writer.Header().Set("Access-Control-Allow-Headers", messages.CORSAllowedHeaders)
+		c.Writer.Header().Set("Access-Control-Max-Age", messages.CORSMaxAge)
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)

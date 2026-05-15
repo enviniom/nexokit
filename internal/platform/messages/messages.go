@@ -34,3 +34,21 @@ const (
 	MsgPanicRecovered = "internal server error"
 	MsgPanicLog       = "panic recovered"
 )
+
+// Middleware — Logger
+const (
+	MsgHTTPRequest = "http request"
+	CtxRequestID   = "request_id"
+)
+
+// Middleware — Request ID
+const (
+	HeaderRequestID = "X-Request-ID"
+)
+
+// Middleware — CORS
+const (
+	CORSAllowedMethods = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+	CORSAllowedHeaders = "Content-Type, Authorization, X-Request-ID"
+	CORSMaxAge         = "86400"
+)
