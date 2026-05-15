@@ -1,0 +1,30 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Go 1.26.3, Gin, GORM, PostgreSQL, Goose, slog, testify
+  Architecture: Modular flat structure with dependency injection
+  Testing: Standard Go testing + httptest
+  Style: Domain-driven modules, no cross-module imports, custom validator
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    - Follow existing code patterns
+    tdd: true
+    test_command: "go test ./..."
+  verify:
+    test_command: "go test ./..."
+    build_command: "go build ./..."
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
