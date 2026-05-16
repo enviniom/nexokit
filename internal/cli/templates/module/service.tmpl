@@ -39,8 +39,16 @@ func (s *{{.Struct}}Service) Get(ctx context.Context, publicID string) (*{{.Stru
 }
 
 // List returns paginated {{.Table}}.
-func (s *{{.Struct}}Service) List(ctx context.Context, limit, offset int) ([]{{.Struct}}, error) {
-	return s.repo.List(ctx, limit, offset)
+func (s *{{.Struct}}Service) List(ctx context.Context, page, perPage int) ([]{{.Struct}}, int64, error) {
+	items, err := s.repo.List(ctx, page, perPage)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := s.repo.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
 }
 
 // Update modifies a {{.Struct}}.

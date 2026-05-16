@@ -36,10 +36,11 @@ func (r *{{.Struct}}Repository) FindByPublicID(ctx context.Context, publicID str
 	return &m, nil
 }
 
-// List returns all {{.Table}} with optional pagination.
-func (r *{{.Struct}}Repository) List(ctx context.Context, limit, offset int) ([]{{.Struct}}, error) {
+// List returns paginated {{.Table}}.
+func (r *{{.Struct}}Repository) List(ctx context.Context, page, perPage int) ([]{{.Struct}}, error) {
 	var items []{{.Struct}}
-	q := r.db.WithContext(ctx).Limit(limit).Offset(offset).Order("created_at DESC")
+	offset := (page - 1) * perPage
+	q := r.db.WithContext(ctx).Limit(perPage).Offset(offset).Order("created_at DESC")
 	{{- if .Tenant }}
 	q = q.Where("company_id = ?", ctx.Value("company_id"))
 	{{- end }}
@@ -47,6 +48,19 @@ func (r *{{.Struct}}Repository) List(ctx context.Context, limit, offset int) ([]
 		return nil, err
 	}
 	return items, nil
+}
+
+// Count returns the total number of {{.Table}}.
+func (r *{{.Struct}}Repository) Count(ctx context.Context) (int64, error) {
+	var count int64
+	q := r.db.WithContext(ctx).Model(&{{.Struct}}{})
+	{{- if .Tenant }}
+	q = q.Where("company_id = ?", ctx.Value("company_id"))
+	{{- end }}
+	if err := q.Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 // Update modifies an existing {{.Struct}}.

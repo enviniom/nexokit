@@ -37,8 +37,16 @@ func (s *GoldenmodService) Get(ctx context.Context, publicID string) (*Goldenmod
 }
 
 // List returns paginated goldenmod.
-func (s *GoldenmodService) List(ctx context.Context, limit, offset int) ([]Goldenmod, error) {
-	return s.repo.List(ctx, limit, offset)
+func (s *GoldenmodService) List(ctx context.Context, page, perPage int) ([]Goldenmod, int64, error) {
+	items, err := s.repo.List(ctx, page, perPage)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := s.repo.Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
 }
 
 // Update modifies a Goldenmod.

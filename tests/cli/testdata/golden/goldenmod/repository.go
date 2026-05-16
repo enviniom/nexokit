@@ -34,15 +34,27 @@ func (r *GoldenmodRepository) FindByPublicID(ctx context.Context, publicID strin
 	return &m, nil
 }
 
-// List returns all goldenmod with optional pagination.
-func (r *GoldenmodRepository) List(ctx context.Context, limit, offset int) ([]Goldenmod, error) {
+// List returns paginated goldenmod.
+func (r *GoldenmodRepository) List(ctx context.Context, page, perPage int) ([]Goldenmod, error) {
 	var items []Goldenmod
-	q := r.db.WithContext(ctx).Limit(limit).Offset(offset).Order("created_at DESC")
+	offset := (page - 1) * perPage
+	q := r.db.WithContext(ctx).Limit(perPage).Offset(offset).Order("created_at DESC")
 	q = q.Where("company_id = ?", ctx.Value("company_id"))
 	if err := q.Find(&items).Error; err != nil {
 		return nil, err
 	}
 	return items, nil
+}
+
+// Count returns the total number of goldenmod.
+func (r *GoldenmodRepository) Count(ctx context.Context) (int64, error) {
+	var count int64
+	q := r.db.WithContext(ctx).Model(&Goldenmod{})
+	q = q.Where("company_id = ?", ctx.Value("company_id"))
+	if err := q.Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 // Update modifies an existing Goldenmod.

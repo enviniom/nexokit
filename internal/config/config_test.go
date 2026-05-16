@@ -140,6 +140,57 @@ func TestLoad_InvalidShutdownTimeout(t *testing.T) {
 	}
 }
 
+func TestLoad_AuthDefaults(t *testing.T) {
+	os.Clearenv()
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Auth.PASETOKey != "" {
+		t.Errorf("expected default PASETO_KEY empty, got %s", cfg.Auth.PASETOKey)
+	}
+	if cfg.Auth.AccessTTLMinutes != 15 {
+		t.Errorf("expected default ACCESS_TTL_MINUTES 15, got %d", cfg.Auth.AccessTTLMinutes)
+	}
+	if cfg.Auth.RefreshTTLDays != 7 {
+		t.Errorf("expected default REFRESH_TTL_DAYS 7, got %d", cfg.Auth.RefreshTTLDays)
+	}
+}
+
+func TestLoad_AuthCustomValues(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("PASETO_KEY", "super-secret-32-byte-key!!")
+	os.Setenv("ACCESS_TTL_MINUTES", "30")
+	os.Setenv("REFRESH_TTL_DAYS", "14")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.Auth.PASETOKey != "super-secret-32-byte-key!!" {
+		t.Errorf("expected PASETO_KEY 'super-secret-32-byte-key!!', got %s", cfg.Auth.PASETOKey)
+	}
+	if cfg.Auth.AccessTTLMinutes != 30 {
+		t.Errorf("expected ACCESS_TTL_MINUTES 30, got %d", cfg.Auth.AccessTTLMinutes)
+	}
+	if cfg.Auth.RefreshTTLDays != 14 {
+		t.Errorf("expected REFRESH_TTL_DAYS 14, got %d", cfg.Auth.RefreshTTLDays)
+	}
+}
+
+func TestLoad_InvalidAccessTTL(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("ACCESS_TTL_MINUTES", "not-a-number")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for invalid ACCESS_TTL_MINUTES")
+	}
+}
+
 func TestLoad_InvalidLogMaxSize(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("LOG_MAX_SIZE", "big")

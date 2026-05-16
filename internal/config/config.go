@@ -17,6 +17,7 @@ type Config struct {
 	Log      LogConfig
 	Shutdown ShutdownConfig
 	Cache    CacheConfig
+	Auth     AuthConfig
 }
 
 // AppConfig holds application-level settings.
@@ -69,6 +70,13 @@ type CacheConfig struct {
 	Driver string
 }
 
+// AuthConfig holds authentication-related settings.
+type AuthConfig struct {
+	PASETOKey        string
+	AccessTTLMinutes int
+	RefreshTTLDays   int
+}
+
 // Load reads environment variables and returns a typed Config.
 // It fails fast on missing required values.
 func Load() (*Config, error) {
@@ -119,6 +127,16 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid LOG_MAX_AGE: %w", err)
 	}
 
+	accessTTL, err := getInt("ACCESS_TTL_MINUTES", 15)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ACCESS_TTL_MINUTES: %w", err)
+	}
+
+	refreshTTL, err := getInt("REFRESH_TTL_DAYS", 7)
+	if err != nil {
+		return nil, fmt.Errorf("invalid REFRESH_TTL_DAYS: %w", err)
+	}
+
 	cfg := &Config{
 		App: AppConfig{
 			Name: getString("APP_NAME", "nexokit"),
@@ -157,6 +175,11 @@ func Load() (*Config, error) {
 		},
 		Cache: CacheConfig{
 			Driver: getString("CACHE_DRIVER", "none"),
+		},
+		Auth: AuthConfig{
+			PASETOKey:        getString("PASETO_KEY", ""),
+			AccessTTLMinutes: accessTTL,
+			RefreshTTLDays:   refreshTTL,
 		},
 	}
 

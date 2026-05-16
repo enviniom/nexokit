@@ -44,16 +44,22 @@ func (h *{{.Struct}}Handler) Get(c *gin.Context) {
 	response.OK(c, to{{.Struct}}Response(m))
 }
 
-// List handles GET /{{.Table}}.
+// List handles GET /{{.Table}} with pagination.
 func (h *{{.Struct}}Handler) List(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	items, err := h.service.List(c.Request.Context(), limit, offset)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	if perPage < 1 {
+		perPage = 20
+	}
+	items, total, err := h.service.List(c.Request.Context(), page, perPage)
 	if err != nil {
 		response.InternalServerError(c, err.Error())
 		return
 	}
-	response.OK(c, to{{.Struct}}ListResponse(items))
+	response.Paginated(c, "{{.Struct}} list retrieved", to{{.Struct}}ListResponse(items), page, perPage, total)
 }
 
 // Update handles PUT /{{.Table}}/:id.

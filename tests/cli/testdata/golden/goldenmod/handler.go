@@ -44,16 +44,22 @@ func (h *GoldenmodHandler) Get(c *gin.Context) {
 	response.OK(c, toGoldenmodResponse(m))
 }
 
-// List handles GET /goldenmod.
+// List handles GET /goldenmod with pagination.
 func (h *GoldenmodHandler) List(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	items, err := h.service.List(c.Request.Context(), limit, offset)
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
+	if perPage < 1 {
+		perPage = 20
+	}
+	items, total, err := h.service.List(c.Request.Context(), page, perPage)
 	if err != nil {
 		response.InternalServerError(c, err.Error())
 		return
 	}
-	response.OK(c, toGoldenmodListResponse(items))
+	response.Paginated(c, "Goldenmod list retrieved", toGoldenmodListResponse(items), page, perPage, total)
 }
 
 // Update handles PUT /goldenmod/:id.
