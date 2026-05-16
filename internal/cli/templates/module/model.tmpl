@@ -1,0 +1,12 @@
+package {{.Package}}
+
+import "github.com/enviniom/nexokit/internal/shared"
+
+// {{.Struct}} is the database model for {{.Name}}.
+type {{.Struct}} struct {
+	shared.BaseModel
+	{{- if .Tenant }}
+	CompanyID uint `gorm:"index;not null" json:"company_id"`
+	{{- end }}
+	Name string `gorm:"not null" json:"name"`
+}

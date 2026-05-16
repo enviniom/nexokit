@@ -1,0 +1,103 @@
+package {{.Package}}
+
+import (
+	"net/http"
+	"strconv"
+
+	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/gin-gonic/gin"
+)
+
+// {{.Struct}}Handler holds HTTP handlers for {{.Struct}}.
+type {{.Struct}}Handler struct {
+	service *{{.Struct}}Service
+}
+
+// New{{.Struct}}Handler creates a new handler instance.
+func New{{.Struct}}Handler(service *{{.Struct}}Service) *{{.Struct}}Handler {
+	return &{{.Struct}}Handler{service: service}
+}
+
+// Create handles POST /{{.Table}}.
+func (h *{{.Struct}}Handler) Create(c *gin.Context) {
+	var req Create{{.Struct}}Request
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	m, err := h.service.Create(c.Request.Context(), req)
+	if err != nil {
+		response.InternalServerError(c, err.Error())
+		return
+	}
+	response.Created(c, to{{.Struct}}Response(m))
+}
+
+// Get handles GET /{{.Table}}/:id.
+func (h *{{.Struct}}Handler) Get(c *gin.Context) {
+	publicID := c.Param("id")
+	m, err := h.service.Get(c.Request.Context(), publicID)
+	if err != nil {
+		response.NotFound(c, "{{.Struct}} not found")
+		return
+	}
+	response.OK(c, to{{.Struct}}Response(m))
+}
+
+// List handles GET /{{.Table}}.
+func (h *{{.Struct}}Handler) List(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	items, err := h.service.List(c.Request.Context(), limit, offset)
+	if err != nil {
+		response.InternalServerError(c, err.Error())
+		return
+	}
+	response.OK(c, to{{.Struct}}ListResponse(items))
+}
+
+// Update handles PUT /{{.Table}}/:id.
+func (h *{{.Struct}}Handler) Update(c *gin.Context) {
+	publicID := c.Param("id")
+	var req Update{{.Struct}}Request
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	m, err := h.service.Update(c.Request.Context(), publicID, req)
+	if err != nil {
+		response.NotFound(c, "{{.Struct}} not found")
+		return
+	}
+	response.OK(c, to{{.Struct}}Response(m))
+}
+
+// Delete handles DELETE /{{.Table}}/:id.
+func (h *{{.Struct}}Handler) Delete(c *gin.Context) {
+	publicID := c.Param("id")
+	if err := h.service.Delete(c.Request.Context(), publicID); err != nil {
+		response.NotFound(c, "{{.Struct}} not found")
+		return
+	}
+	response.NoContent(c)
+}
+
+func to{{.Struct}}Response(m *{{.Struct}}) {{.Struct}}Response {
+	return {{.Struct}}Response{
+		ID:        m.PublicID,
+		Name:      m.Name,
+		{{- if .Tenant }}
+		CompanyID: m.CompanyID,
+		{{- end }}
+		CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt: m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
+func to{{.Struct}}ListResponse(items []{{.Struct}}) []{{.Struct}}Response {
+	out := make([]{{.Struct}}Response, len(items))
+	for i, m := range items {
+		out[i] = to{{.Struct}}Response(&m)
+	}
+	return out
+}

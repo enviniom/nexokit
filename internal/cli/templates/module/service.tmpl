@@ -1,0 +1,65 @@
+package {{.Package}}
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/google/uuid"
+)
+
+// {{.Struct}}Service contains business logic for {{.Struct}}.
+type {{.Struct}}Service struct {
+	repo *{{.Struct}}Repository
+}
+
+// New{{.Struct}}Service creates a new service instance.
+func New{{.Struct}}Service(repo *{{.Struct}}Repository) *{{.Struct}}Service {
+	return &{{.Struct}}Service{repo: repo}
+}
+
+// Create validates and creates a new {{.Struct}}.
+func (s *{{.Struct}}Service) Create(ctx context.Context, req Create{{.Struct}}Request) (*{{.Struct}}, error) {
+	// TODO: add domain validation before persistence
+	m := &{{.Struct}}{
+		Name: req.Name,
+		{{- if .Tenant }}
+		CompanyID: req.CompanyID,
+		{{- end }}
+	}
+	m.PublicID = uuid.NewString() // TODO: switch to ULID when identity package is ready
+	if err := s.repo.Create(ctx, m); err != nil {
+		return nil, fmt.Errorf("failed to create {{.Package}}: %w", err)
+	}
+	return m, nil
+}
+
+// Get retrieves a {{.Struct}} by public ID.
+func (s *{{.Struct}}Service) Get(ctx context.Context, publicID string) (*{{.Struct}}, error) {
+	return s.repo.FindByPublicID(ctx, publicID)
+}
+
+// List returns paginated {{.Table}}.
+func (s *{{.Struct}}Service) List(ctx context.Context, limit, offset int) ([]{{.Struct}}, error) {
+	return s.repo.List(ctx, limit, offset)
+}
+
+// Update modifies a {{.Struct}}.
+func (s *{{.Struct}}Service) Update(ctx context.Context, publicID string, req Update{{.Struct}}Request) (*{{.Struct}}, error) {
+	m, err := s.repo.FindByPublicID(ctx, publicID)
+	if err != nil {
+		return nil, err
+	}
+	m.Name = req.Name
+	{{- if .Tenant }}
+	m.CompanyID = req.CompanyID
+	{{- end }}
+	if err := s.repo.Update(ctx, m); err != nil {
+		return nil, fmt.Errorf("failed to update {{.Package}}: %w", err)
+	}
+	return m, nil
+}
+
+// Delete removes a {{.Struct}} by public ID.
+func (s *{{.Struct}}Service) Delete(ctx context.Context, publicID string) error {
+	return s.repo.Delete(ctx, publicID)
+}

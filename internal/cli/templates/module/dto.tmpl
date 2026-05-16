@@ -1,0 +1,28 @@
+package {{.Package}}
+
+// Create{{.Struct}}Request is the payload for creating a {{.Struct}}.
+type Create{{.Struct}}Request struct {
+	Name string `json:"name" binding:"required"`
+	{{- if .Tenant }}
+	CompanyID uint `json:"company_id" binding:"required"`
+	{{- end }}
+}
+
+// Update{{.Struct}}Request is the payload for updating a {{.Struct}}.
+type Update{{.Struct}}Request struct {
+	Name string `json:"name" binding:"required"`
+	{{- if .Tenant }}
+	CompanyID uint `json:"company_id" binding:"required"`
+	{{- end }}
+}
+
+// {{.Struct}}Response is the JSON representation returned by the API.
+type {{.Struct}}Response struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	{{- if .Tenant }}
+	CompanyID uint   `json:"company_id"`
+	{{- end }}
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}

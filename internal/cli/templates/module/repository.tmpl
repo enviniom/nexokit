@@ -1,0 +1,64 @@
+package {{.Package}}
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/enviniom/nexokit/internal/shared"
+	"gorm.io/gorm"
+)
+
+// {{.Struct}}Repository handles persistence for {{.Struct}}.
+type {{.Struct}}Repository struct {
+	db *gorm.DB
+}
+
+// New{{.Struct}}Repository creates a new repository instance.
+func New{{.Struct}}Repository(db *gorm.DB) *{{.Struct}}Repository {
+	return &{{.Struct}}Repository{db: db}
+}
+
+// Create persists a new {{.Struct}}.
+func (r *{{.Struct}}Repository) Create(ctx context.Context, m *{{.Struct}}) error {
+	return r.db.WithContext(ctx).Create(m).Error
+}
+
+// FindByPublicID retrieves a {{.Struct}} by its public ID.
+func (r *{{.Struct}}Repository) FindByPublicID(ctx context.Context, publicID string) (*{{.Struct}}, error) {
+	var m {{.Struct}}
+	q := r.db.WithContext(ctx).Where("public_id = ?", publicID)
+	{{- if .Tenant }}
+	q = q.Where("company_id = ?", ctx.Value("company_id"))
+	{{- end }}
+	if err := q.First(&m).Error; err != nil {
+		return nil, fmt.Errorf("{{.Package}} not found: %w", err)
+	}
+	return &m, nil
+}
+
+// List returns all {{.Table}} with optional pagination.
+func (r *{{.Struct}}Repository) List(ctx context.Context, limit, offset int) ([]{{.Struct}}, error) {
+	var items []{{.Struct}}
+	q := r.db.WithContext(ctx).Limit(limit).Offset(offset).Order("created_at DESC")
+	{{- if .Tenant }}
+	q = q.Where("company_id = ?", ctx.Value("company_id"))
+	{{- end }}
+	if err := q.Find(&items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// Update modifies an existing {{.Struct}}.
+func (r *{{.Struct}}Repository) Update(ctx context.Context, m *{{.Struct}}) error {
+	return r.db.WithContext(ctx).Save(m).Error
+}
+
+// Delete soft-deletes a {{.Struct}}.
+func (r *{{.Struct}}Repository) Delete(ctx context.Context, publicID string) error {
+	q := r.db.WithContext(ctx).Where("public_id = ?", publicID)
+	{{- if .Tenant }}
+	q = q.Where("company_id = ?", ctx.Value("company_id"))
+	{{- end }}
+	return q.Delete(&{{.Struct}}{}).Error
+}

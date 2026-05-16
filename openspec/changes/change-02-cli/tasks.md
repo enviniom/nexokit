@@ -41,11 +41,11 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Generators
 
-- [ ] 3.1 Create `internal/cli/generator/module.go` with name validation, directory creation, and idempotency check.
-- [ ] 3.2 Create `internal/cli/templates/module/*.tmpl` for handler, service, repository, dto, model, routes, validation.
-- [ ] 3.3 Implement `make module <name>` with flags `--crud`, `--migration`, `--tenant`.
-- [ ] 3.4 Implement `make migration <name>` command.
-- [ ] 3.5 Implement `make seed <name>` command.
+- [x] 3.1 Create `internal/cli/generator/module.go` with name validation, directory creation, and idempotency check.
+- [x] 3.2 Create `internal/cli/templates/module/*.tmpl` for handler, service, repository, dto, model, routes, validation.
+- [x] 3.3 Implement `make module <name>` with flags `--crud`, `--migration`, `--tenant`.
+- [x] 3.4 Implement `make migration <name>` command.
+- [x] 3.5 Implement `make seed <name>` command.
 
 ## Phase 4: Root & Seed
 
