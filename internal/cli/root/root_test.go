@@ -7,11 +7,12 @@ import (
 )
 
 type mockStorage struct {
-	exists         bool
-	existsErr      error
-	createErr      error
-	created        bool
-	lastEmail      string
+	exists           bool
+	existsErr        error
+	createErr        error
+	created          bool
+	lastName         string
+	lastEmail        string
 	lastPasswordHash string
 }
 
@@ -19,8 +20,9 @@ func (m *mockStorage) RootExists() (bool, error) {
 	return m.exists, m.existsErr
 }
 
-func (m *mockStorage) CreateRoot(email, passwordHash string) error {
+func (m *mockStorage) CreateRoot(name, email, passwordHash string) error {
 	m.created = true
+	m.lastName = name
 	m.lastEmail = email
 	m.lastPasswordHash = passwordHash
 	return m.createErr
@@ -38,14 +40,15 @@ func TestValidateInput(t *testing.T) {
 		input CreateRootInput
 		want  string
 	}{
-		{"empty email", CreateRootInput{Password: "Password1"}, "email is required"},
-		{"invalid email", CreateRootInput{Email: "not-an-email", Password: "Password1"}, "invalid email"},
-		{"empty password", CreateRootInput{Email: "root@example.com"}, "password is required"},
-		{"short password", CreateRootInput{Email: "root@example.com", Password: "Short1"}, "password must be at least 8 characters"},
-		{"no uppercase", CreateRootInput{Email: "root@example.com", Password: "password1"}, "password must contain uppercase, lowercase, and a digit"},
-		{"no lowercase", CreateRootInput{Email: "root@example.com", Password: "PASSWORD1"}, "password must contain uppercase, lowercase, and a digit"},
-		{"no digit", CreateRootInput{Email: "root@example.com", Password: "Password"}, "password must contain uppercase, lowercase, and a digit"},
-		{"valid", CreateRootInput{Email: "root@example.com", Password: "Password1"}, ""},
+		{"empty name", CreateRootInput{Email: "root@example.com", Password: "Password1"}, "name is required"},
+		{"empty email", CreateRootInput{Name: "Root", Password: "Password1"}, "email is required"},
+		{"invalid email", CreateRootInput{Name: "Root", Email: "not-an-email", Password: "Password1"}, "invalid email"},
+		{"empty password", CreateRootInput{Name: "Root", Email: "root@example.com"}, "password is required"},
+		{"short password", CreateRootInput{Name: "Root", Email: "root@example.com", Password: "Short1"}, "password must be at least 8 characters"},
+		{"no uppercase", CreateRootInput{Name: "Root", Email: "root@example.com", Password: "password1"}, "password must contain uppercase, lowercase, and a digit"},
+		{"no lowercase", CreateRootInput{Name: "Root", Email: "root@example.com", Password: "PASSWORD1"}, "password must contain uppercase, lowercase, and a digit"},
+		{"no digit", CreateRootInput{Name: "Root", Email: "root@example.com", Password: "Password"}, "password must contain uppercase, lowercase, and a digit"},
+		{"valid", CreateRootInput{Name: "Root", Email: "root@example.com", Password: "Password1"}, ""},
 	}
 
 	for _, tt := range tests {
@@ -70,7 +73,7 @@ func TestValidateInput(t *testing.T) {
 
 func TestCreator_StorageNotWired(t *testing.T) {
 	c := NewCreator(nil, nil)
-	err := c.Create(CreateRootInput{Email: "root@example.com", Password: "Password1"})
+	err := c.Create(CreateRootInput{Name: "Root", Email: "root@example.com", Password: "Password1"})
 	if !errors.Is(err, ErrStorageNotWired) {
 		t.Errorf("expected ErrStorageNotWired, got %v", err)
 	}
@@ -79,7 +82,7 @@ func TestCreator_StorageNotWired(t *testing.T) {
 func TestCreator_StorageWithoutHasher(t *testing.T) {
 	storage := &mockStorage{}
 	c := NewCreator(storage, nil)
-	err := c.Create(CreateRootInput{Email: "root@example.com", Password: "Password1"})
+	err := c.Create(CreateRootInput{Name: "Root", Email: "root@example.com", Password: "Password1"})
 	if !errors.Is(err, ErrStorageNotWired) {
 		t.Errorf("expected ErrStorageNotWired, got %v", err)
 	}
@@ -91,7 +94,7 @@ func TestCreator_StorageWithoutHasher(t *testing.T) {
 func TestCreator_Idempotent(t *testing.T) {
 	storage := &mockStorage{exists: true}
 	c := NewCreator(storage, &mockHasher{})
-	err := c.Create(CreateRootInput{Email: "root@example.com", Password: "Password1"})
+	err := c.Create(CreateRootInput{Name: "Root", Email: "root@example.com", Password: "Password1"})
 	if !errors.Is(err, ErrRootAlreadyExists) {
 		t.Errorf("expected ErrRootAlreadyExists, got %v", err)
 	}
@@ -100,12 +103,15 @@ func TestCreator_Idempotent(t *testing.T) {
 func TestCreator_CreateSuccess(t *testing.T) {
 	storage := &mockStorage{}
 	c := NewCreator(storage, &mockHasher{})
-	err := c.Create(CreateRootInput{Email: "root@example.com", Password: "Password1"})
+	err := c.Create(CreateRootInput{Name: "Root User", Email: "root@example.com", Password: "Password1"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !storage.created {
 		t.Error("expected storage.CreateRoot to be called")
+	}
+	if storage.lastName != "Root User" {
+		t.Errorf("expected name 'Root User', got %q", storage.lastName)
 	}
 	if storage.lastPasswordHash == "Password1" {
 		t.Error("expected hashed password, got raw password")
@@ -118,7 +124,7 @@ func TestCreator_CreateSuccess(t *testing.T) {
 func TestCreator_CreateStorageError(t *testing.T) {
 	storage := &mockStorage{createErr: errors.New("db down")}
 	c := NewCreator(storage, &mockHasher{})
-	err := c.Create(CreateRootInput{Email: "root@example.com", Password: "Password1"})
+	err := c.Create(CreateRootInput{Name: "Root", Email: "root@example.com", Password: "Password1"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -127,7 +133,7 @@ func TestCreator_CreateStorageError(t *testing.T) {
 func TestCreator_ExistsCheckError(t *testing.T) {
 	storage := &mockStorage{existsErr: errors.New("timeout")}
 	c := NewCreator(storage, &mockHasher{})
-	err := c.Create(CreateRootInput{Email: "root@example.com", Password: "Password1"})
+	err := c.Create(CreateRootInput{Name: "Root", Email: "root@example.com", Password: "Password1"})
 	if err == nil {
 		t.Fatal("expected error")
 	}

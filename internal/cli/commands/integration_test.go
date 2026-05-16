@@ -3,12 +3,17 @@ package commands
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/config"
 	"github.com/enviniom/nexokit/internal/infra/db"
+	"github.com/enviniom/nexokit/internal/modules/roles"
+	"github.com/enviniom/nexokit/internal/modules/users"
+	"gorm.io/gorm"
 )
 
 func dbURLAvailable() bool {
@@ -49,23 +54,61 @@ func TestMigrateCommand_CreateAndValidate(t *testing.T) {
 	}
 }
 
-func TestCreateRootCommand_StorageSafety(t *testing.T) {
-	// This test verifies that create-root fails safely when storage is not wired,
-	// even when database is available.
+func TestCreateRootCommand_IdempotentRealDB(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	if !dbURLAvailable() {
 		t.Skip("skipping: no database environment configured")
 	}
 
-	var out bytes.Buffer
-	stdio := cli.Stdio{Out: &out}
-	cmd := &CreateRootCommand{}
-
-	err := cmd.Run(context.Background(), []string{"--email", "root@test.com", "--password", "Password1"}, stdio)
-	if err == nil {
-		t.Fatal("expected error because storage is not wired")
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
 	}
-	if !bytes.Contains([]byte(err.Error()), []byte("not yet wired")) {
-		t.Errorf("expected 'not yet wired' error, got %v", err)
+
+	database, err := db.Connect(cfg)
+	if err != nil {
+		t.Fatalf("failed to connect to database: %v", err)
+	}
+	defer db.Close(database)
+
+	// Ensure schema exists
+	if err := database.AutoMigrate(&roles.Role{}, &users.User{}); err != nil {
+		t.Fatalf("failed to auto-migrate: %v", err)
+	}
+
+	// Seed root role if missing
+	var rootRole roles.Role
+	if err := database.Where("name = ?", "root").First(&rootRole).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			rootRole = roles.Role{Name: "root", Slug: "root", IsSystem: true}
+			if createErr := database.Create(&rootRole).Error; createErr != nil {
+				t.Fatalf("failed to seed root role: %v", createErr)
+			}
+		} else {
+			t.Fatalf("failed to query root role: %v", err)
+		}
+	}
+
+	cmd := &CreateRootCommand{}
+	var out bytes.Buffer
+	stdio := cli.Stdio{In: strings.NewReader(""), Out: &out}
+
+	// First run should create root
+	err = cmd.Run(context.Background(), []string{"--name", "Root", "--email", "root@test.com", "--password", "Password1"}, stdio)
+	if err != nil {
+		t.Fatalf("first run failed: %v", err)
+	}
+
+	// Second run should be idempotent
+	out.Reset()
+	err = cmd.Run(context.Background(), []string{"--name", "Root", "--email", "root@test.com", "--password", "Password1"}, stdio)
+	if err != nil {
+		t.Fatalf("second run failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "already exists") {
+		t.Errorf("expected idempotency message, got %q", out.String())
 	}
 }
 

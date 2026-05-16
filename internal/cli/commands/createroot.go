@@ -6,15 +6,20 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/cli/root"
 	"github.com/enviniom/nexokit/internal/config"
+	"github.com/enviniom/nexokit/internal/infra/db"
 )
 
 // CreateRootCommand creates the root user.
-type CreateRootCommand struct{}
+type CreateRootCommand struct {
+	Storage root.RootStorage
+	Hasher  root.PasswordHasher
+}
 
 func (c *CreateRootCommand) Name() string        { return "create-root" }
 func (c *CreateRootCommand) Description() string { return "Create the root user (idempotent)" }
@@ -23,6 +28,7 @@ func (c *CreateRootCommand) Run(ctx context.Context, args []string, stdio cli.St
 	fs := flag.NewFlagSet("create-root", flag.ContinueOnError)
 	fs.SetOutput(stdio.Err)
 
+	name := fs.String("name", "", "Root user name")
 	email := fs.String("email", "", "Root user email")
 	password := fs.String("password", "", "Root user password")
 	force := fs.Bool("force", false, "Skip confirmation prompt in non-local environments")
@@ -33,7 +39,24 @@ func (c *CreateRootCommand) Run(ctx context.Context, args []string, stdio cli.St
 
 	scanner := bufio.NewScanner(stdio.In)
 
+	// Apply environment variable defaults
+	if *name == "" {
+		*name = os.Getenv("ROOT_USER_NAME")
+	}
+	if *email == "" {
+		*email = os.Getenv("ROOT_USER_EMAIL")
+	}
+	if *password == "" {
+		*password = os.Getenv("ROOT_USER_PASSWORD")
+	}
+
 	var err error
+	if *name == "" {
+		*name, err = prompt(stdio, scanner, "Name: ")
+		if err != nil {
+			return fmt.Errorf("failed to read name: %w", err)
+		}
+	}
 	if *email == "" {
 		*email, err = prompt(stdio, scanner, "Email: ")
 		if err != nil {
@@ -48,12 +71,14 @@ func (c *CreateRootCommand) Run(ctx context.Context, args []string, stdio cli.St
 	}
 
 	input := root.CreateRootInput{
+		Name:     strings.TrimSpace(*name),
 		Email:    strings.TrimSpace(*email),
 		Password: *password,
 	}
 
 	requireConfirm := true
-	if cfg, cfgErr := config.Load(); cfgErr == nil {
+	cfg, cfgErr := config.Load()
+	if cfgErr == nil {
 		if cfg.IsLocal() || cfg.IsTest() {
 			requireConfirm = false
 		}
@@ -61,6 +86,7 @@ func (c *CreateRootCommand) Run(ctx context.Context, args []string, stdio cli.St
 
 	if requireConfirm && !*force {
 		stdio.Println("You are about to create a root user in a non-local environment.")
+		stdio.Printf("Name: %s\n", input.Name)
 		stdio.Printf("Email: %s\n", input.Email)
 		confirm, err := prompt(stdio, scanner, "Type 'yes' to confirm: ")
 		if err != nil {
@@ -71,7 +97,21 @@ func (c *CreateRootCommand) Run(ctx context.Context, args []string, stdio cli.St
 		}
 	}
 
-	creator := root.NewCreator(nil, nil)
+	storage := c.Storage
+	hasher := c.Hasher
+	if storage == nil || hasher == nil {
+		if cfgErr != nil {
+			return fmt.Errorf("failed to load config: %w", cfgErr)
+		}
+		database, err := db.Connect(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to connect to database: %w", err)
+		}
+		storage = newRootStorage(database)
+		hasher = &passwordHasherAdapter{}
+	}
+
+	creator := root.NewCreator(storage, hasher)
 	if err := creator.Create(input); err != nil {
 		if errors.Is(err, root.ErrRootAlreadyExists) {
 			stdio.Println("Root user already exists. Skipping.")

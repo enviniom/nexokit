@@ -10,25 +10,22 @@ import (
 // ErrRootAlreadyExists is returned when a root user already exists.
 var ErrRootAlreadyExists = errors.New("root user already exists")
 
-// ErrStorageNotWired is returned when the auth/user storage layer is not yet implemented.
-var ErrStorageNotWired = errors.New("auth storage not yet wired: root creation requires the auth schema and password hasher change")
+// ErrStorageNotWired is returned when the root creator has no storage or hasher.
+var ErrStorageNotWired = errors.New("root storage or password hasher not wired")
 
 // CreateRootInput holds validated root creation parameters.
 type CreateRootInput struct {
+	Name     string
 	Email    string
 	Password string
 }
 
 // RootStorage defines the storage boundary for root creation.
-// The concrete implementation will be provided by the auth schema change.
-// TODO(auth): wire this boundary once users, roles, and password hashing exist.
-// The implementation must hash the password before calling CreateRoot and keep
-// create-root idempotent by checking for an existing root user first.
 type RootStorage interface {
 	// RootExists returns true if any root user already exists.
 	RootExists() (bool, error)
 	// CreateRoot persists a new root user within a transaction.
-	CreateRoot(email, passwordHash string) error
+	CreateRoot(name, email, passwordHash string) error
 }
 
 // PasswordHasher defines the boundary for password hashing.
@@ -75,15 +72,18 @@ func (c *Creator) Create(input CreateRootInput) error {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	if err := c.Storage.CreateRoot(input.Email, hash); err != nil {
+	if err := c.Storage.CreateRoot(input.Name, input.Email, hash); err != nil {
 		return fmt.Errorf("failed to create root user: %w", err)
 	}
 
 	return nil
 }
 
-// ValidateInput checks email and password requirements.
+// ValidateInput checks name, email and password requirements.
 func ValidateInput(input CreateRootInput) error {
+	if input.Name == "" {
+		return errors.New("name is required")
+	}
 	if input.Email == "" {
 		return errors.New("email is required")
 	}

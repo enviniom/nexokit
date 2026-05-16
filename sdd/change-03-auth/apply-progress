@@ -1,0 +1,140 @@
+# Apply Progress: change-03-auth
+
+## PR1 / Slice 1 Correction Only (Roles Module)
+
+### Completed Tasks (cumulative)
+
+- [x] 1.1 Add `AuthConfig` to `internal/config/config.go` and `.env.example`
+- [x] 1.2 RED: Write failing tests for `password.Hash` and `password.Verify`
+- [x] 1.3 GREEN: Implement `internal/platform/password/password.go` with argon2id
+- [x] 1.4 RED: Write failing tests for `token.IssueAccess` and `token.ParseAccess`
+- [x] 1.5 GREEN: Implement `internal/platform/token/token.go` with PASETO v4.local and claims
+- [x] 1.6 Implement `token.GenerateRefresh` and `token.HashRefresh` (opaque SHA-256)
+- [x] 1.7 Implement `internal/platform/identity/identity.go` ULID/public ID generator
+- [x] 1.8 Create `migrations/20260516000000_auth.sql` for `roles`, `users`, `refresh_tokens`
+- [x] 1.9 Create `seeds/roles.go` to idempotently seed `root`, `admin`, `user` as system roles
+- [x] 1.10 Create `internal/modules/roles/{model,dto,repository,service,handler,routes}.go`
+- [x] 1.11 PR1 Correction: roles CRUD (create, update, delete), paginated list, unique name, system-role protection, BaseModel inheritance, slug/description fields, migration and seed alignment, CLI template pagination update
+
+### TDD Cycle Evidence
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 1.11 CRUD | `internal/modules/roles/service_test.go` | Unit | ✅ 8/8 | ✅ Written | ✅ Passed | ✅ 7 cases | ✅ Clean |
+| 1.11 CRUD | `internal/modules/roles/handler_test.go` | Handler/Unit | ✅ 8/8 | ✅ Written | ✅ Passed | ✅ 6 cases | ✅ Clean |
+| 1.11 Seeds | `seeds/roles_test.go` | Integration | ✅ 2/2 | ✅ Written | ✅ Passed | ✅ 2 cases | ✅ Clean |
+| 1.11 Templates | `tests/cli/golden_test.go` | Generator | ✅ 1/1 | N/A (structure) | ✅ Passed | ➖ Single | ✅ Clean |
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `internal/modules/roles/model.go` | Modified | Switched to `shared.BaseModel`; added `slug`, `description` |
+| `internal/modules/roles/dto.go` | Modified | Added `slug`, `description`, `created_by`, `updated_by`; added request DTOs |
+| `internal/modules/roles/repository.go` | Modified | Added `Create`, `Update`, `Delete`, `Count`, `GetByName`; `List` now paginated |
+| `internal/modules/roles/service.go` | Modified | Added `Create`, `Update`, `Delete`; unique name enforcement; system-role protection; paginated `List` |
+| `internal/modules/roles/handler.go` | Modified | Added `Create`, `Update`, `Delete`; `List` now uses `page`/`per_page` and `response.Paginated` |
+| `internal/modules/roles/routes.go` | Modified | Added `POST`, `PUT`, `DELETE` endpoints |
+| `internal/modules/roles/service_test.go` | Modified | Full CRUD + pagination + unique + system-role tests |
+| `internal/modules/roles/handler_test.go` | Modified | Full CRUD + pagination + system-role tests |
+| `migrations/20260516000000_auth.sql` | Modified | Added `slug`, `description`, `created_by`, `updated_by` to `roles` table |
+| `seeds/roles.go` | Modified | Added `slug`, `description` to seed struct and data |
+| `seeds/roles_test.go` | Modified | Assert `slug` and `description` presence |
+| `internal/cli/templates/module/handler.tmpl` | Modified | `List` now uses `page`/`per_page` and `response.Paginated` |
+| `internal/cli/templates/module/service.tmpl` | Modified | `List` returns `(items, total, error)`; calls `repo.Count` |
+| `internal/cli/templates/module/repository.tmpl` | Modified | `List` accepts `page, perPage`; added `Count` method |
+| `tests/cli/testdata/golden/goldenmod/handler.go` | Modified | Aligned golden with template changes |
+| `tests/cli/testdata/golden/goldenmod/service.go` | Modified | Aligned golden with template changes |
+| `tests/cli/testdata/golden/goldenmod/repository.go` | Modified | Aligned golden with template changes |
+
+### Deviations from Design
+- The original design.md described roles as read-only (`List`/`Get` only). This correction implements full CRUD as required by user review, while keeping system-role protection.
+- The `users` and `auth` modules, middleware, and CLI root are intentionally NOT implemented per PR1 boundary.
+
+### Issues Found
+- None.
+
+### Remaining Tasks
+- [ ] 2.1 Users module CRUD
+- [ ] 2.2 PATCH /users/:id/password
+- [ ] 2.3 PATCH /users/:id/status
+- [ ] 2.4 Wire create-root to real storage/hasher
+- [ ] 2.5 create-root env vars
+- [ ] 3.1 Auth module endpoints
+- [ ] 3.2–3.7 Auth service, middleware, container wiring
+- [ ] 4.3 Middleware tests
+- [ ] 4.4 Integration tests (migration, seed, root)
+- [ ] 4.5 Verify no password leak
+- [ ] 5.1 Cleanup TODOs
+- [ ] 5.2 Update .env.example docs
+
+### Workload / PR Boundary
+- Mode: chained PR slice
+- Current work unit: PR 1 / slice 1 correction only (roles module)
+- Boundary: roles module complete with CRUD, pagination, unique constraints, system-role protection, BaseModel fields, slug/description, seed/migration alignment, CLI template pagination
+- Estimated review budget impact: ~350 lines changed in PR1 (within 400-line budget)
+
+### Status
+11/11 PR1 tasks complete. Ready for user review before commit. Next batch: PR 2 (users + CLI root).
+
+## PR2 / Slice 2 (Users + CLI Root)
+
+### Completed Tasks (cumulative)
+
+- [x] PR1 cleanup: `seeds/roles.go` now uses `internal/modules/roles.Role` instead of a duplicate local struct.
+- [x] 2.1 Create `internal/modules/users/{model,dto,repository,service,handler,routes}.go` with CRUD.
+- [x] 2.2 Implement `PATCH /users/:id/password` requiring current password and argon2id rehash.
+- [x] 2.3 Implement `PATCH /users/:id/status` active/inactive toggle.
+- [x] 2.4 Wire `internal/cli/commands/createroot.go` to real `RootStorage` and `PasswordHasher`.
+- [x] 2.5 Update `create-root` to read `ROOT_USER_NAME`, `ROOT_USER_EMAIL`, `ROOT_USER_PASSWORD`.
+- [x] PR2 stabilization: users create/update now propagate repository errors during email uniqueness checks.
+
+### TDD Cycle Evidence
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| 2.1 Users CRUD | `internal/modules/users/service_test.go`, `handler_test.go` | Unit/Handler | ✅ Passing | ✅ Written | ✅ Passed | ✅ list/get/create/update/delete cases | ✅ Clean |
+| 2.2 Password change | `internal/modules/users/service_test.go`, `handler_test.go` | Unit/Handler | ✅ Passing | ✅ Written | ✅ Passed | ✅ success/wrong current/missing user | ✅ Clean |
+| 2.3 Status toggle | `internal/modules/users/service_test.go`, `handler_test.go` | Unit/Handler | ✅ Passing | ✅ Written | ✅ Passed | ✅ active/inactive/not found | ✅ Clean |
+| 2.4 CLI root wiring | `internal/cli/commands/*test.go`, `internal/cli/root/root_test.go` | Unit/Integration | ✅ Passing | ✅ Written | ✅ Passed | ✅ env/idempotency/storage wiring | ✅ Clean |
+| 2.5 Root env vars | `internal/cli/commands/createroot_test.go` | Unit | ✅ Passing | ✅ Written | ✅ Passed | ✅ flags/env/prompt flow | ✅ Clean |
+| PR2 stabilization | `internal/modules/users/service_test.go` | Unit | ✅ Passing | ✅ Written | ✅ Passed | ✅ create/update repo-error cases | ✅ Clean |
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `seeds/roles.go` | Modified | Uses `roles.Role` model directly for seed records. |
+| `.env.example` | Modified | Added `ROOT_USER_NAME`, `ROOT_USER_EMAIL`, `ROOT_USER_PASSWORD`. |
+| `internal/modules/users/*` | Created | Users model, DTOs, repository, service, handler, routes, and tests. |
+| `internal/cli/commands/createroot.go` | Modified | Reads root env vars and wires real storage/hasher when not injected. |
+| `internal/cli/commands/root_storage.go` | Created | GORM-backed `RootStorage` and argon2id password hasher adapter. |
+| `internal/cli/root/root.go` | Modified | Removed stale TODO/wiring message now that real wiring exists. |
+| `openspec/changes/change-03-auth/tasks.md` | Modified | Marked PR2 tasks complete and updated partial testing status. |
+
+### Verification
+
+- `go test ./internal/modules/users` ✅
+- `go test ./...` ✅
+
+### Remaining Tasks
+
+- [ ] 3.1 Create `internal/modules/auth/{service,handler,routes}.go` for login, refresh, logout, me
+- [ ] 3.2 Implement login: verify password, issue PASETO access + opaque refresh, store hash
+- [ ] 3.3 Implement refresh: validate refresh hash, rotate pair, revoke old hash
+- [ ] 3.4 Implement logout: revoke provided refresh token
+- [ ] 3.5 Implement `GET /auth/me` returning authenticated user without password/hash
+- [ ] 3.6 Implement `internal/middleware/auth.go`: Bearer validation, user lookup, active check, context injection
+- [ ] 3.7 Wire all modules into `internal/app/container.go` and mount protected groups in router
+- [ ] 4.3 Middleware tests
+- [ ] 4.5 Verify no password or `password_hash` leaks in any JSON response
+- [ ] 5.1 Remove TODO comments from remaining platform files and module stubs
+
+### Workload / PR Boundary
+
+- Mode: chained PR slice
+- Current work unit: PR 2 / slice 2 (users + CLI root)
+- Boundary: starts after PR1 platform/schema/roles and ends with users CRUD plus root CLI wired to real storage and hasher.
+
+### Status
+PR2 tasks complete in working tree. Full Go test suite passes. Fresh review required before commit.
