@@ -11,5 +11,7 @@ func All() []cli.Command {
 		&StatusCommand{},
 		&MigrateCommand{},
 		&MakeCommand{},
+		&CreateRootCommand{},
+		&SeedCommand{},
 	}
 }

@@ -123,6 +123,8 @@ updated_at
 
 NexoKit debe permitir crear un usuario root inicial de forma segura.
 
+Este change debe resolver el TODO dejado por el CLI interno en `internal/cli/root/root.go`: cablear `RootStorage` y `PasswordHasher` reales para que `go run ./cmd/nexokit create-root` deje de retornar `ErrStorageNotWired` y pueda crear el usuario root de forma idempotente.
+
 Opciones recomendadas:
 
 ### Opción A: seed por variables de entorno
@@ -277,3 +279,4 @@ Este change se considera completo cuando:
 12. Un usuario inactivo no puede iniciar sesión.
 13. Todas las respuestas usan el DTO estándar.
 14. Las contraseñas nunca se devuelven en respuestas.
+15. El comando `go run ./cmd/nexokit create-root` usa el storage real de usuarios/roles y el hasher argon2id, no deja pendiente el TODO de `internal/cli/root/root.go`.

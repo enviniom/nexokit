@@ -49,13 +49,13 @@ Chain strategy: stacked-to-main
 
 ## Phase 4: Root & Seed
 
-- [ ] 4.1 Create `internal/cli/root/` package with safe root creation boundary and idempotency check.
-- [ ] 4.2 Implement `create-root` command with email/password flags or prompt, validation, and transaction wrapper.
-- [ ] 4.3 Implement `seed` command dispatcher for running seed files.
+- [x] 4.1 Create `internal/cli/root/` package with safe root creation boundary and idempotency check.
+- [x] 4.2 Implement `create-root` command with email/password flags or prompt, validation, and safe boundary returning `ErrStorageNotWired` until auth schema and password hashing are wired.
+- [x] 4.3 Implement `seed` command dispatcher for running seed files.
 
 ## Phase 5: Testing & Docs
 
-- [ ] 5.1 Write unit tests for dispatcher, command validation, and module name normalization.
-- [ ] 5.2 Write golden file tests for `make module` with `--crud`, `--migration`, `--tenant` in `tests/fixtures/cli/golden/`.
-- [ ] 5.3 Write integration tests for migrate commands and root safety (skip if no DB env).
-- [ ] 5.4 Create `docs/cli.md` documenting commands, flags, and out-of-scope items.
+- [x] 5.1 Write unit tests for dispatcher, command validation, and module name normalization.
+- [x] 5.2 Write golden file tests for `make module` with `--crud`, `--migration`, `--tenant` in `tests/fixtures/cli/golden/`.
+- [x] 5.3 Write integration tests for migrate commands and root safety (skip if no DB env).
+- [x] 5.4 Create `docs/cli.md` documenting commands, flags, and out-of-scope items.

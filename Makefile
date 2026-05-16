@@ -54,12 +54,10 @@ migrate-reset:
 	go run ./cmd/nexokit migrate reset
 
 seed:
-	@echo "seed command not yet implemented (scheduled in Phase 4)"
-	@exit 1
+	go run ./cmd/nexokit seed
 
 create-root:
-	@echo "create-root command not yet implemented (scheduled in Phase 4)"
-	@exit 1
+	go run ./cmd/nexokit create-root
 
 lint: vet
 

@@ -16,6 +16,7 @@ cmd/nexokit/nexokit
 # Build output
 /bin/
 /dist/
+.tmp/
 
 # Environment
 .env
