@@ -39,7 +39,7 @@ Makefile ──→ go run ./cmd/nexokit <command>
 | `internal/cli/root/*.go` | Create | Root-user creation command/service boundary; adapters can evolve when auth schema lands. |
 | `Makefile` | Modify | Add `dev`, `build`, `test-unit`, `test-integration`, `test-coverage`, CLI-backed migration, seed, root, lint targets. |
 | `docs/cli.md` or README section | Create/Modify | Document internal CLI commands and non-goals. |
-| `tests/fixtures/cli/golden/` | Create | Golden expected files for generator tests. |
+| `tests/cli/testdata/golden/` | Create | Golden expected files for generator tests. |
 
 ## Interfaces / Contracts
 
@@ -62,7 +62,7 @@ Generated modules use flat files: `handler.go`, `service.go`, `repository.go`, `
 | Layer | What to Test | Approach |
 |---|---|---|
 | Unit | Dispatcher, command validation, module name normalization | Table-driven Go tests. |
-| Golden | Generated module with `--crud`, `--migration`, `--tenant` | Compare against `tests/fixtures/cli/golden`; update intentionally only. |
+| Golden | Generated module with `--crud`, `--migration`, `--tenant` | Compare against `tests/cli/testdata/golden`; update intentionally only. |
 | Integration | Migration commands and root safety | DB-backed tests when integration env is available; otherwise skip with clear reason. |
 
 ## Non-Goals
