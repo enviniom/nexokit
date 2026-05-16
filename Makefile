@@ -1,26 +1,67 @@
-.PHONY: build run test migrate-up migrate-down migrate-create migrate-status fmt vet install-hooks uninstall-hooks check-env
+.PHONY: dev build test migrate-up migrate-down migrate-create migrate-status migrate-reset seed create-root lint fmt vet install-hooks uninstall-hooks check-env
+
+# Load .env if present for Makefile variable expansion.
+# Export only the variables the app/CLI reads, avoiding accidental env bleed.
+-include .env
+
+export APP_NAME APP_ENV APP_URL APP_PORT
+export DATABASE_URL DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD DB_SSL_MODE DB_MAX_OPEN_CONNS DB_MAX_IDLE_CONNS DB_CONN_MAX_LIFETIME_SECONDS
+export CORS_ALLOWED_ORIGINS
+export LOG_LEVEL LOG_FORMAT LOG_FILE LOG_MAX_SIZE LOG_MAX_BACKUPS LOG_MAX_AGE LOG_COMPRESS LOG_GIN_FILE LOG_ERROR_FILE
+export SHUTDOWN_TIMEOUT_SECONDS
+export CACHE_DRIVER
+
+dev:
+	go run ./cmd/nexokit serve
 
 build:
 	go build -o bin/api ./cmd/api
-
-run:
-	go run ./cmd/api
+	go build -o bin/nexokit ./cmd/nexokit
 
 test:
 	go test ./...
 
 migrate-up:
-	goose -dir migrations postgres "$(DATABASE_URL)" up
+	@if [ -z "$(DATABASE_URL)" ] && [ -z "$(DB_HOST)" ]; then \
+		echo "error: database configuration missing. Set DATABASE_URL or DB_* variables."; \
+		exit 1; \
+	fi
+	go run ./cmd/nexokit migrate up
 
 migrate-down:
-	goose -dir migrations postgres "$(DATABASE_URL)" down
+	@if [ -z "$(DATABASE_URL)" ] && [ -z "$(DB_HOST)" ]; then \
+		echo "error: database configuration missing. Set DATABASE_URL or DB_* variables."; \
+		exit 1; \
+	fi
+	go run ./cmd/nexokit migrate down
 
 migrate-create:
 	@read -p "Migration name: " name; \
-	goose -dir migrations create $$name sql
+	go run ./cmd/nexokit migrate create $$name
 
 migrate-status:
-	goose -dir migrations postgres "$(DATABASE_URL)" status
+	@if [ -z "$(DATABASE_URL)" ] && [ -z "$(DB_HOST)" ]; then \
+		echo "error: database configuration missing. Set DATABASE_URL or DB_* variables."; \
+		exit 1; \
+	fi
+	go run ./cmd/nexokit migrate status
+
+migrate-reset:
+	@if [ -z "$(DATABASE_URL)" ] && [ -z "$(DB_HOST)" ]; then \
+		echo "error: database configuration missing. Set DATABASE_URL or DB_* variables."; \
+		exit 1; \
+	fi
+	go run ./cmd/nexokit migrate reset
+
+seed:
+	@echo "seed command not yet implemented (scheduled in Phase 4)"
+	@exit 1
+
+create-root:
+	@echo "create-root command not yet implemented (scheduled in Phase 4)"
+	@exit 1
+
+lint: vet
 
 fmt:
 	go fmt ./...

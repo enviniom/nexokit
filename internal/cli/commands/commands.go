@@ -1,3 +1,14 @@
+// Package commands implements the nexokit CLI subcommands.
 package commands
 
-// TODO: implement in change-02-cli
+import "github.com/enviniom/nexokit/internal/cli"
+
+// All returns all available CLI commands.
+func All() []cli.Command {
+	return []cli.Command{
+		&ServeCommand{},
+		&ConfigCommand{},
+		&StatusCommand{},
+		&MigrateCommand{},
+	}
+}
