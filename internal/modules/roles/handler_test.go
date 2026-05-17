@@ -224,6 +224,38 @@ func TestHandler_Create(t *testing.T) {
 			t.Fatalf("expected status 409, got %d", w.Code)
 		}
 	})
+
+	t.Run("returns validation error on invalid fields", func(t *testing.T) {
+		svc := &fakeService{created: &RoleResponse{PublicID: "role3", Name: "editor", Slug: "editor"}}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = jsonRequest(http.MethodPost, "/roles", CreateRoleRequest{Name: "", Slug: ""})
+		h.Create(c)
+
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status 422, got %d", w.Code)
+		}
+
+		var resp response.APIResponse[any]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if resp.Success {
+			t.Error("expected error response")
+		}
+		errsMap, ok := resp.Errors.(map[string]any)
+		if !ok {
+			t.Fatal("expected errors to be a map")
+		}
+		if _, ok := errsMap["name"]; !ok {
+			t.Error("expected validation error for name")
+		}
+		if _, ok := errsMap["slug"]; !ok {
+			t.Error("expected validation error for slug")
+		}
+	})
 }
 
 func TestHandler_Update(t *testing.T) {
@@ -264,6 +296,39 @@ func TestHandler_Update(t *testing.T) {
 
 		if w.Code != http.StatusForbidden {
 			t.Fatalf("expected status 403, got %d", w.Code)
+		}
+	})
+
+	t.Run("returns validation error on invalid fields", func(t *testing.T) {
+		svc := &fakeService{updated: &RoleResponse{PublicID: "role1", Name: "editor", Slug: "editor"}}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "role1"}}
+		c.Request = jsonRequest(http.MethodPut, "/roles/role1", UpdateRoleRequest{Name: "", Slug: ""})
+		h.Update(c)
+
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status 422, got %d", w.Code)
+		}
+
+		var resp response.APIResponse[any]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if resp.Success {
+			t.Error("expected error response")
+		}
+		errsMap, ok := resp.Errors.(map[string]any)
+		if !ok {
+			t.Fatal("expected errors to be a map")
+		}
+		if _, ok := errsMap["name"]; !ok {
+			t.Error("expected validation error for name")
+		}
+		if _, ok := errsMap["slug"]; !ok {
+			t.Error("expected validation error for slug")
 		}
 	})
 }

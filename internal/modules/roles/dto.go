@@ -1,6 +1,11 @@
 package roles
 
-import "time"
+import (
+	"time"
+
+	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/validator"
+)
 
 // RoleResponse is the DTO for role read operations.
 type RoleResponse struct {
@@ -17,14 +22,30 @@ type RoleResponse struct {
 
 // CreateRoleRequest is the DTO for creating a role.
 type CreateRoleRequest struct {
-	Name        string `json:"name" binding:"required"`
-	Slug        string `json:"slug" binding:"required"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
 	Description string `json:"description"`
+}
+
+// Validate performs field-level validation for CreateRoleRequest.
+func (r CreateRoleRequest) Validate() response.ValidationErrors {
+	errs := make(response.ValidationErrors)
+	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
+	validator.Field(errs, "slug", r.Slug).Required()
+	return errs
 }
 
 // UpdateRoleRequest is the DTO for updating a role.
 type UpdateRoleRequest struct {
-	Name        string `json:"name" binding:"required"`
-	Slug        string `json:"slug" binding:"required"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
 	Description string `json:"description"`
+}
+
+// Validate performs field-level validation for UpdateRoleRequest.
+func (r UpdateRoleRequest) Validate() response.ValidationErrors {
+	errs := make(response.ValidationErrors)
+	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
+	validator.Field(errs, "slug", r.Slug).Required()
+	return errs
 }

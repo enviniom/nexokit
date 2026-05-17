@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
 )
@@ -22,7 +23,11 @@ func NewGoldenmodHandler(service *GoldenmodService) *GoldenmodHandler {
 func (h *GoldenmodHandler) Create(c *gin.Context) {
 	var req CreateGoldenmodRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
+	}
+	if errs := req.Validate(); errs.HasErrors() {
+		response.ValidationError(c, errs)
 		return
 	}
 	m, err := h.service.Create(c.Request.Context(), req)
@@ -67,7 +72,11 @@ func (h *GoldenmodHandler) Update(c *gin.Context) {
 	publicID := c.Param("id")
 	var req UpdateGoldenmodRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
+	}
+	if errs := req.Validate(); errs.HasErrors() {
+		response.ValidationError(c, errs)
 		return
 	}
 	m, err := h.service.Update(c.Request.Context(), publicID, req)

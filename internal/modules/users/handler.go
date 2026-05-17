@@ -58,7 +58,11 @@ func (h *Handler) GetByPublicID(c *gin.Context) {
 func (h *Handler) Create(c *gin.Context) {
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
+	}
+	if errs := req.Validate(); errs.HasErrors() {
+		response.ValidationError(c, errs)
 		return
 	}
 	user, err := h.service.Create(req)
@@ -79,10 +83,15 @@ func (h *Handler) Update(c *gin.Context) {
 	publicID := c.Param("id")
 	var req UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
+		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	user, err := h.service.Update(publicID, req)
+	if errs := req.Validate(); errs.HasErrors() {
+		response.ValidationError(c, errs)
+		return
+	}
+	// TODO(PR3): pass authenticated user's public ID as actorPublicID.
+	user, err := h.service.Update(publicID, "", req)
 	if err != nil {
 		status := apperror.Status(err)
 		if status == http.StatusNotFound {
@@ -119,10 +128,15 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	publicID := c.Param("id")
 	var req ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
+		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if err := h.service.ChangePassword(publicID, req); err != nil {
+	if errs := req.Validate(); errs.HasErrors() {
+		response.ValidationError(c, errs)
+		return
+	}
+	// TODO(PR3): pass authenticated user's public ID as actorPublicID.
+	if err := h.service.ChangePassword(publicID, "", req); err != nil {
 		status := apperror.Status(err)
 		if status == http.StatusNotFound {
 			response.NotFound(c, messages.MsgNotFound)

@@ -45,6 +45,8 @@ Chain strategy: stacked-to-main
 - [x] 2.3 Implement `PATCH /users/:id/status` active/inactive toggle
 - [x] 2.4 Wire `internal/cli/commands/createroot.go` to real `RootStorage` and `PasswordHasher`
 - [x] 2.5 Update `create-root` to read `ROOT_USER_NAME`, `ROOT_USER_EMAIL`, `ROOT_USER_PASSWORD`
+- [x] 2.6 PR2 Correction: DTO `Validate()` methods using `internal/platform/validator`; handlers bind without binding tags and return `ValidationError`; roles/users DTOs and CLI templates aligned.
+- [x] 2.7 PR2 Correction: Root user business rules enforced in users service — API cannot create/modify root role users; root edits restricted to self (actorPublicID boundary wired, pending PR3 auth context); root has no company; CLI root creation preserved.
 
 ## Phase 3: Auth & Middleware
 

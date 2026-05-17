@@ -136,5 +136,77 @@
 - Current work unit: PR 2 / slice 2 (users + CLI root)
 - Boundary: starts after PR1 platform/schema/roles and ends with users CRUD plus root CLI wired to real storage and hasher.
 
+## PR2 Correction Only (Users/Roles DTO Validation + Root Business Rules)
+
+### Completed Tasks (cumulative)
+
+- [x] PR2 Correction: DTO `Validate()` methods for users (`CreateUserRequest`, `UpdateUserRequest`, `ChangePasswordRequest`, `UpdateStatusRequest`) and roles (`CreateRoleRequest`, `UpdateRoleRequest`) using `internal/platform/validator`.
+- [x] PR2 Correction: Users and roles handlers bind JSON without `binding` tags, then call `req.Validate()` and return `response.ValidationError` (422) on failure.
+- [x] PR2 Correction: CLI module templates (`dto.tmpl`, `handler.tmpl`, `validation.tmpl`) and golden files aligned to generate `Validate()` methods and handler validation flow.
+- [x] PR2 Correction: Root user business rules in `users.Service`:
+  - `Create` rejects requests with root `RoleID` (returns `ErrForbidden`).
+  - `Update` rejects promoting a non-root user to root role.
+  - `Update` root user requires `actorPublicID == user.PublicID`; empty actor is rejected (secure until PR3 auth context).
+  - `Update` root user only applies `Name` and `Email`; `RoleID` and `CompanyID` are ignored.
+  - `ChangePassword` root user requires matching `actorPublicID`.
+  - `RoleResolver` interface added to users service; `rootRoleID()` cached lookup.
+- [x] PR2 Correction: CLI `rootStorage` continues to create root user with no company; no API breakage.
+
+### TDD Cycle Evidence
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| Users DTO Validate | `internal/modules/users/dto_test.go` | Unit | N/A (new) | ✅ Written | ✅ Passed | ✅ 8 cases | ✅ Clean |
+| Roles DTO Validate | `internal/modules/roles/dto_test.go` | Unit | N/A (new) | ✅ Written | ✅ Passed | ✅ 5 cases | ✅ Clean |
+| Users handler validation | `internal/modules/users/handler_test.go` | Handler/Unit | ✅ Passing | ✅ Written | ✅ Passed | ✅ 3 cases | ✅ Clean |
+| Roles handler validation | `internal/modules/roles/handler_test.go` | Handler/Unit | ✅ Passing | ✅ Written | ✅ Passed | ✅ 2 cases | ✅ Clean |
+| Root create rejection | `internal/modules/users/service_test.go` | Unit | ✅ Passing | ✅ Written | ✅ Passed | ✅ root/non-root | ✅ Clean |
+| Root update rules | `internal/modules/users/service_test.go` | Unit | ✅ Passing | ✅ Written | ✅ Passed | ✅ promote/self-edit/no-actor/company-ignore | ✅ Clean |
+| Template alignment | `tests/cli/golden_test.go` | Generator | ✅ Passing | N/A (struct) | ✅ Passed | ➖ Single | ✅ Clean |
+
+### Files Changed
+
+| File | Action | What Was Done |
+|------|--------|---------------|
+| `internal/modules/users/dto.go` | Modified | Removed `binding` tags; added `Validate()` to all request DTOs using `platform/validator`. |
+| `internal/modules/users/dto_test.go` | Created | Table-driven tests for all users request DTO `Validate()` methods. |
+| `internal/modules/users/handler.go` | Modified | Handlers call `req.Validate()` and return `ValidationError`; `BadRequest` for binding errors only. |
+| `internal/modules/users/handler_test.go` | Modified | Added 422 validation-error test cases for Create, Update, ChangePassword. |
+| `internal/modules/users/service.go` | Modified | Added `RoleResolver` dependency; `rootRoleID()` cache; root business rules in Create, Update, ChangePassword. |
+| `internal/modules/users/service_test.go` | Modified | Added `fakeRoleResolver`; root rule tests; updated all signatures for `actorPublicID`. |
+| `internal/modules/roles/dto.go` | Modified | Removed `binding` tags; added `Validate()` to `CreateRoleRequest` and `UpdateRoleRequest`. |
+| `internal/modules/roles/dto_test.go` | Created | Table-driven tests for roles request DTO `Validate()` methods. |
+| `internal/modules/roles/handler.go` | Modified | Handlers call `req.Validate()` and return `ValidationError`. |
+| `internal/modules/roles/handler_test.go` | Modified | Added 422 validation-error test cases for Create, Update. |
+| `internal/cli/templates/module/dto.tmpl` | Modified | Generates `Validate()` methods with `platform/validator`; no `binding` tags. |
+| `internal/cli/templates/module/handler.tmpl` | Modified | Generated handlers call `req.Validate()` and return `ValidationError`. |
+| `internal/cli/templates/module/validation.tmpl` | Modified | Replaced go-playground validator with project convention comment. |
+| `tests/cli/testdata/golden/goldenmod/*` | Modified | Aligned golden files with template changes. |
+
+### Deviations from Design
+- `Service.Update` and `Service.ChangePassword` now accept `actorPublicID string` to enforce root self-edit rules. This parameter is intentionally passed as empty string from handlers until PR3 auth middleware provides the authenticated actor. Empty actor blocks root edits via API, which is the secure default.
+
+### Issues Found
+- Pre-existing flaky test in `internal/platform/identity`: `TestGenerate/generates_sortable_ids` occasionally fails due to ULID timestamp collision. Unrelated to this change.
+
+### Remaining Tasks
+- [ ] 3.1 Create `internal/modules/auth/{service,handler,routes}.go` for login, refresh, logout, me
+- [ ] 3.2 Implement login: verify password, issue PASETO access + opaque refresh, store hash
+- [ ] 3.3 Implement refresh: validate refresh hash, rotate pair, revoke old hash
+- [ ] 3.4 Implement logout: revoke provided refresh token
+- [ ] 3.5 Implement `GET /auth/me` returning authenticated user without password/hash
+- [ ] 3.6 Implement `internal/middleware/auth.go`: Bearer validation, user lookup, active check, context injection
+- [ ] 3.7 Wire all modules into `internal/app/container.go` and mount protected groups in router
+- [ ] 4.3 Middleware tests: valid/missing/expired token, inactive user rejection
+- [ ] 4.5 Verify no password or `password_hash` leaks in any JSON response
+- [ ] 5.1 Remove TODO comments from remaining platform files and module stubs
+- [ ] 5.2 Update `.env.example` docs for new auth variables
+
+### Workload / PR Boundary
+- Mode: chained PR slice
+- Current work unit: PR 2 correction only (users/roles DTO validation + root business rules)
+- Boundary: validation refactor and root-rule enforcement; no PR3 auth/login/middleware work
+- Estimated review budget impact: ~250 lines changed (within 400-line budget)
+
 ### Status
-PR2 tasks complete in working tree. Full Go test suite passes. Fresh review required before commit.
+PR2 correction complete. Full Go test suite passes (except pre-existing identity flaky test). Ready for verify/commit decision by orchestrator.

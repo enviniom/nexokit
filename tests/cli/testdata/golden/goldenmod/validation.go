@@ -1,13 +1,5 @@
 package goldenmod
 
-import "github.com/go-playground/validator/v10"
-
-// ValidateCreateGoldenmodRequest performs custom validation on create requests.
-func ValidateCreateGoldenmodRequest(sl validator.StructLevel) {
-	// TODO: add custom cross-field or business validation rules
-}
-
-// ValidateUpdateGoldenmodRequest performs custom validation on update requests.
-func ValidateUpdateGoldenmodRequest(sl validator.StructLevel) {
-	// TODO: add custom cross-field or business validation rules
-}
+// Validation rules are defined on request DTOs via the Validate() method.
+// Use internal/platform/validator for field-level validation.
+// Add business-rule validation in the service layer.

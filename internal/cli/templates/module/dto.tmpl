@@ -1,19 +1,49 @@
 package {{.Package}}
 
+import (
+	"github.com/enviniom/nexokit/internal/platform/messages"
+	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/validator"
+)
+
 // Create{{.Struct}}Request is the payload for creating a {{.Struct}}.
 type Create{{.Struct}}Request struct {
-	Name string `json:"name" binding:"required"`
+	Name string `json:"name"`
 	{{- if .Tenant }}
-	CompanyID uint `json:"company_id" binding:"required"`
+	CompanyID uint `json:"company_id"`
 	{{- end }}
+}
+
+// Validate performs field-level validation for Create{{.Struct}}Request.
+func (r Create{{.Struct}}Request) Validate() response.ValidationErrors {
+	errs := make(response.ValidationErrors)
+	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
+	{{- if .Tenant }}
+	if r.CompanyID == 0 {
+		errs.Add("company_id", messages.MsgRequired)
+	}
+	{{- end }}
+	return errs
 }
 
 // Update{{.Struct}}Request is the payload for updating a {{.Struct}}.
 type Update{{.Struct}}Request struct {
-	Name string `json:"name" binding:"required"`
+	Name string `json:"name"`
 	{{- if .Tenant }}
-	CompanyID uint `json:"company_id" binding:"required"`
+	CompanyID uint `json:"company_id"`
 	{{- end }}
+}
+
+// Validate performs field-level validation for Update{{.Struct}}Request.
+func (r Update{{.Struct}}Request) Validate() response.ValidationErrors {
+	errs := make(response.ValidationErrors)
+	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
+	{{- if .Tenant }}
+	if r.CompanyID == 0 {
+		errs.Add("company_id", messages.MsgRequired)
+	}
+	{{- end }}
+	return errs
 }
 
 // {{.Struct}}Response is the JSON representation returned by the API.

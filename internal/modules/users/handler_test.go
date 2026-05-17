@@ -58,7 +58,7 @@ func (f *fakeService) Create(req CreateUserRequest) (*UserResponse, error) {
 	return f.created, nil
 }
 
-func (f *fakeService) Update(publicID string, req UpdateUserRequest) (*UserResponse, error) {
+func (f *fakeService) Update(publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -73,7 +73,7 @@ func (f *fakeService) Delete(publicID string) error {
 	return f.err
 }
 
-func (f *fakeService) ChangePassword(publicID string, req ChangePasswordRequest) error {
+func (f *fakeService) ChangePassword(publicID string, actorPublicID string, req ChangePasswordRequest) error {
 	return f.changePasswordErr
 }
 
@@ -224,7 +224,7 @@ func TestHandler_Create(t *testing.T) {
 		}
 	})
 
-	t.Run("returns bad request on invalid body", func(t *testing.T) {
+	t.Run("returns validation error on incomplete body", func(t *testing.T) {
 		svc := &fakeService{}
 		_, h := setupHandler(svc)
 
@@ -233,8 +233,8 @@ func TestHandler_Create(t *testing.T) {
 		c.Request = jsonRequest(http.MethodPost, "/users", map[string]string{"email": "bad"})
 		h.Create(c)
 
-		if w.Code != http.StatusBadRequest {
-			t.Fatalf("expected status 400, got %d", w.Code)
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status 422, got %d", w.Code)
 		}
 	})
 
@@ -249,6 +249,44 @@ func TestHandler_Create(t *testing.T) {
 
 		if w.Code != http.StatusConflict {
 			t.Fatalf("expected status 409, got %d", w.Code)
+		}
+	})
+
+	t.Run("returns validation error on invalid fields", func(t *testing.T) {
+		svc := &fakeService{created: &UserResponse{PublicID: "user3", Name: "Charlie", Email: "charlie@example.com", RoleID: 2, RoleName: "user"}}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = jsonRequest(http.MethodPost, "/users", CreateUserRequest{Name: "", Email: "not-email", Password: "short", RoleID: 0})
+		h.Create(c)
+
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status 422, got %d", w.Code)
+		}
+
+		var resp response.APIResponse[any]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if resp.Success {
+			t.Error("expected error response")
+		}
+		errsMap, ok := resp.Errors.(map[string]any)
+		if !ok {
+			t.Fatal("expected errors to be a map")
+		}
+		if _, ok := errsMap["name"]; !ok {
+			t.Error("expected validation error for name")
+		}
+		if _, ok := errsMap["email"]; !ok {
+			t.Error("expected validation error for email")
+		}
+		if _, ok := errsMap["password"]; !ok {
+			t.Error("expected validation error for password")
+		}
+		if _, ok := errsMap["role_id"]; !ok {
+			t.Error("expected validation error for role_id")
 		}
 	})
 }
@@ -306,6 +344,42 @@ func TestHandler_Update(t *testing.T) {
 
 		if w.Code != http.StatusConflict {
 			t.Fatalf("expected status 409, got %d", w.Code)
+		}
+	})
+
+	t.Run("returns validation error on invalid fields", func(t *testing.T) {
+		svc := &fakeService{updated: &UserResponse{PublicID: "user1", Name: "Alice", Email: "alice@example.com", RoleID: 2, RoleName: "user"}}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "user1"}}
+		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "", Email: "bad", RoleID: 0})
+		h.Update(c)
+
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status 422, got %d", w.Code)
+		}
+
+		var resp response.APIResponse[any]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if resp.Success {
+			t.Error("expected error response")
+		}
+		errsMap, ok := resp.Errors.(map[string]any)
+		if !ok {
+			t.Fatal("expected errors to be a map")
+		}
+		if _, ok := errsMap["name"]; !ok {
+			t.Error("expected validation error for name")
+		}
+		if _, ok := errsMap["email"]; !ok {
+			t.Error("expected validation error for email")
+		}
+		if _, ok := errsMap["role_id"]; !ok {
+			t.Error("expected validation error for role_id")
 		}
 	})
 }
@@ -388,6 +462,39 @@ func TestHandler_ChangePassword(t *testing.T) {
 
 		if w.Code != http.StatusNotFound {
 			t.Fatalf("expected status 404, got %d", w.Code)
+		}
+	})
+
+	t.Run("returns validation error on invalid fields", func(t *testing.T) {
+		svc := &fakeService{}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "user1"}}
+		c.Request = jsonRequest(http.MethodPatch, "/users/user1/password", ChangePasswordRequest{CurrentPassword: "", NewPassword: "short"})
+		h.ChangePassword(c)
+
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status 422, got %d", w.Code)
+		}
+
+		var resp response.APIResponse[any]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if resp.Success {
+			t.Error("expected error response")
+		}
+		errsMap, ok := resp.Errors.(map[string]any)
+		if !ok {
+			t.Fatal("expected errors to be a map")
+		}
+		if _, ok := errsMap["current_password"]; !ok {
+			t.Error("expected validation error for current_password")
+		}
+		if _, ok := errsMap["new_password"]; !ok {
+			t.Error("expected validation error for new_password")
 		}
 	})
 }

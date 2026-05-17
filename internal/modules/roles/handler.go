@@ -58,7 +58,11 @@ func (h *Handler) GetByPublicID(c *gin.Context) {
 func (h *Handler) Create(c *gin.Context) {
 	var req CreateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
+	}
+	if errs := req.Validate(); errs.HasErrors() {
+		response.ValidationError(c, errs)
 		return
 	}
 	role, err := h.service.Create(req)
@@ -79,7 +83,11 @@ func (h *Handler) Update(c *gin.Context) {
 	publicID := c.Param("id")
 	var req UpdateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
+	}
+	if errs := req.Validate(); errs.HasErrors() {
+		response.ValidationError(c, errs)
 		return
 	}
 	role, err := h.service.Update(publicID, req)

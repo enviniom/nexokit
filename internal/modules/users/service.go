@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 	"github.com/enviniom/nexokit/internal/shared"
@@ -16,26 +17,48 @@ type PasswordHasher interface {
 	Verify(password, hash string) error
 }
 
+// RoleResolver resolves role metadata for business rule enforcement.
+type RoleResolver interface {
+	GetByName(name string) (*roles.Role, error)
+}
+
 // Service defines the business logic contract for users.
 type Service interface {
 	List(page, perPage int) ([]UserResponse, int64, error)
 	GetByPublicID(publicID string) (*UserResponse, error)
 	Create(req CreateUserRequest) (*UserResponse, error)
-	Update(publicID string, req UpdateUserRequest) (*UserResponse, error)
+	Update(publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error)
 	Delete(publicID string) error
-	ChangePassword(publicID string, req ChangePasswordRequest) error
+	ChangePassword(publicID string, actorPublicID string, req ChangePasswordRequest) error
 	ToggleStatus(publicID string, req UpdateStatusRequest) (*UserResponse, error)
 }
 
 // userService is the concrete implementation of Service.
 type userService struct {
-	repo   Repository
-	hasher PasswordHasher
+	repo             Repository
+	hasher           PasswordHasher
+	resolver         RoleResolver
+	cachedRootRoleID uint
 }
 
 // NewService creates a new users service.
-func NewService(repo Repository, hasher PasswordHasher) Service {
-	return &userService{repo: repo, hasher: hasher}
+func NewService(repo Repository, hasher PasswordHasher, resolver RoleResolver) Service {
+	return &userService{repo: repo, hasher: hasher, resolver: resolver}
+}
+
+func (s *userService) rootRoleID() (uint, error) {
+	if s.cachedRootRoleID != 0 {
+		return s.cachedRootRoleID, nil
+	}
+	if s.resolver == nil {
+		return 0, errors.New("role resolver not configured")
+	}
+	role, err := s.resolver.GetByName("root")
+	if err != nil {
+		return 0, err
+	}
+	s.cachedRootRoleID = role.ID
+	return role.ID, nil
 }
 
 // List returns paginated users as DTOs.
@@ -73,6 +96,16 @@ func (s *userService) GetByPublicID(publicID string) (*UserResponse, error) {
 
 // Create creates a new user after checking email uniqueness.
 func (s *userService) Create(req CreateUserRequest) (*UserResponse, error) {
+	rootRoleID, err := s.rootRoleID()
+	if err != nil {
+		return nil, err
+	}
+
+	// Rule: API cannot create users with the root role.
+	if req.RoleID == rootRoleID {
+		return nil, apperror.ErrForbidden
+	}
+
 	if _, err := s.repo.GetByEmail(req.Email); err == nil {
 		return nil, apperror.ErrConflict
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -117,7 +150,7 @@ func (s *userService) Create(req CreateUserRequest) (*UserResponse, error) {
 }
 
 // Update updates a user if the new email is unique.
-func (s *userService) Update(publicID string, req UpdateUserRequest) (*UserResponse, error) {
+func (s *userService) Update(publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error) {
 	user, err := s.repo.GetByPublicID(publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -126,21 +159,45 @@ func (s *userService) Update(publicID string, req UpdateUserRequest) (*UserRespo
 		return nil, err
 	}
 
-	if user.Email != req.Email {
-		existing, err := s.repo.GetByEmail(req.Email)
-		if err == nil {
-			if existing.PublicID != publicID {
-				return nil, apperror.ErrConflict
-			}
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
+	rootRoleID, err := s.rootRoleID()
+	if err != nil {
+		return nil, err
 	}
 
-	user.Name = req.Name
-	user.Email = req.Email
-	user.RoleID = req.RoleID
-	user.CompanyID = req.CompanyID
+	isRoot := user.RoleID == rootRoleID
+
+	// Rule: cannot promote a non-root user to root role.
+	if !isRoot && req.RoleID == rootRoleID {
+		return nil, apperror.ErrForbidden
+	}
+
+	if isRoot {
+		// Rule: root can only be edited by itself.
+		// When auth context is unavailable (empty actor), reject for safety.
+		if actorPublicID == "" || actorPublicID != user.PublicID {
+			return nil, apperror.ErrForbidden
+		}
+		// Rule: root can only have name and email edited.
+		user.Name = req.Name
+		user.Email = req.Email
+		// RoleID and CompanyID are intentionally ignored for root.
+	} else {
+		if user.Email != req.Email {
+			existing, err := s.repo.GetByEmail(req.Email)
+			if err == nil {
+				if existing.PublicID != publicID {
+					return nil, apperror.ErrConflict
+				}
+			} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, err
+			}
+		}
+
+		user.Name = req.Name
+		user.Email = req.Email
+		user.RoleID = req.RoleID
+		user.CompanyID = req.CompanyID
+	}
 
 	if err := s.repo.Update(user); err != nil {
 		if isUniqueConstraintError(err) {
@@ -172,13 +229,25 @@ func (s *userService) Delete(publicID string) error {
 }
 
 // ChangePassword verifies the current password and updates the hash.
-func (s *userService) ChangePassword(publicID string, req ChangePasswordRequest) error {
+func (s *userService) ChangePassword(publicID string, actorPublicID string, req ChangePasswordRequest) error {
 	user, err := s.repo.GetByPublicID(publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.ErrNotFound
 		}
 		return err
+	}
+
+	rootRoleID, err := s.rootRoleID()
+	if err != nil {
+		return err
+	}
+
+	// Rule: root can only change its own password.
+	if user.RoleID == rootRoleID {
+		if actorPublicID == "" || actorPublicID != user.PublicID {
+			return apperror.ErrForbidden
+		}
 	}
 
 	if err := s.hasher.Verify(req.CurrentPassword, user.PasswordHash); err != nil {

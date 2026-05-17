@@ -1,13 +1,5 @@
 package {{.Package}}
 
-import "github.com/go-playground/validator/v10"
-
-// ValidateCreate{{.Struct}}Request performs custom validation on create requests.
-func ValidateCreate{{.Struct}}Request(sl validator.StructLevel) {
-	// TODO: add custom cross-field or business validation rules
-}
-
-// ValidateUpdate{{.Struct}}Request performs custom validation on update requests.
-func ValidateUpdate{{.Struct}}Request(sl validator.StructLevel) {
-	// TODO: add custom cross-field or business validation rules
-}
+// Validation rules are defined on request DTOs via the Validate() method.
+// Use internal/platform/validator for field-level validation.
+// Add business-rule validation in the service layer.
