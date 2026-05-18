@@ -8,6 +8,7 @@ type Repository interface {
 	Count() (int64, error)
 	GetByPublicID(publicID string) (*Role, error)
 	GetByName(name string) (*Role, error)
+	GetBySlug(slug string) (*Role, error)
 	Create(role *Role) error
 	Update(role *Role) error
 	Delete(publicID string) error
@@ -58,6 +59,18 @@ func (r *GormRepository) GetByPublicID(publicID string) (*Role, error) {
 func (r *GormRepository) GetByName(name string) (*Role, error) {
 	var role Role
 	if err := r.db.Where("name = ?", name).First(&role).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, err
+		}
+		return nil, err
+	}
+	return &role, nil
+}
+
+// GetBySlug returns a role by its slug.
+func (r *GormRepository) GetBySlug(slug string) (*Role, error) {
+	var role Role
+	if err := r.db.Where("slug = ?", slug).First(&role).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, err
 		}

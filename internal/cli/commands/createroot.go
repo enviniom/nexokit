@@ -13,6 +13,7 @@ import (
 	"github.com/enviniom/nexokit/internal/cli/root"
 	"github.com/enviniom/nexokit/internal/config"
 	"github.com/enviniom/nexokit/internal/infra/db"
+	pwd "github.com/enviniom/nexokit/internal/platform/password"
 )
 
 // CreateRootCommand creates the root user.
@@ -108,7 +109,7 @@ func (c *CreateRootCommand) Run(ctx context.Context, args []string, stdio cli.St
 			return fmt.Errorf("failed to connect to database: %w", err)
 		}
 		storage = newRootStorage(database)
-		hasher = &passwordHasherAdapter{}
+		hasher = pwd.Manager{}
 	}
 
 	creator := root.NewCreator(storage, hasher)

@@ -27,9 +27,9 @@ func RolesSeed() error {
 
 func seedRoles(database *gorm.DB) error {
 	roleList := []roles.Role{
-		{Name: "root", Slug: "root", Description: "System root role", IsSystem: true},
-		{Name: "admin", Slug: "admin", Description: "System admin role", IsSystem: true},
-		{Name: "user", Slug: "user", Description: "System user role", IsSystem: true},
+		{Name: "root", Slug: roles.RootRoleSlug, Description: "System root role", IsSystem: true},
+		{Name: "admin", Slug: roles.AdminRoleSlug, Description: "System admin role", IsSystem: true},
+		{Name: "user", Slug: roles.UserRoleSlug, Description: "System user role", IsSystem: true},
 	}
 
 	for i := range roleList {

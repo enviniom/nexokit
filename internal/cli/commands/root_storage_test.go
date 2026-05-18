@@ -38,7 +38,7 @@ func TestRootStorage_RootExists_RoleButNoUser(t *testing.T) {
 	db := setupTestDB(t)
 	storage := newRootStorage(db)
 
-	rootRole := roles.Role{Name: "root", Slug: "root", IsSystem: true}
+	rootRole := roles.Role{Name: "root", Slug: roles.RootRoleSlug, IsSystem: true}
 	if err := db.Create(&rootRole).Error; err != nil {
 		t.Fatalf("failed to create root role: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestRootStorage_RootExists_UserExists(t *testing.T) {
 	db := setupTestDB(t)
 	storage := newRootStorage(db)
 
-	rootRole := roles.Role{Name: "root", Slug: "root", IsSystem: true}
+	rootRole := roles.Role{Name: "root", Slug: roles.RootRoleSlug, IsSystem: true}
 	if err := db.Create(&rootRole).Error; err != nil {
 		t.Fatalf("failed to create root role: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestRootStorage_CreateRoot_Success(t *testing.T) {
 	db := setupTestDB(t)
 	storage := newRootStorage(db)
 
-	rootRole := roles.Role{Name: "root", Slug: "root", IsSystem: true}
+	rootRole := roles.Role{Name: "root", Slug: roles.RootRoleSlug, IsSystem: true}
 	if err := db.Create(&rootRole).Error; err != nil {
 		t.Fatalf("failed to create root role: %v", err)
 	}

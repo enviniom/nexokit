@@ -17,12 +17,12 @@ var (
 
 // AccessClaims holds the claims extracted from a PASETO v4.local access token.
 type AccessClaims struct {
-	Sub       string     `json:"sub"`
-	Role      string     `json:"role"`
-	CompanyID *uint      `json:"company_id,omitempty"`
-	TokenType string     `json:"token_type"`
-	IssuedAt  time.Time  `json:"issued_at"`
-	ExpiresAt time.Time  `json:"expires_at"`
+	Sub       string    `json:"sub"`
+	Role      string    `json:"role"`
+	CompanyID *uint     `json:"company_id,omitempty"`
+	TokenType string    `json:"token_type"`
+	IssuedAt  time.Time `json:"issued_at"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 // Manager handles PASETO token operations.
@@ -115,8 +115,8 @@ func (m *Manager) ParseAccess(tokenStr string) (*AccessClaims, error) {
 	return claims, nil
 }
 
-// GenerateRefresh creates a new opaque refresh token using crypto/rand.
-func GenerateRefresh() (string, error) {
+// GenerateRefreshToken creates a new opaque refresh token using crypto/rand.
+func (m *Manager) GenerateRefreshToken() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("failed to generate refresh token: %w", err)
@@ -124,8 +124,8 @@ func GenerateRefresh() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// HashRefresh returns the SHA-256 hex digest of a refresh token.
-func HashRefresh(token string) string {
+// HashRefreshToken returns the SHA-256 hex digest of a refresh token.
+func (m *Manager) HashRefreshToken(token string) string {
 	h := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(h[:])
 }

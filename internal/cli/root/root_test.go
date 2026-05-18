@@ -30,7 +30,7 @@ func (m *mockStorage) CreateRoot(name, email, passwordHash string) error {
 
 type mockHasher struct{}
 
-func (m *mockHasher) Hash(password string) (string, error) {
+func (m *mockHasher) HashPassword(password string) (string, error) {
 	return "mock-hash:" + password, nil
 }
 

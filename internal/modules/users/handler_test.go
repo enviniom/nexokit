@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
 )
@@ -26,15 +27,17 @@ func jsonRequest(method, path string, body any) *http.Request {
 
 // fakeService is a test double for the service.
 type fakeService struct {
-	users           []UserResponse
-	user            *UserResponse
-	total           int64
-	err             error
-	created         *UserResponse
-	updated         *UserResponse
-	deletedPID      string
+	users             []UserResponse
+	user              *UserResponse
+	total             int64
+	err               error
+	created           *UserResponse
+	updated           *UserResponse
+	deletedPID        string
 	changePasswordErr error
-	toggled         *UserResponse
+	toggled           *UserResponse
+	updateActor       string
+	passwordActor     string
 }
 
 func (f *fakeService) List(page, perPage int) ([]UserResponse, int64, error) {
@@ -59,6 +62,7 @@ func (f *fakeService) Create(req CreateUserRequest) (*UserResponse, error) {
 }
 
 func (f *fakeService) Update(publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error) {
+	f.updateActor = actorPublicID
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -74,6 +78,7 @@ func (f *fakeService) Delete(publicID string) error {
 }
 
 func (f *fakeService) ChangePassword(publicID string, actorPublicID string, req ChangePasswordRequest) error {
+	f.passwordActor = actorPublicID
 	return f.changePasswordErr
 }
 
@@ -86,7 +91,7 @@ func (f *fakeService) ToggleStatus(publicID string, req UpdateStatusRequest) (*U
 
 func setupHandler(svc Service) (*gin.Engine, *Handler) {
 	gin.SetMode(gin.TestMode)
-	h := NewHandler(svc)
+	h := NewHandler(svc, nil)
 	return gin.New(), h
 }
 
@@ -287,6 +292,27 @@ func TestHandler_Create(t *testing.T) {
 		}
 		if _, ok := errsMap["role_id"]; !ok {
 			t.Error("expected validation error for role_id")
+		}
+	})
+
+	t.Run("passes authenticated actor public ID to service", func(t *testing.T) {
+		svc := &fakeService{
+			updated: &UserResponse{PublicID: "root1", Name: "Root", Email: "root@example.com", RoleID: 1, RoleName: "root"},
+		}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "root1"}}
+		authctx.SetGin(c, &authctx.User{PublicID: "root1", IsActive: true})
+		c.Request = jsonRequest(http.MethodPut, "/users/root1", UpdateUserRequest{Name: "Root", Email: "root@example.com", RoleID: 1})
+		h.Update(c)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w.Code)
+		}
+		if svc.updateActor != "root1" {
+			t.Fatalf("expected actor 'root1', got %q", svc.updateActor)
 		}
 	})
 }
@@ -495,6 +521,25 @@ func TestHandler_ChangePassword(t *testing.T) {
 		}
 		if _, ok := errsMap["new_password"]; !ok {
 			t.Error("expected validation error for new_password")
+		}
+	})
+
+	t.Run("passes authenticated actor public ID to password service", func(t *testing.T) {
+		svc := &fakeService{}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "root1"}}
+		authctx.SetGin(c, &authctx.User{PublicID: "root1", IsActive: true})
+		c.Request = jsonRequest(http.MethodPatch, "/users/root1/password", ChangePasswordRequest{CurrentPassword: "old", NewPassword: "NewPassword1"})
+		h.ChangePassword(c)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w.Code)
+		}
+		if svc.passwordActor != "root1" {
+			t.Fatalf("expected actor 'root1', got %q", svc.passwordActor)
 		}
 	})
 }

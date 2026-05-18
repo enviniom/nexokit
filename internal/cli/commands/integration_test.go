@@ -80,7 +80,7 @@ func TestCreateRootCommand_IdempotentRealDB(t *testing.T) {
 
 	// Seed root role if missing
 	var rootRole roles.Role
-	if err := database.Where("name = ?", "root").First(&rootRole).Error; err != nil {
+	if err := database.Where("slug = ?", roles.RootRoleSlug).First(&rootRole).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			rootRole = roles.Role{Name: "root", Slug: "root", IsSystem: true}
 			if createErr := database.Create(&rootRole).Error; createErr != nil {

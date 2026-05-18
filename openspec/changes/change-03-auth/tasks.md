@@ -50,23 +50,23 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Auth & Middleware
 
-- [ ] 3.1 Create `internal/modules/auth/{service,handler,routes}.go` for login, refresh, logout, me
-- [ ] 3.2 Implement login: verify password, issue PASETO access + opaque refresh, store hash
-- [ ] 3.3 Implement refresh: validate refresh hash, rotate pair, revoke old hash
-- [ ] 3.4 Implement logout: revoke provided refresh token
-- [ ] 3.5 Implement `GET /auth/me` returning authenticated user without password/hash
-- [ ] 3.6 Implement `internal/middleware/auth.go`: Bearer validation, user lookup, active check, context injection
-- [ ] 3.7 Wire all modules into `internal/app/container.go` and mount protected groups in router
+- [x] 3.1 Create `internal/modules/auth/{service,handler,routes}.go` for login, refresh, logout, me
+- [x] 3.2 Implement login: verify password, issue PASETO access + opaque refresh, store hash
+- [x] 3.3 Implement refresh: validate refresh hash, rotate pair, revoke old hash
+- [x] 3.4 Implement logout: revoke provided refresh token
+- [x] 3.5 Implement `GET /auth/me` returning authenticated user without password/hash
+- [x] 3.6 Implement `internal/middleware/auth.go`: Bearer validation, user lookup, active check, context injection
+- [x] 3.7 Wire all modules into `internal/app/container.go` and mount protected groups in router
 
 ## Phase 4: Testing & Verification
 
 - [x] 4.1 Unit tests for identity, password, token with table-driven cases
-- [~] 4.2 Handler tests for roles, users, auth using `httptest` and fake services — roles/users done; auth pending PR 3
-- [ ] 4.3 Middleware tests: valid/missing/expired token, inactive user rejection
-- [~] 4.4 Integration tests for migration, seed idempotency, root create/re-run; skip with `testing.Short()` — seed/root done; auth DB flows pending PR 3
-- [ ] 4.5 Verify no password or `password_hash` leaks in any JSON response
+- [x] 4.2 Handler tests for roles, users, auth using `httptest` and fake services
+- [x] 4.3 Middleware tests: valid/missing/expired token, inactive user rejection
+- [x] 4.4 Integration tests for migration, seed idempotency, root create/re-run, and auth DB refresh-token flows; skip with `testing.Short()` when external infrastructure is required
+- [x] 4.5 Verify no password or `password_hash` leaks in any JSON response
 
 ## Phase 5: Cleanup
 
-- [ ] 5.1 Remove TODO comments from platform files and module stubs
-- [ ] 5.2 Update `.env.example` docs for new auth variables
+- [x] 5.1 Remove TODO comments from platform files and module stubs relevant to auth/users/roles
+- [x] 5.2 Update `.env.example` docs for new auth variables

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
@@ -12,12 +13,16 @@ import (
 
 // Handler handles HTTP requests for the users module.
 type Handler struct {
-	service Service
+	service       Service
+	actorProvider func(*gin.Context) string
 }
 
 // NewHandler creates a new users handler.
-func NewHandler(service Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service Service, actorProvider func(*gin.Context) string) *Handler {
+	if actorProvider == nil {
+		actorProvider = authctx.PublicIDFromGin
+	}
+	return &Handler{service: service, actorProvider: actorProvider}
 }
 
 // List returns paginated users.
@@ -90,8 +95,7 @@ func (h *Handler) Update(c *gin.Context) {
 		response.ValidationError(c, errs)
 		return
 	}
-	// TODO(PR3): pass authenticated user's public ID as actorPublicID.
-	user, err := h.service.Update(publicID, "", req)
+	user, err := h.service.Update(publicID, h.actorPublicID(c), req)
 	if err != nil {
 		status := apperror.Status(err)
 		if status == http.StatusNotFound {
@@ -135,8 +139,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		response.ValidationError(c, errs)
 		return
 	}
-	// TODO(PR3): pass authenticated user's public ID as actorPublicID.
-	if err := h.service.ChangePassword(publicID, "", req); err != nil {
+	if err := h.service.ChangePassword(publicID, h.actorPublicID(c), req); err != nil {
 		status := apperror.Status(err)
 		if status == http.StatusNotFound {
 			response.NotFound(c, messages.MsgNotFound)
@@ -152,12 +155,23 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	response.Success[any](c, messages.MsgSuccess, nil)
 }
 
+func (h *Handler) actorPublicID(c *gin.Context) string {
+	if h.actorProvider == nil {
+		return ""
+	}
+	return h.actorProvider(c)
+}
+
 // ToggleStatus handles PATCH /users/:id/status.
 func (h *Handler) ToggleStatus(c *gin.Context) {
 	publicID := c.Param("id")
 	var req UpdateStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, err.Error())
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
+	}
+	if errs := req.Validate(); errs.HasErrors() {
+		response.ValidationError(c, errs)
 		return
 	}
 	user, err := h.service.ToggleStatus(publicID, req)

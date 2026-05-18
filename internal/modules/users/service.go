@@ -13,13 +13,13 @@ import (
 
 // PasswordHasher defines the boundary for password hashing.
 type PasswordHasher interface {
-	Hash(password string) (string, error)
-	Verify(password, hash string) error
+	HashPassword(password string) (string, error)
+	VerifyPassword(password, hash string) error
 }
 
 // RoleResolver resolves role metadata for business rule enforcement.
 type RoleResolver interface {
-	GetByName(name string) (*roles.Role, error)
+	GetBySlug(slug string) (*roles.Role, error)
 }
 
 // Service defines the business logic contract for users.
@@ -53,7 +53,7 @@ func (s *userService) rootRoleID() (uint, error) {
 	if s.resolver == nil {
 		return 0, errors.New("role resolver not configured")
 	}
-	role, err := s.resolver.GetByName("root")
+	role, err := s.resolver.GetBySlug(roles.RootRoleSlug)
 	if err != nil {
 		return 0, err
 	}
@@ -117,7 +117,7 @@ func (s *userService) Create(req CreateUserRequest) (*UserResponse, error) {
 		return nil, err
 	}
 
-	hash, err := s.hasher.Hash(req.Password)
+	hash, err := s.hasher.HashPassword(req.Password)
 	if err != nil {
 		return nil, err
 	}
@@ -250,11 +250,11 @@ func (s *userService) ChangePassword(publicID string, actorPublicID string, req 
 		}
 	}
 
-	if err := s.hasher.Verify(req.CurrentPassword, user.PasswordHash); err != nil {
+	if err := s.hasher.VerifyPassword(req.CurrentPassword, user.PasswordHash); err != nil {
 		return apperror.ErrUnauthorized
 	}
 
-	newHash, err := s.hasher.Hash(req.NewPassword)
+	newHash, err := s.hasher.HashPassword(req.NewPassword)
 	if err != nil {
 		return err
 	}

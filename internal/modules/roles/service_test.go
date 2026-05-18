@@ -59,6 +59,21 @@ func (f *fakeRepository) GetByName(name string) (*Role, error) {
 	return nil, gorm.ErrRecordNotFound
 }
 
+func (f *fakeRepository) GetBySlug(slug string) (*Role, error) {
+	if f.getByNameErr != nil {
+		return nil, f.getByNameErr
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	for i := range f.roles {
+		if f.roles[i].Slug == slug {
+			return &f.roles[i], nil
+		}
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
 func (f *fakeRepository) Create(role *Role) error {
 	if f.createErr != nil {
 		return f.createErr

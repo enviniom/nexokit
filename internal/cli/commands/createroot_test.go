@@ -39,7 +39,7 @@ type fakeRootHasher struct {
 	err  error
 }
 
-func (f *fakeRootHasher) Hash(password string) (string, error) {
+func (f *fakeRootHasher) HashPassword(password string) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}

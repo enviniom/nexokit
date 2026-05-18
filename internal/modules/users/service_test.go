@@ -28,7 +28,7 @@ type fakeRoleResolver struct {
 	err  error
 }
 
-func (f *fakeRoleResolver) GetByName(name string) (*roles.Role, error) {
+func (f *fakeRoleResolver) GetBySlug(slug string) (*roles.Role, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -130,14 +130,14 @@ type fakeHasher struct {
 	err  error
 }
 
-func (f *fakeHasher) Hash(password string) (string, error) {
+func (f *fakeHasher) HashPassword(password string) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}
 	return f.hash, nil
 }
 
-func (f *fakeHasher) Verify(password, hash string) error {
+func (f *fakeHasher) VerifyPassword(password, hash string) error {
 	if f.err != nil {
 		return f.err
 	}

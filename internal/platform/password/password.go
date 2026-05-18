@@ -33,6 +33,19 @@ var defaultParams = params{
 	keyLength:   32,
 }
 
+// Manager handles password hashing and verification.
+type Manager struct{}
+
+// HashPassword creates an argon2id hash of the given password.
+func (Manager) HashPassword(password string) (string, error) {
+	return Hash(password)
+}
+
+// VerifyPassword compares a password against an encoded argon2id hash.
+func (Manager) VerifyPassword(password, encodedHash string) error {
+	return Verify(password, encodedHash)
+}
+
 // Hash creates an argon2id hash of the given password.
 func Hash(password string) (string, error) {
 	salt := make([]byte, defaultParams.saltLength)

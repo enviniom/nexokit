@@ -90,11 +90,13 @@ func TestIssueAndParseAccess(t *testing.T) {
 	})
 }
 
-func TestGenerateRefresh(t *testing.T) {
+func TestManager_GenerateRefreshToken(t *testing.T) {
+	m := NewManager("test-key-must-be-32-bytes-long!!", 15*time.Minute)
+
 	t.Run("generates non-empty token", func(t *testing.T) {
-		token, err := GenerateRefresh()
+		token, err := m.GenerateRefreshToken()
 		if err != nil {
-			t.Fatalf("GenerateRefresh failed: %v", err)
+			t.Fatalf("GenerateRefreshToken failed: %v", err)
 		}
 		if token == "" {
 			t.Error("expected non-empty refresh token")
@@ -102,13 +104,13 @@ func TestGenerateRefresh(t *testing.T) {
 	})
 
 	t.Run("generates unique tokens", func(t *testing.T) {
-		t1, err := GenerateRefresh()
+		t1, err := m.GenerateRefreshToken()
 		if err != nil {
-			t.Fatalf("GenerateRefresh failed: %v", err)
+			t.Fatalf("GenerateRefreshToken failed: %v", err)
 		}
-		t2, err := GenerateRefresh()
+		t2, err := m.GenerateRefreshToken()
 		if err != nil {
-			t.Fatalf("GenerateRefresh failed: %v", err)
+			t.Fatalf("GenerateRefreshToken failed: %v", err)
 		}
 		if t1 == t2 {
 			t.Error("expected unique refresh tokens")
@@ -116,26 +118,28 @@ func TestGenerateRefresh(t *testing.T) {
 	})
 }
 
-func TestHashRefresh(t *testing.T) {
+func TestManager_HashRefreshToken(t *testing.T) {
+	m := NewManager("test-key-must-be-32-bytes-long!!", 15*time.Minute)
+
 	t.Run("produces consistent hash", func(t *testing.T) {
 		token := "test-refresh-token"
-		hash1 := HashRefresh(token)
-		hash2 := HashRefresh(token)
+		hash1 := m.HashRefreshToken(token)
+		hash2 := m.HashRefreshToken(token)
 		if hash1 != hash2 {
 			t.Error("expected consistent hash for same token")
 		}
 	})
 
 	t.Run("different tokens produce different hashes", func(t *testing.T) {
-		hash1 := HashRefresh("token-a")
-		hash2 := HashRefresh("token-b")
+		hash1 := m.HashRefreshToken("token-a")
+		hash2 := m.HashRefreshToken("token-b")
 		if hash1 == hash2 {
 			t.Error("expected different hashes for different tokens")
 		}
 	})
 
 	t.Run("hash is hex encoded", func(t *testing.T) {
-		hash := HashRefresh("any-token")
+		hash := m.HashRefreshToken("any-token")
 		if len(hash) != 64 {
 			t.Errorf("expected SHA-256 hex length 64, got %d", len(hash))
 		}

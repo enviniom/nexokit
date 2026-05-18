@@ -7,7 +7,6 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/modules/users"
 	"github.com/enviniom/nexokit/internal/platform/identity"
-	pw "github.com/enviniom/nexokit/internal/platform/password"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
@@ -25,7 +24,7 @@ func newRootStorage(db *gorm.DB) root.RootStorage {
 // RootExists returns true if a user with the root role already exists.
 func (s *rootStorage) RootExists() (bool, error) {
 	var rootRole roles.Role
-	if err := s.db.Where("name = ?", "root").First(&rootRole).Error; err != nil {
+	if err := s.db.Where("slug = ?", roles.RootRoleSlug).First(&rootRole).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
@@ -42,7 +41,7 @@ func (s *rootStorage) RootExists() (bool, error) {
 // CreateRoot persists a new root user linked to the root role.
 func (s *rootStorage) CreateRoot(name, email, passwordHash string) error {
 	var rootRole roles.Role
-	if err := s.db.Where("name = ?", "root").First(&rootRole).Error; err != nil {
+	if err := s.db.Where("slug = ?", roles.RootRoleSlug).First(&rootRole).Error; err != nil {
 		return err
 	}
 
@@ -62,12 +61,4 @@ func (s *rootStorage) CreateRoot(name, email, passwordHash string) error {
 		IsActive:     true,
 	}
 	return s.db.Create(user).Error
-}
-
-// passwordHasherAdapter implements root.PasswordHasher using the platform password package.
-type passwordHasherAdapter struct{}
-
-// Hash delegates to the platform argon2id hasher.
-func (h *passwordHasherAdapter) Hash(password string) (string, error) {
-	return pw.Hash(password)
 }

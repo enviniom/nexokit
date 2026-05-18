@@ -31,8 +31,8 @@ type RootStorage interface {
 // PasswordHasher defines the boundary for password hashing.
 // The concrete implementation will be provided by the password hashing change.
 type PasswordHasher interface {
-	// Hash returns a secure hash of the given password.
-	Hash(password string) (string, error)
+	// HashPassword returns a secure hash of the given password.
+	HashPassword(password string) (string, error)
 }
 
 // Creator validates input and delegates to storage.
@@ -67,7 +67,7 @@ func (c *Creator) Create(input CreateRootInput) error {
 		return ErrRootAlreadyExists
 	}
 
-	hash, err := c.Hasher.Hash(input.Password)
+	hash, err := c.Hasher.HashPassword(input.Password)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
