@@ -9,6 +9,7 @@ type Repository interface {
 	Count() (int64, error)
 	GetByPublicID(publicID string) (*Permission, error)
 	GetBySlug(slug string) (*Permission, error)
+	ListSlugsByUserPublicID(publicID string) ([]string, error)
 	Create(permission *Permission) error
 	Update(permission *Permission) error
 	Delete(publicID string) error
@@ -68,6 +69,19 @@ func (r *GormRepository) GetBySlug(slug string) (*Permission, error) {
 		return nil, err
 	}
 	return &permission, nil
+}
+
+// ListSlugsByUserPublicID returns permission slugs assigned to a user's role.
+func (r *GormRepository) ListSlugsByUserPublicID(publicID string) ([]string, error) {
+	var slugs []string
+	err := r.db.Table("permissions").
+		Select("permissions.slug").
+		Joins("JOIN role_permissions ON role_permissions.permission_id = permissions.id").
+		Joins("JOIN users ON users.role_id = role_permissions.role_id").
+		Where("users.public_id = ?", publicID).
+		Order("permissions.slug ASC").
+		Pluck("permissions.slug", &slugs).Error
+	return slugs, err
 }
 
 // Create persists a new permission.

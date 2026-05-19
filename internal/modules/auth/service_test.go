@@ -41,6 +41,9 @@ func (f *fakeUserRepository) GetByEmail(email string) (*users.User, error) {
 func (f *fakeUserRepository) Create(user *users.User) error { return nil }
 func (f *fakeUserRepository) Update(user *users.User) error { return nil }
 func (f *fakeUserRepository) Delete(publicID string) error  { return nil }
+func (f *fakeUserRepository) ListPublicIDsByRoleID(roleID uint) ([]string, error) {
+	return nil, nil
+}
 
 type fakePasswordVerifier struct{ err error }
 

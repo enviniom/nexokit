@@ -1,6 +1,9 @@
 package roles
 
-import "github.com/enviniom/nexokit/internal/shared"
+import (
+	"github.com/enviniom/nexokit/internal/modules/permissions"
+	"github.com/enviniom/nexokit/internal/shared"
+)
 
 const (
 	// RootRoleSlug is the stable business identifier for the root role.
@@ -17,5 +20,6 @@ type Role struct {
 	Name        string `gorm:"uniqueIndex;not null"`
 	Slug        string `gorm:"uniqueIndex;not null"`
 	Description string
-	IsSystem    bool `gorm:"not null;default:false"`
+	IsSystem    bool                     `gorm:"not null;default:false"`
+	Permissions []permissions.Permission `gorm:"many2many:role_permissions;joinForeignKey:RoleID;joinReferences:PermissionID"`
 }

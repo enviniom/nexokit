@@ -124,6 +124,19 @@ func (f *fakeRepository) Delete(publicID string) error {
 	return gorm.ErrRecordNotFound
 }
 
+func (f *fakeRepository) ListPublicIDsByRoleID(roleID uint) ([]string, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	ids := make([]string, 0)
+	for _, user := range f.users {
+		if user.RoleID == roleID {
+			ids = append(ids, user.PublicID)
+		}
+	}
+	return ids, nil
+}
+
 // fakeHasher is a test double for the password hasher.
 type fakeHasher struct {
 	hash string

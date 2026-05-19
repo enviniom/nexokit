@@ -11,6 +11,7 @@ type Repository interface {
 	Create(user *User) error
 	Update(user *User) error
 	Delete(publicID string) error
+	ListPublicIDsByRoleID(roleID uint) ([]string, error)
 }
 
 // GormRepository is the GORM implementation of Repository.
@@ -79,4 +80,14 @@ func (r *GormRepository) Update(user *User) error {
 // Delete soft-deletes a user by its public ID.
 func (r *GormRepository) Delete(publicID string) error {
 	return r.db.Where("public_id = ?", publicID).Delete(&User{}).Error
+}
+
+// ListPublicIDsByRoleID returns public IDs for users assigned to the role.
+func (r *GormRepository) ListPublicIDsByRoleID(roleID uint) ([]string, error) {
+	var publicIDs []string
+	err := r.db.Model(&User{}).
+		Where("role_id = ?", roleID).
+		Order("public_id ASC").
+		Pluck("public_id", &publicIDs).Error
+	return publicIDs, err
 }

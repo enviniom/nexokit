@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
 )
@@ -33,6 +34,8 @@ type fakeService struct {
 	created    *RoleResponse
 	updated    *RoleResponse
 	deletedPID string
+	catalog    []RolePermissionGroupResponse
+	assigned   *RolePermissionAssignmentResponse
 }
 
 func (f *fakeService) List(page, perPage int) ([]RoleResponse, int64, error) {
@@ -69,6 +72,20 @@ func (f *fakeService) Update(publicID string, req UpdateRoleRequest) (*RoleRespo
 func (f *fakeService) Delete(publicID string) error {
 	f.deletedPID = publicID
 	return f.err
+}
+
+func (f *fakeService) GetPermissionCatalog(publicID string) ([]RolePermissionGroupResponse, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.catalog, nil
+}
+
+func (f *fakeService) AssignPermissions(publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.assigned, nil
 }
 
 func setupHandler(svc Service) (*gin.Engine, *Handler) {
@@ -361,6 +378,119 @@ func TestHandler_Delete(t *testing.T) {
 		c.Params = gin.Params{{Key: "id", Value: "role1"}}
 		c.Request = httptest.NewRequest(http.MethodDelete, "/roles/role1", nil)
 		h.Delete(c)
+
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("expected status 403, got %d", w.Code)
+		}
+	})
+}
+
+func TestHandler_GetPermissionCatalog(t *testing.T) {
+	t.Run("returns grouped catalog with granted flags", func(t *testing.T) {
+		svc := &fakeService{catalog: []RolePermissionGroupResponse{{Module: "users", Permissions: []RolePermissionResponse{{Slug: "users.index", Granted: true}, {Slug: "users.view", Granted: false}}}}}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "role1"}}
+		h.GetPermissionCatalog(c)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w.Code)
+		}
+		var resp response.APIResponse[[]RolePermissionGroupResponse]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(resp.Data) != 1 || len(resp.Data[0].Permissions) != 2 {
+			t.Fatalf("expected grouped permissions, got %+v", resp.Data)
+		}
+		if !resp.Data[0].Permissions[0].Granted || resp.Data[0].Permissions[1].Granted {
+			t.Fatalf("expected granted flags true/false, got %+v", resp.Data[0].Permissions)
+		}
+	})
+
+	t.Run("returns not found when role is missing", func(t *testing.T) {
+		svc := &fakeService{err: apperror.ErrNotFound}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "missing"}}
+		h.GetPermissionCatalog(c)
+
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected status 404, got %d", w.Code)
+		}
+	})
+}
+
+func TestHandler_AssignPermissions(t *testing.T) {
+	t.Run("returns updated grouped catalog", func(t *testing.T) {
+		svc := &fakeService{assigned: &RolePermissionAssignmentResponse{RoleID: "role1", Permissions: []string{"users.index"}, Catalog: []RolePermissionGroupResponse{{Module: "users", Permissions: []RolePermissionResponse{{Slug: "users.index", Granted: true}}}}}}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "role1"}}
+		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"users.index"}})
+		c.Set("permission_slugs", []string{"roles.assign_permissions"})
+		h.AssignPermissions(c)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w.Code)
+		}
+		var resp response.APIResponse[RolePermissionAssignmentResponse]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if len(resp.Data.Permissions) != 1 || resp.Data.Permissions[0] != "users.index" {
+			t.Fatalf("expected exact permissions response, got %+v", resp.Data.Permissions)
+		}
+	})
+
+	t.Run("returns bad request for invalid slug", func(t *testing.T) {
+		svc := &fakeService{err: apperror.ErrBadRequest}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "role1"}}
+		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"missing.slug"}})
+		c.Set("permission_slugs", []string{"roles.assign_permissions"})
+		h.AssignPermissions(c)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected status 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("returns forbidden when user lacks assignment permission", func(t *testing.T) {
+		svc := &fakeService{}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "role1"}}
+		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"users.index"}})
+		authctx.SetGin(c, &authctx.User{PublicID: "actor", Role: "user"})
+		h.AssignPermissions(c)
+
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("expected status 403, got %d", w.Code)
+		}
+	})
+
+	t.Run("returns forbidden when system role protection fails", func(t *testing.T) {
+		svc := &fakeService{err: apperror.ErrForbidden}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "role1"}}
+		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"users.view"}})
+		c.Set("permission_slugs", []string{"roles.assign_permissions"})
+		h.AssignPermissions(c)
 
 		if w.Code != http.StatusForbidden {
 			t.Fatalf("expected status 403, got %d", w.Code)

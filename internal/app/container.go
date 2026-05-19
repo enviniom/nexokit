@@ -7,6 +7,7 @@ import (
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/modules/auth"
+	"github.com/enviniom/nexokit/internal/modules/permissions"
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/modules/users"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
@@ -32,11 +33,13 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	_ = log
 	_ = cache
 
+	usersRepo := users.NewRepository(db)
+	permissionsRepo := permissions.NewRepository(db)
+
 	rolesRepo := roles.NewRepository(db)
-	rolesService := roles.NewService(rolesRepo)
+	rolesService := roles.NewService(rolesRepo, roles.WithPermissionCatalog(permissionsRepo), roles.WithRoleMembers(usersRepo), roles.WithCache(cache))
 	rolesHandler := roles.NewHandler(rolesService)
 
-	usersRepo := users.NewRepository(db)
 	passwordManager := password.Manager{}
 	usersService := users.NewService(usersRepo, passwordManager, rolesRepo)
 	usersHandler := users.NewHandler(usersService, authctx.PublicIDFromGin)

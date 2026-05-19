@@ -33,10 +33,10 @@ Chain strategy: stacked-to-main
 
 ## Phase 2: Role Assignment API / Cache
 
-- [ ] 2.1 RED: add handler/service tests for `GET /api/v1/roles/:id/permissions` grouped catalog with `granted` flags and 404 role missing.
-- [ ] 2.2 RED: add tests for `PUT /api/v1/roles/:id/permissions` exact slug replacement, invalid slug rejection, unauthorized assignment, and system role protection.
-- [ ] 2.3 Modify `internal/modules/roles/{model,repository,service,dto,handler,routes}.go` for permission preloads, read-only role DTO slugs, catalog GET, and assignment PUT.
-- [ ] 2.4 Add resolver/cache logic in `internal/modules/permissions/service.go` and role-member lookup in `internal/modules/users/repository.go`; delete `rbac:permissions:{public_id}` on assignment success.
+- [x] 2.1 RED: add handler/service tests for `GET /api/v1/roles/:id/permissions` grouped catalog with `granted` flags and 404 role missing.
+- [x] 2.2 RED: add tests for `PUT /api/v1/roles/:id/permissions` exact slug replacement, invalid slug rejection, unauthorized assignment, and system role protection.
+- [x] 2.3 Modify `internal/modules/roles/{model,repository,service,dto,handler,routes}.go` for permission preloads, read-only role DTO slugs, catalog GET, and assignment PUT.
+- [x] 2.4 Add resolver/cache logic in `internal/modules/permissions/service.go` and role-member lookup in `internal/modules/users/repository.go`; delete `rbac:permissions:{public_id}` on assignment success.
 
 ## Phase 3: Authorization Wiring
 

@@ -54,6 +54,60 @@ func (h *Handler) GetByPublicID(c *gin.Context) {
 	response.Success(c, messages.MsgSuccess, role)
 }
 
+// GetPermissionCatalog returns the full permission catalog annotated for a role.
+func (h *Handler) GetPermissionCatalog(c *gin.Context) {
+	publicID := c.Param("id")
+	catalog, err := h.service.GetPermissionCatalog(publicID)
+	if err != nil {
+		status := apperror.Status(err)
+		if status == http.StatusNotFound {
+			response.NotFound(c, messages.MsgNotFound)
+			return
+		}
+		response.InternalServerError(c, messages.MsgInternalError)
+		return
+	}
+	response.Success(c, messages.MsgSuccess, catalog)
+}
+
+// AssignPermissions replaces a role's permission assignments by slug.
+func (h *Handler) AssignPermissions(c *gin.Context) {
+	publicID := c.Param("id")
+	var req AssignRolePermissionsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
+	}
+	if errs := req.Validate(); errs.HasErrors() {
+		response.ValidationError(c, errs)
+		return
+	}
+	actorPermissions := permissionSlugsFromContext(c)
+	if !containsPermission(actorPermissions, "roles.assign_permissions") {
+		response.Forbidden(c, messages.MsgForbidden)
+		return
+	}
+	result, err := h.service.AssignPermissions(publicID, req, actorPermissions)
+	if err != nil {
+		status := apperror.Status(err)
+		if status == http.StatusNotFound {
+			response.NotFound(c, messages.MsgNotFound)
+			return
+		}
+		if status == http.StatusForbidden {
+			response.Forbidden(c, messages.MsgForbidden)
+			return
+		}
+		if status == http.StatusBadRequest {
+			response.BadRequest(c, messages.MsgBadRequest)
+			return
+		}
+		response.InternalServerError(c, messages.MsgInternalError)
+		return
+	}
+	response.Success(c, messages.MsgSuccess, result)
+}
+
 // Create creates a new role.
 func (h *Handler) Create(c *gin.Context) {
 	var req CreateRoleRequest
@@ -128,4 +182,25 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	response.Success[any](c, messages.MsgSuccess, nil)
+}
+
+func permissionSlugsFromContext(c *gin.Context) []string {
+	value, ok := c.Get("permission_slugs")
+	if !ok {
+		return nil
+	}
+	permissions, ok := value.([]string)
+	if !ok {
+		return nil
+	}
+	return permissions
+}
+
+func containsPermission(items []string, slug string) bool {
+	for _, item := range items {
+		if item == slug {
+			return true
+		}
+	}
+	return false
 }

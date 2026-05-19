@@ -1,11 +1,15 @@
 package permissions
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 	"github.com/enviniom/nexokit/internal/shared"
@@ -20,16 +24,30 @@ type Service interface {
 	Create(req CreatePermissionRequest) (*PermissionResponse, error)
 	Update(publicID string, req UpdatePermissionRequest) (*PermissionResponse, error)
 	Delete(publicID string) error
+	Resolve(publicID string) ([]string, error)
 }
 
 // permissionService is the concrete implementation of Service.
 type permissionService struct {
-	repo Repository
+	repo  Repository
+	cache cache.Cache
 }
 
+// ServiceOption configures optional permission service collaborators.
+type ServiceOption func(*permissionService)
+
 // NewService creates a new permissions service.
-func NewService(repo Repository) Service {
-	return &permissionService{repo: repo}
+func NewService(repo Repository, opts ...ServiceOption) Service {
+	s := &permissionService{repo: repo}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// WithCache configures cache-backed permission resolution.
+func WithCache(c cache.Cache) ServiceOption {
+	return func(s *permissionService) { s.cache = c }
 }
 
 // ListGrouped returns all permissions grouped by module and sorted for rendering.
@@ -159,6 +177,38 @@ func (s *permissionService) Delete(publicID string) error {
 		return apperror.ErrForbidden
 	}
 	return s.repo.Delete(publicID)
+}
+
+// Resolve returns permission slugs for a user, cache-first with a five-minute TTL.
+func (s *permissionService) Resolve(publicID string) ([]string, error) {
+	key := fmt.Sprintf("rbac:permissions:%s", publicID)
+	if s.cache != nil {
+		cached, err := s.cache.Get(context.Background(), key)
+		if err != nil {
+			return nil, err
+		}
+		if len(cached) > 0 {
+			var slugs []string
+			if err := json.Unmarshal(cached, &slugs); err != nil {
+				return nil, err
+			}
+			return slugs, nil
+		}
+	}
+	slugs, err := s.repo.ListSlugsByUserPublicID(publicID)
+	if err != nil {
+		return nil, err
+	}
+	if s.cache != nil {
+		payload, err := json.Marshal(slugs)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.cache.Set(context.Background(), key, payload, 5*time.Minute); err != nil {
+			return nil, err
+		}
+	}
+	return slugs, nil
 }
 
 func validatePermissionParts(module, action, slug string) error {

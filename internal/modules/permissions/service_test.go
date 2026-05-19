@@ -1,8 +1,11 @@
 package permissions
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/shared"
@@ -15,6 +18,7 @@ type fakeRepository struct {
 	err         error
 	createErr   error
 	updateErr   error
+	userSlugs   map[string][]string
 }
 
 func (f *fakeRepository) List(page, perPage int) ([]Permission, error) {
@@ -86,6 +90,41 @@ func (f *fakeRepository) Delete(publicID string) error {
 	}
 	return gorm.ErrRecordNotFound
 }
+
+func (f *fakeRepository) ListSlugsByUserPublicID(publicID string) ([]string, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return append([]string(nil), f.userSlugs[publicID]...), nil
+}
+
+type resolverCache struct {
+	values map[string][]byte
+	sets   map[string][]byte
+	ttls   map[string]time.Duration
+}
+
+func (c *resolverCache) Get(ctx context.Context, key string) ([]byte, error) {
+	if c.values == nil {
+		return nil, nil
+	}
+	return c.values[key], nil
+}
+
+func (c *resolverCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	if c.sets == nil {
+		c.sets = make(map[string][]byte)
+	}
+	if c.ttls == nil {
+		c.ttls = make(map[string]time.Duration)
+	}
+	c.sets[key] = value
+	c.ttls[key] = ttl
+	return nil
+}
+
+func (c *resolverCache) Delete(ctx context.Context, key string) error { return nil }
+func (c *resolverCache) Close() error                                 { return nil }
 
 func TestPermissionFieldsAndSlugUniqueness(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -205,4 +244,44 @@ func TestService_SystemCRUDProtection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestService_ResolvePermissions(t *testing.T) {
+	t.Run("returns cached permissions without repository lookup", func(t *testing.T) {
+		cached, _ := json.Marshal([]string{"users.index", "roles.index"})
+		repo := &fakeRepository{err: errors.New("repository should not be called")}
+		svc := NewService(repo, WithCache(&resolverCache{values: map[string][]byte{"rbac:permissions:user-one": cached}}))
+
+		got, err := svc.Resolve("user-one")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 2 || got[0] != "users.index" || got[1] != "roles.index" {
+			t.Fatalf("expected cached slugs, got %v", got)
+		}
+	})
+
+	t.Run("loads permissions from repository and stores five minute cache entry", func(t *testing.T) {
+		cache := &resolverCache{}
+		repo := &fakeRepository{userSlugs: map[string][]string{"user-one": {"users.view", "auth.view"}}}
+		svc := NewService(repo, WithCache(cache))
+
+		got, err := svc.Resolve("user-one")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(got) != 2 || got[0] != "users.view" || got[1] != "auth.view" {
+			t.Fatalf("expected repository slugs, got %v", got)
+		}
+		if cache.ttls["rbac:permissions:user-one"] != 5*time.Minute {
+			t.Fatalf("expected 5 minute ttl, got %v", cache.ttls["rbac:permissions:user-one"])
+		}
+		var stored []string
+		if err := json.Unmarshal(cache.sets["rbac:permissions:user-one"], &stored); err != nil {
+			t.Fatalf("cached value is not a string slice: %v", err)
+		}
+		if len(stored) != 2 || stored[0] != "users.view" || stored[1] != "auth.view" {
+			t.Fatalf("expected cached repository slugs, got %v", stored)
+		}
+	})
 }
