@@ -44,3 +44,10 @@ type LoginResponse struct {
 	RefreshToken string             `json:"refresh_token"`
 	User         users.UserResponse `json:"user"`
 }
+
+// MeResponse returns the authenticated user with role and permission metadata.
+type MeResponse struct {
+	users.UserResponse
+	RoleSlug    string   `json:"role_slug"`
+	Permissions []string `json:"permissions"`
+}

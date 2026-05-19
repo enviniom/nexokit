@@ -20,10 +20,12 @@ import (
 
 // Container holds the dependency graph for all application modules.
 type Container struct {
-	rolesHandler *roles.Handler
-	usersHandler *users.Handler
-	authHandler  *auth.Handler
-	authMW       gin.HandlerFunc
+	rolesHandler       *roles.Handler
+	usersHandler       *users.Handler
+	permissionsHandler *permissions.Handler
+	authHandler        *auth.Handler
+	authMW             gin.HandlerFunc
+	authzMW            gin.HandlerFunc
 }
 
 // NewContainer creates a new Container with the given dependencies.
@@ -31,10 +33,11 @@ type Container struct {
 // stored as public fields; they are only used during module wiring.
 func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache.Cache) *Container {
 	_ = log
-	_ = cache
 
 	usersRepo := users.NewRepository(db)
 	permissionsRepo := permissions.NewRepository(db)
+	permissionsService := permissions.NewService(permissionsRepo, permissions.WithCache(cache))
+	permissionsHandler := permissions.NewHandler(permissionsService)
 
 	rolesRepo := roles.NewRepository(db)
 	rolesService := roles.NewService(rolesRepo, roles.WithPermissionCatalog(permissionsRepo), roles.WithRoleMembers(usersRepo), roles.WithCache(cache))
@@ -49,17 +52,19 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	authService := auth.NewService(usersRepo, passwordManager, tokenManager, tokenManager, refreshRepo, time.Duration(cfg.Auth.RefreshTTLDays)*24*time.Hour)
 	authHandler := auth.NewHandler(authService)
 	authMW := middleware.Auth(tokenManager, userLookup{repo: usersRepo})
+	authzMW := middleware.AttachPermissions(permissionsService)
 
-	return &Container{rolesHandler: rolesHandler, usersHandler: usersHandler, authHandler: authHandler, authMW: authMW}
+	return &Container{rolesHandler: rolesHandler, usersHandler: usersHandler, permissionsHandler: permissionsHandler, authHandler: authHandler, authMW: authMW, authzMW: authzMW}
 }
 
 // RegisterModules mounts all business module routes onto the v1 router group.
 func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
-	auth.Register(v1, c.authHandler, c.authMW)
+	auth.Register(v1, c.authHandler, c.authMW, c.authzMW)
 	protected := v1.Group("")
-	protected.Use(c.authMW)
-	roles.Register(protected, c.rolesHandler)
-	users.Register(protected, c.usersHandler)
+	protected.Use(c.authMW, c.authzMW)
+	roles.Register(protected, c.rolesHandler, middleware.RequirePermission)
+	users.Register(protected, c.usersHandler, middleware.RequirePermission)
+	permissions.Register(protected, c.permissionsHandler, middleware.RequirePermission)
 }
 
 type userLookup struct {
@@ -77,6 +82,7 @@ func (l userLookup) GetAuthUser(publicID string) (*authctx.User, error) {
 		Email:     user.Email,
 		Name:      user.Name,
 		Role:      user.Role.Name,
+		RoleSlug:  user.Role.Slug,
 		RoleID:    user.RoleID,
 		CompanyID: user.CompanyID,
 		IsActive:  user.IsActive,

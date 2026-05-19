@@ -129,11 +129,11 @@ func TestHandler_RefreshLogoutAndMe(t *testing.T) {
 		}
 	})
 
-	t.Run("me returns context user without password fields", func(t *testing.T) {
+	t.Run("me returns context user with role and permission slugs", func(t *testing.T) {
 		h := NewHandler(fakeAuthService{})
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		authctx.SetGin(c, &authctx.User{PublicID: "user1", Email: "user@example.com", Name: "Alice", Role: "admin", RoleID: 3, IsActive: true})
+		authctx.SetGin(c, &authctx.User{PublicID: "user1", Email: "user@example.com", Name: "Alice", Role: "admin", RoleSlug: "admin", RoleID: 3, IsActive: true, Permissions: []string{"users.index", "auth.view"}})
 
 		h.Me(c)
 
@@ -142,6 +142,13 @@ func TestHandler_RefreshLogoutAndMe(t *testing.T) {
 		}
 		if strings.Contains(w.Body.String(), "password") || strings.Contains(w.Body.String(), "password_hash") {
 			t.Fatalf("response leaked password fields: %s", w.Body.String())
+		}
+		var resp response.APIResponse[MeResponse]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode me response: %v", err)
+		}
+		if resp.Data.RoleSlug != "admin" || len(resp.Data.Permissions) != 2 || resp.Data.Permissions[1] != "auth.view" {
+			t.Fatalf("expected role slug and permissions in /me response, got %#v", resp.Data)
 		}
 	})
 

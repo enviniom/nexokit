@@ -434,7 +434,7 @@ func TestHandler_AssignPermissions(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "role1"}}
 		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"users.index"}})
-		c.Set("permission_slugs", []string{"roles.assign_permissions"})
+		authctx.SetGin(c, &authctx.User{PublicID: "actor", Role: "admin", RoleSlug: "admin", Permissions: []string{"roles.assign_permissions"}})
 		h.AssignPermissions(c)
 
 		if w.Code != http.StatusOK {
@@ -457,7 +457,7 @@ func TestHandler_AssignPermissions(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "role1"}}
 		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"missing.slug"}})
-		c.Set("permission_slugs", []string{"roles.assign_permissions"})
+		authctx.SetGin(c, &authctx.User{PublicID: "actor", Role: "admin", RoleSlug: "admin", Permissions: []string{"roles.assign_permissions"}})
 		h.AssignPermissions(c)
 
 		if w.Code != http.StatusBadRequest {
@@ -473,7 +473,7 @@ func TestHandler_AssignPermissions(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "role1"}}
 		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"users.index"}})
-		authctx.SetGin(c, &authctx.User{PublicID: "actor", Role: "user"})
+		authctx.SetGin(c, &authctx.User{PublicID: "actor", Role: "user", RoleSlug: "user", Permissions: []string{"users.view"}})
 		h.AssignPermissions(c)
 
 		if w.Code != http.StatusForbidden {
@@ -489,7 +489,7 @@ func TestHandler_AssignPermissions(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "role1"}}
 		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"users.view"}})
-		c.Set("permission_slugs", []string{"roles.assign_permissions"})
+		authctx.SetGin(c, &authctx.User{PublicID: "actor", Role: "admin", RoleSlug: "admin", Permissions: []string{"roles.assign_permissions"}})
 		h.AssignPermissions(c)
 
 		if w.Code != http.StatusForbidden {

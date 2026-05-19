@@ -86,7 +86,7 @@ func (h *Handler) Me(c *gin.Context) {
 		response.Unauthorized(c, messages.MsgUnauthorized)
 		return
 	}
-	response.Success(c, messages.MsgSuccess, users.UserResponse{
+	response.Success(c, messages.MsgSuccess, MeResponse{UserResponse: users.UserResponse{
 		PublicID:  current.PublicID,
 		Name:      current.Name,
 		Email:     current.Email,
@@ -94,7 +94,7 @@ func (h *Handler) Me(c *gin.Context) {
 		RoleID:    current.RoleID,
 		RoleName:  current.Role,
 		CompanyID: current.CompanyID,
-	})
+	}, RoleSlug: current.RoleSlug, Permissions: current.Permissions})
 }
 
 func (h *Handler) respondError(c *gin.Context, err error) {

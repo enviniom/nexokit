@@ -40,14 +40,14 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Authorization Wiring
 
-- [ ] 3.1 RED: add `internal/middleware/authorization_test.go` for 401, 403, root bypass, role match/mismatch, cache miss, and resolver failure.
-- [ ] 3.2 Modify `internal/platform/authctx/authctx.go` with `RoleSlug string` and `Permissions []string`; update call sites.
-- [ ] 3.3 Create `internal/middleware/authorization.go` with `PermissionResolver`, `AttachPermissions`, `RequirePermission`, and `RequireRole`.
-- [ ] 3.4 Wire permissions, resolver, role assignment, and guards in `internal/app/container.go`; keep API-only scope.
+- [x] 3.1 RED: add `internal/middleware/authorization_test.go` for 401, 403, root bypass, role match/mismatch, cache miss, and resolver failure.
+- [x] 3.2 Modify `internal/platform/authctx/authctx.go` with `RoleSlug string` and `Permissions []string`; update call sites.
+- [x] 3.3 Create `internal/middleware/authorization.go` with `PermissionResolver`, `AttachPermissions`, `RequirePermission`, and `RequireRole`.
+- [x] 3.4 Wire permissions, resolver, role assignment, and guards in `internal/app/container.go`; keep API-only scope.
 
 ## Phase 4: Route Guards / Verification
 
-- [ ] 4.1 RED: add route tests for guarded users, roles, permissions, `/api/v1/auth/me` permission slugs, and standard 401/403 envelopes.
-- [ ] 4.2 Modify `internal/modules/auth/{handler,dto,routes}.go` so `/auth/me` returns role data and permission slugs from context.
-- [ ] 4.3 Apply route permissions in `internal/modules/users/routes.go`, `internal/modules/roles/routes.go`, and `internal/modules/permissions/routes.go` per design taxonomy.
-- [ ] 4.4 Run `go test ./...` and `go build ./...`; fix failures without weakening RBAC scenarios.
+- [x] 4.1 RED: add route tests for guarded users, roles, permissions, `/api/v1/auth/me` permission slugs, and standard 401/403 envelopes.
+- [x] 4.2 Modify `internal/modules/auth/{handler,dto,routes}.go` so `/auth/me` returns role data and permission slugs from context.
+- [x] 4.3 Apply route permissions in `internal/modules/users/routes.go`, `internal/modules/roles/routes.go`, and `internal/modules/permissions/routes.go` per design taxonomy.
+- [x] 4.4 Run `go test ./...` and `go build ./...`; fix failures without weakening RBAC scenarios.

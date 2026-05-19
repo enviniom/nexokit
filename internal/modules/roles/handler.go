@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
@@ -185,20 +186,16 @@ func (h *Handler) Delete(c *gin.Context) {
 }
 
 func permissionSlugsFromContext(c *gin.Context) []string {
-	value, ok := c.Get("permission_slugs")
-	if !ok {
+	user, ok := authctx.FromGin(c)
+	if !ok || user == nil {
 		return nil
 	}
-	permissions, ok := value.([]string)
-	if !ok {
-		return nil
-	}
-	return permissions
+	return user.Permissions
 }
 
 func containsPermission(items []string, slug string) bool {
 	for _, item := range items {
-		if item == slug {
+		if item == "*" || item == slug {
 			return true
 		}
 	}

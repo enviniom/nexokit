@@ -6,14 +6,16 @@ const contextKey = "auth_user"
 
 // User is the sanitized authenticated user injected into request context.
 type User struct {
-	ID        uint
-	PublicID  string
-	Email     string
-	Name      string
-	Role      string
-	RoleID    uint
-	CompanyID *uint
-	IsActive  bool
+	ID          uint
+	PublicID    string
+	Email       string
+	Name        string
+	Role        string
+	RoleSlug    string
+	RoleID      uint
+	CompanyID   *uint
+	IsActive    bool
+	Permissions []string
 }
 
 // SetGin stores the authenticated user in the Gin context.
