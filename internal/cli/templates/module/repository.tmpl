@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	{{- if .Tenant }}
+	"github.com/enviniom/nexokit/internal/platform/tenant"
+	{{- end }}
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
@@ -24,11 +27,11 @@ func (r *{{.Struct}}Repository) Create(ctx context.Context, m *{{.Struct}}) erro
 }
 
 // FindByPublicID retrieves a {{.Struct}} by its public ID.
-func (r *{{.Struct}}Repository) FindByPublicID(ctx context.Context, publicID string) (*{{.Struct}}, error) {
+func (r *{{.Struct}}Repository) FindByPublicID(ctx context.Context, {{- if .Tenant }} tc tenant.TenantContext, {{- end }} publicID string) (*{{.Struct}}, error) {
 	var m {{.Struct}}
 	q := r.db.WithContext(ctx).Where("public_id = ?", publicID)
 	{{- if .Tenant }}
-	q = q.Where("company_id = ?", ctx.Value("company_id"))
+	q = tenant.ApplyTenantScope(q, tc)
 	{{- end }}
 	if err := q.First(&m).Error; err != nil {
 		return nil, fmt.Errorf("{{.Package}} not found: %w", err)
@@ -37,12 +40,12 @@ func (r *{{.Struct}}Repository) FindByPublicID(ctx context.Context, publicID str
 }
 
 // List returns paginated {{.Table}}.
-func (r *{{.Struct}}Repository) List(ctx context.Context, page, perPage int) ([]{{.Struct}}, error) {
+func (r *{{.Struct}}Repository) List(ctx context.Context, {{- if .Tenant }} tc tenant.TenantContext, {{- end }} page, perPage int) ([]{{.Struct}}, error) {
 	var items []{{.Struct}}
 	offset := (page - 1) * perPage
 	q := r.db.WithContext(ctx).Limit(perPage).Offset(offset).Order("created_at DESC")
 	{{- if .Tenant }}
-	q = q.Where("company_id = ?", ctx.Value("company_id"))
+	q = tenant.ApplyTenantScope(q, tc)
 	{{- end }}
 	if err := q.Find(&items).Error; err != nil {
 		return nil, err
@@ -51,11 +54,11 @@ func (r *{{.Struct}}Repository) List(ctx context.Context, page, perPage int) ([]
 }
 
 // Count returns the total number of {{.Table}}.
-func (r *{{.Struct}}Repository) Count(ctx context.Context) (int64, error) {
+func (r *{{.Struct}}Repository) Count(ctx context.Context{{- if .Tenant }}, tc tenant.TenantContext{{- end }}) (int64, error) {
 	var count int64
 	q := r.db.WithContext(ctx).Model(&{{.Struct}}{})
 	{{- if .Tenant }}
-	q = q.Where("company_id = ?", ctx.Value("company_id"))
+	q = tenant.ApplyTenantScope(q, tc)
 	{{- end }}
 	if err := q.Count(&count).Error; err != nil {
 		return 0, err
@@ -69,10 +72,10 @@ func (r *{{.Struct}}Repository) Update(ctx context.Context, m *{{.Struct}}) erro
 }
 
 // Delete soft-deletes a {{.Struct}}.
-func (r *{{.Struct}}Repository) Delete(ctx context.Context, publicID string) error {
+func (r *{{.Struct}}Repository) Delete(ctx context.Context, {{- if .Tenant }} tc tenant.TenantContext, {{- end }} publicID string) error {
 	q := r.db.WithContext(ctx).Where("public_id = ?", publicID)
 	{{- if .Tenant }}
-	q = q.Where("company_id = ?", ctx.Value("company_id"))
+	q = tenant.ApplyTenantScope(q, tc)
 	{{- end }}
 	return q.Delete(&{{.Struct}}{}).Error
 }

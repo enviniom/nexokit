@@ -74,6 +74,24 @@ func TestGolden_ModuleWithAllFlags(t *testing.T) {
 		}
 	}
 
+	repository, err := os.ReadFile(filepath.Join(moduleDir, "repository.go"))
+	if err != nil {
+		t.Fatalf("reading generated repository.go: %v", err)
+	}
+	repositoryText := string(repository)
+	for _, want := range []string{
+		`"github.com/enviniom/nexokit/internal/platform/tenant"`,
+		"tc tenant.TenantContext",
+		"tenant.ApplyTenantScope(q, tc)",
+	} {
+		if !strings.Contains(repositoryText, want) {
+			t.Errorf("generated tenant repository missing %q", want)
+		}
+	}
+	if strings.Contains(repositoryText, `ctx.Value("company_id")`) {
+		t.Error("generated tenant repository must not read company_id from context values")
+	}
+
 	// Verify migration was created
 	entries, err := os.ReadDir(filepath.Join(tmpDir, "migrations"))
 	if err != nil {

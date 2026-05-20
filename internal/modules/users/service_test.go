@@ -6,9 +6,14 @@ import (
 
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
+
+const RootRoleID uint = 1
+
+func uintPtr(v uint) *uint { return &v }
 
 // fakeRepository is a test double for the repository.
 type fakeRepository struct {
@@ -20,6 +25,7 @@ type fakeRepository struct {
 	getByEmailErr  error
 	createErr      error
 	updateErr      error
+	lastTenant     tenant.TenantContext
 }
 
 // fakeRoleResolver is a test double for the role resolver.
@@ -35,24 +41,40 @@ func (f *fakeRoleResolver) GetBySlug(slug string) (*roles.Role, error) {
 	return f.role, nil
 }
 
-func (f *fakeRepository) List(page, perPage int) ([]User, error) {
+func (f *fakeRepository) List(tc tenant.TenantContext, page, perPage int) ([]User, error) {
+	f.lastTenant = tc
 	if f.err != nil {
 		return nil, f.err
 	}
-	return f.users, nil
+	return filterUsersByTenant(f.users, tc), nil
 }
 
-func (f *fakeRepository) Count() (int64, error) {
+func (f *fakeRepository) Count(tc tenant.TenantContext) (int64, error) {
+	f.lastTenant = tc
 	if f.err != nil {
 		return 0, f.err
 	}
-	return f.total, nil
+	if f.total != 0 {
+		return f.total, nil
+	}
+	return int64(len(filterUsersByTenant(f.users, tc))), nil
 }
 
-func (f *fakeRepository) GetByPublicID(publicID string) (*User, error) {
+func (f *fakeRepository) GetByPublicID(tc tenant.TenantContext, publicID string) (*User, error) {
+	f.lastTenant = tc
 	if f.err != nil {
 		return nil, f.err
 	}
+	if u, ok := f.userByPublicID[publicID]; ok {
+		if !tenantAllowsUser(tc, u) {
+			return nil, gorm.ErrRecordNotFound
+		}
+		return u, nil
+	}
+	return nil, gorm.ErrRecordNotFound
+}
+
+func (f *fakeRepository) GetAuthUser(publicID string) (*User, error) {
 	if u, ok := f.userByPublicID[publicID]; ok {
 		return u, nil
 	}
@@ -111,17 +133,35 @@ func (f *fakeRepository) Update(user *User) error {
 	return gorm.ErrRecordNotFound
 }
 
-func (f *fakeRepository) Delete(publicID string) error {
+func (f *fakeRepository) Delete(tc tenant.TenantContext, publicID string) error {
+	f.lastTenant = tc
 	if f.err != nil {
 		return f.err
 	}
 	for i := range f.users {
-		if f.users[i].PublicID == publicID {
+		if f.users[i].PublicID == publicID && tenantAllowsUser(tc, &f.users[i]) {
 			f.users = append(f.users[:i], f.users[i+1:]...)
 			return nil
 		}
 	}
 	return gorm.ErrRecordNotFound
+}
+
+func filterUsersByTenant(users []User, tc tenant.TenantContext) []User {
+	if tc.IsRootScope {
+		return users
+	}
+	filtered := make([]User, 0, len(users))
+	for _, user := range users {
+		if tenantAllowsUser(tc, &user) {
+			filtered = append(filtered, user)
+		}
+	}
+	return filtered
+}
+
+func tenantAllowsUser(tc tenant.TenantContext, user *User) bool {
+	return tc.IsRootScope || (user.CompanyID != nil && *user.CompanyID == tc.CompanyID)
 }
 
 func (f *fakeRepository) ListPublicIDsByRoleID(roleID uint) ([]string, error) {
@@ -171,7 +211,7 @@ func TestService_List(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		result, total, err := svc.List(1, 10)
+		result, total, err := svc.List(tenant.NewRoot(), 1, 10)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -193,7 +233,7 @@ func TestService_List(t *testing.T) {
 		repo := &fakeRepository{users: []User{}, total: 0}
 		svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		result, total, err := svc.List(1, 10)
+		result, total, err := svc.List(tenant.NewRoot(), 1, 10)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -209,7 +249,7 @@ func TestService_List(t *testing.T) {
 		repo := &fakeRepository{err: apperror.ErrInternal}
 		svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		_, _, err := svc.List(1, 10)
+		_, _, err := svc.List(tenant.NewRoot(), 1, 10)
 		if err == nil {
 			t.Error("expected error")
 		}
@@ -225,7 +265,7 @@ func TestService_GetByPublicID(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		result, err := svc.GetByPublicID("user1")
+		result, err := svc.GetByPublicID(tenant.NewRoot(), "user1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -241,7 +281,7 @@ func TestService_GetByPublicID(t *testing.T) {
 		repo := &fakeRepository{userByPublicID: map[string]*User{}}
 		svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		_, err := svc.GetByPublicID("missing")
+		_, err := svc.GetByPublicID(tenant.NewRoot(), "missing")
 		if err == nil {
 			t.Error("expected error for missing user")
 		}
@@ -251,13 +291,67 @@ func TestService_GetByPublicID(t *testing.T) {
 	})
 }
 
+func TestService_TenantScopedReads(t *testing.T) {
+	companyOne := uint(1)
+	companyTwo := uint(2)
+	repo := &fakeRepository{
+		users: []User{
+			{BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", CompanyID: &companyOne, Role: roles.Role{Name: "admin"}},
+			{BaseModel: shared.BaseModel{PublicID: "user2"}, Name: "Bob", Email: "bob@example.com", CompanyID: &companyTwo, Role: roles.Role{Name: "admin"}},
+			{BaseModel: shared.BaseModel{PublicID: "root1"}, Name: "Root", Email: "root@example.com", CompanyID: nil, Role: roles.Role{Name: "root"}},
+		},
+		userByPublicID: map[string]*User{
+			"user1": {BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", CompanyID: &companyOne, Role: roles.Role{Name: "admin"}},
+			"user2": {BaseModel: shared.BaseModel{PublicID: "user2"}, Name: "Bob", Email: "bob@example.com", CompanyID: &companyTwo, Role: roles.Role{Name: "admin"}},
+		},
+	}
+	svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}})
+
+	t.Run("admin sees only own company users", func(t *testing.T) {
+		result, total, err := svc.List(tenant.NewScoped(companyOne, "acme"), 1, 10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if total != 1 || len(result) != 1 || result[0].PublicID != "user1" {
+			t.Fatalf("expected only company one user, total=%d result=%#v", total, result)
+		}
+	})
+
+	t.Run("root global sees all users", func(t *testing.T) {
+		result, total, err := svc.List(tenant.NewRoot(), 1, 10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if total != 3 || len(result) != 3 {
+			t.Fatalf("expected all users for root, total=%d len=%d", total, len(result))
+		}
+	})
+
+	t.Run("root scoped sees one company", func(t *testing.T) {
+		result, total, err := svc.List(tenant.NewScoped(companyTwo, "globex"), 1, 10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if total != 1 || len(result) != 1 || result[0].PublicID != "user2" {
+			t.Fatalf("expected only company two user, total=%d result=%#v", total, result)
+		}
+	})
+
+	t.Run("cross tenant get returns not found", func(t *testing.T) {
+		_, err := svc.GetByPublicID(tenant.NewScoped(companyOne, "acme"), "user2")
+		if !errors.Is(err, apperror.ErrNotFound) {
+			t.Fatalf("expected ErrNotFound for cross-tenant read, got %v", err)
+		}
+	})
+}
+
 func TestService_Create(t *testing.T) {
 	t.Run("creates a new user successfully", func(t *testing.T) {
 		repo := &fakeRepository{users: []User{}, userByEmail: map[string]*User{}}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 1}
-		result, err := svc.Create(req)
+		req := CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 2, CompanyID: uintPtr(1)}
+		result, err := svc.Create(tenant.NewRoot(), req)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -280,8 +374,8 @@ func TestService_Create(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 1}
-		_, err := svc.Create(req)
+		req := CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 2, CompanyID: uintPtr(1)}
+		_, err := svc.Create(tenant.NewRoot(), req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -294,8 +388,8 @@ func TestService_Create(t *testing.T) {
 		repo := &fakeRepository{getByEmailErr: apperror.ErrInternal}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 1}
-		_, err := svc.Create(req)
+		req := CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 2, CompanyID: uintPtr(1)}
+		_, err := svc.Create(tenant.NewRoot(), req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -308,8 +402,8 @@ func TestService_Create(t *testing.T) {
 		repo := &fakeRepository{userByEmail: map[string]*User{}, createErr: gorm.ErrDuplicatedKey}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 1}
-		_, err := svc.Create(req)
+		req := CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 2, CompanyID: uintPtr(1)}
+		_, err := svc.Create(tenant.NewRoot(), req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -319,18 +413,69 @@ func TestService_Create(t *testing.T) {
 	})
 }
 
-func TestService_Create_RejectsRootRole(t *testing.T) {
-	t.Run("returns forbidden when creating user with root role", func(t *testing.T) {
+func TestService_Create_AllowsRootWithoutCompany(t *testing.T) {
+	t.Run("creates root with nullable company", func(t *testing.T) {
 		repo := &fakeRepository{users: []User{}, userByEmail: map[string]*User{}}
-		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 1}, Name: "root"}})
+		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}})
 
-		req := CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 1}
-		_, err := svc.Create(req)
-		if err == nil {
-			t.Fatal("expected error")
+		req := CreateUserRequest{Name: "Root", Email: "root@example.com", Password: "Password1", RoleID: RootRoleID}
+		result, err := svc.Create(tenant.NewRoot(), req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
+		if result.CompanyID != nil {
+			t.Fatalf("expected root company_id to stay nil, got %v", *result.CompanyID)
+		}
+	})
+}
+
+func TestService_Create_TenantIsolation(t *testing.T) {
+	rootRole := &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}
+
+	t.Run("root global requires company for non-root user", func(t *testing.T) {
+		repo := &fakeRepository{users: []User{}, userByEmail: map[string]*User{}}
+		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: rootRole})
+
+		_, err := svc.Create(tenant.NewRoot(), CreateUserRequest{Name: "Admin", Email: "admin@example.com", Password: "Password1", RoleID: 2})
+
+		if !errors.Is(err, apperror.ErrBadRequest) {
+			t.Fatalf("expected ErrBadRequest, got %v", err)
+		}
+	})
+
+	t.Run("scoped tenant forces missing company to current tenant", func(t *testing.T) {
+		repo := &fakeRepository{users: []User{}, userByEmail: map[string]*User{}}
+		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: rootRole})
+
+		result, err := svc.Create(tenant.NewScoped(7, "acme"), CreateUserRequest{Name: "Admin", Email: "admin@example.com", Password: "Password1", RoleID: 2})
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.CompanyID == nil || *result.CompanyID != 7 {
+			t.Fatalf("expected company_id 7, got %v", result.CompanyID)
+		}
+	})
+
+	t.Run("scoped tenant rejects another company", func(t *testing.T) {
+		repo := &fakeRepository{users: []User{}, userByEmail: map[string]*User{}}
+		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: rootRole})
+
+		_, err := svc.Create(tenant.NewScoped(7, "acme"), CreateUserRequest{Name: "Admin", Email: "admin@example.com", Password: "Password1", RoleID: 2, CompanyID: uintPtr(8)})
+
 		if !errors.Is(err, apperror.ErrForbidden) {
-			t.Errorf("expected ErrForbidden, got %v", err)
+			t.Fatalf("expected ErrForbidden, got %v", err)
+		}
+	})
+
+	t.Run("only root global can create root without company", func(t *testing.T) {
+		repo := &fakeRepository{users: []User{}, userByEmail: map[string]*User{}}
+		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: rootRole})
+
+		_, err := svc.Create(tenant.NewScoped(7, "acme"), CreateUserRequest{Name: "Root", Email: "root@example.com", Password: "Password1", RoleID: RootRoleID})
+
+		if !errors.Is(err, apperror.ErrForbidden) {
+			t.Fatalf("expected ErrForbidden, got %v", err)
 		}
 	})
 }
@@ -348,8 +493,8 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", RoleID: 2}
-		result, err := svc.Update("user1", "", req)
+		req := UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", RoleID: 2, CompanyID: uintPtr(1)}
+		result, err := svc.Update(tenant.NewRoot(), "user1", "", req)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -368,7 +513,7 @@ func TestService_Update(t *testing.T) {
 		repo := &fakeRepository{userByPublicID: map[string]*User{}}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		_, err := svc.Update("missing", "", UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 1})
+		_, err := svc.Update(tenant.NewRoot(), "missing", "", UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 2, CompanyID: uintPtr(1)})
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -392,8 +537,8 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 1}
-		_, err := svc.Update("user1", "", req)
+		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 2, CompanyID: uintPtr(1)}
+		_, err := svc.Update(tenant.NewRoot(), "user1", "", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -414,8 +559,8 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 1}
-		_, err := svc.Update("user1", "", req)
+		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 2, CompanyID: uintPtr(1)}
+		_, err := svc.Update(tenant.NewRoot(), "user1", "", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -437,8 +582,8 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 1}
-		_, err := svc.Update("user1", "", req)
+		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 2, CompanyID: uintPtr(1)}
+		_, err := svc.Update(tenant.NewRoot(), "user1", "", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -460,7 +605,7 @@ func TestService_Update(t *testing.T) {
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 1}, Name: "root"}})
 
 		req := UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 1}
-		_, err := svc.Update("user1", "", req)
+		_, err := svc.Update(tenant.NewRoot(), "user1", "", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -482,7 +627,7 @@ func TestService_Update(t *testing.T) {
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 1}, Name: "root"}})
 
 		req := UpdateUserRequest{Name: "Root Updated", Email: "root-new@example.com", RoleID: 1}
-		_, err := svc.Update("root1", "", req)
+		_, err := svc.Update(tenant.NewRoot(), "root1", "", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -504,7 +649,7 @@ func TestService_Update(t *testing.T) {
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 1}, Name: "root"}})
 
 		req := UpdateUserRequest{Name: "Root Updated", Email: "root-new@example.com", RoleID: 1}
-		_, err := svc.Update("root1", "other", req)
+		_, err := svc.Update(tenant.NewRoot(), "root1", "other", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -527,7 +672,7 @@ func TestService_Update(t *testing.T) {
 
 		companyID := uint(42)
 		req := UpdateUserRequest{Name: "Root Updated", Email: "root-new@example.com", RoleID: 2, CompanyID: &companyID}
-		result, err := svc.Update("root1", "root1", req)
+		result, err := svc.Update(tenant.NewRoot(), "root1", "root1", req)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -544,6 +689,62 @@ func TestService_Update(t *testing.T) {
 	})
 }
 
+func TestService_TenantScopedWrites(t *testing.T) {
+	companyOne := uint(1)
+	companyTwo := uint(2)
+	repo := &fakeRepository{
+		users: []User{
+			{BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", PasswordHash: "oldhash", RoleID: 2, CompanyID: &companyOne, IsActive: true},
+			{BaseModel: shared.BaseModel{PublicID: "user2"}, Name: "Bob", Email: "bob@example.com", PasswordHash: "oldhash", RoleID: 2, CompanyID: &companyTwo, IsActive: true},
+		},
+		userByPublicID: map[string]*User{
+			"user1": {BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", PasswordHash: "oldhash", RoleID: 2, CompanyID: &companyOne, IsActive: true},
+			"user2": {BaseModel: shared.BaseModel{PublicID: "user2"}, Name: "Bob", Email: "bob@example.com", PasswordHash: "oldhash", RoleID: 2, CompanyID: &companyTwo, IsActive: true},
+		},
+		userByEmail: map[string]*User{},
+	}
+	svc := NewService(repo, &fakeHasher{hash: "newhash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}})
+	scope := tenant.NewScoped(companyOne, "acme")
+
+	t.Run("updates user within tenant scope", func(t *testing.T) {
+		result, err := svc.Update(scope, "user1", "", UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", RoleID: 2, CompanyID: &companyOne})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.Name != "Alice Updated" || result.CompanyID == nil || *result.CompanyID != companyOne {
+			t.Fatalf("expected updated company-one user, got %#v", result)
+		}
+	})
+
+	t.Run("cross tenant update returns not found", func(t *testing.T) {
+		_, err := svc.Update(scope, "user2", "", UpdateUserRequest{Name: "Bob Updated", Email: "bob-new@example.com", RoleID: 2, CompanyID: &companyTwo})
+		if !errors.Is(err, apperror.ErrNotFound) {
+			t.Fatalf("expected ErrNotFound for cross-tenant update, got %v", err)
+		}
+	})
+
+	t.Run("cross tenant delete returns not found", func(t *testing.T) {
+		err := svc.Delete(scope, "user2")
+		if !errors.Is(err, apperror.ErrNotFound) {
+			t.Fatalf("expected ErrNotFound for cross-tenant delete, got %v", err)
+		}
+	})
+
+	t.Run("cross tenant password change returns not found", func(t *testing.T) {
+		err := svc.ChangePassword(scope, "user2", "", ChangePasswordRequest{CurrentPassword: "oldpassword", NewPassword: "NewPassword1"})
+		if !errors.Is(err, apperror.ErrNotFound) {
+			t.Fatalf("expected ErrNotFound for cross-tenant password change, got %v", err)
+		}
+	})
+
+	t.Run("cross tenant status toggle returns not found", func(t *testing.T) {
+		_, err := svc.ToggleStatus(scope, "user2", UpdateStatusRequest{IsActive: false})
+		if !errors.Is(err, apperror.ErrNotFound) {
+			t.Fatalf("expected ErrNotFound for cross-tenant status toggle, got %v", err)
+		}
+	})
+}
+
 func TestService_Delete(t *testing.T) {
 	t.Run("deletes a user successfully", func(t *testing.T) {
 		repo := &fakeRepository{
@@ -556,7 +757,7 @@ func TestService_Delete(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		err := svc.Delete("user1")
+		err := svc.Delete(tenant.NewRoot(), "user1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -566,7 +767,7 @@ func TestService_Delete(t *testing.T) {
 		repo := &fakeRepository{userByPublicID: map[string]*User{}}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		err := svc.Delete("missing")
+		err := svc.Delete(tenant.NewRoot(), "missing")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -588,7 +789,7 @@ func TestService_ChangePassword(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "newhash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		err := svc.ChangePassword("user1", "", ChangePasswordRequest{CurrentPassword: "oldpassword", NewPassword: "NewPassword1"})
+		err := svc.ChangePassword(tenant.NewRoot(), "user1", "", ChangePasswordRequest{CurrentPassword: "oldpassword", NewPassword: "NewPassword1"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -605,7 +806,7 @@ func TestService_ChangePassword(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "newhash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		err := svc.ChangePassword("user1", "", ChangePasswordRequest{CurrentPassword: "wrong", NewPassword: "NewPassword1"})
+		err := svc.ChangePassword(tenant.NewRoot(), "user1", "", ChangePasswordRequest{CurrentPassword: "wrong", NewPassword: "NewPassword1"})
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -618,7 +819,7 @@ func TestService_ChangePassword(t *testing.T) {
 		repo := &fakeRepository{userByPublicID: map[string]*User{}}
 		svc := NewService(repo, &fakeHasher{hash: "newhash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		err := svc.ChangePassword("missing", "", ChangePasswordRequest{CurrentPassword: "old", NewPassword: "NewPassword1"})
+		err := svc.ChangePassword(tenant.NewRoot(), "missing", "", ChangePasswordRequest{CurrentPassword: "old", NewPassword: "NewPassword1"})
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -640,7 +841,7 @@ func TestService_ToggleStatus(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		result, err := svc.ToggleStatus("user1", UpdateStatusRequest{IsActive: false})
+		result, err := svc.ToggleStatus(tenant.NewRoot(), "user1", UpdateStatusRequest{IsActive: false})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -660,7 +861,7 @@ func TestService_ToggleStatus(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		result, err := svc.ToggleStatus("user1", UpdateStatusRequest{IsActive: true})
+		result, err := svc.ToggleStatus(tenant.NewRoot(), "user1", UpdateStatusRequest{IsActive: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -673,7 +874,7 @@ func TestService_ToggleStatus(t *testing.T) {
 		repo := &fakeRepository{userByPublicID: map[string]*User{}}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		_, err := svc.ToggleStatus("missing", UpdateStatusRequest{IsActive: false})
+		_, err := svc.ToggleStatus(tenant.NewRoot(), "missing", UpdateStatusRequest{IsActive: false})
 		if err == nil {
 			t.Fatal("expected error")
 		}

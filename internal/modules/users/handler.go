@@ -2,12 +2,13 @@ package users
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/messages"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,27 +28,21 @@ func NewHandler(service Service, actorProvider func(*gin.Context) string) *Handl
 
 // List returns paginated users.
 func (h *Handler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if page < 1 {
-		page = 1
-	}
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
-	if perPage < 1 {
-		perPage = 20
-	}
+	pagination := query.PaginationFromGin(c)
 
-	users, total, err := h.service.List(page, perPage)
+	tc := h.tenantContext(c)
+	users, total, err := h.service.List(tc, pagination.Page, pagination.PerPage)
 	if err != nil {
 		response.InternalServerError(c, messages.MsgInternalError)
 		return
 	}
-	response.Paginated(c, messages.MsgSuccess, users, page, perPage, total)
+	response.Paginated(c, messages.MsgSuccess, users, pagination.Page, pagination.PerPage, total)
 }
 
 // GetByPublicID returns a single user by its public ID.
 func (h *Handler) GetByPublicID(c *gin.Context) {
 	publicID := c.Param("id")
-	user, err := h.service.GetByPublicID(publicID)
+	user, err := h.service.GetByPublicID(h.tenantContext(c), publicID)
 	if err != nil {
 		if apperror.Status(err) == http.StatusNotFound {
 			response.NotFound(c, messages.MsgNotFound)
@@ -70,11 +65,19 @@ func (h *Handler) Create(c *gin.Context) {
 		response.ValidationError(c, errs)
 		return
 	}
-	user, err := h.service.Create(req)
+	user, err := h.service.Create(h.tenantContext(c), req)
 	if err != nil {
 		status := apperror.Status(err)
 		if status == http.StatusConflict {
 			response.Conflict(c, messages.MsgConflict)
+			return
+		}
+		if status == http.StatusBadRequest {
+			response.BadRequest(c, messages.MsgBadRequest)
+			return
+		}
+		if status == http.StatusForbidden {
+			response.Forbidden(c, messages.MsgForbidden)
 			return
 		}
 		response.InternalServerError(c, messages.MsgInternalError)
@@ -95,7 +98,7 @@ func (h *Handler) Update(c *gin.Context) {
 		response.ValidationError(c, errs)
 		return
 	}
-	user, err := h.service.Update(publicID, h.actorPublicID(c), req)
+	user, err := h.service.Update(h.tenantContext(c), publicID, h.actorPublicID(c), req)
 	if err != nil {
 		status := apperror.Status(err)
 		if status == http.StatusNotFound {
@@ -115,7 +118,7 @@ func (h *Handler) Update(c *gin.Context) {
 // Delete soft-deletes a user by its public ID.
 func (h *Handler) Delete(c *gin.Context) {
 	publicID := c.Param("id")
-	if err := h.service.Delete(publicID); err != nil {
+	if err := h.service.Delete(h.tenantContext(c), publicID); err != nil {
 		status := apperror.Status(err)
 		if status == http.StatusNotFound {
 			response.NotFound(c, messages.MsgNotFound)
@@ -139,7 +142,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		response.ValidationError(c, errs)
 		return
 	}
-	if err := h.service.ChangePassword(publicID, h.actorPublicID(c), req); err != nil {
+	if err := h.service.ChangePassword(h.tenantContext(c), publicID, h.actorPublicID(c), req); err != nil {
 		status := apperror.Status(err)
 		if status == http.StatusNotFound {
 			response.NotFound(c, messages.MsgNotFound)
@@ -162,6 +165,13 @@ func (h *Handler) actorPublicID(c *gin.Context) string {
 	return h.actorProvider(c)
 }
 
+func (h *Handler) tenantContext(c *gin.Context) tenant.TenantContext {
+	if tc, ok := tenant.FromGin(c); ok {
+		return tc
+	}
+	return tenant.NewRoot()
+}
+
 // ToggleStatus handles PATCH /users/:id/status.
 func (h *Handler) ToggleStatus(c *gin.Context) {
 	publicID := c.Param("id")
@@ -174,7 +184,7 @@ func (h *Handler) ToggleStatus(c *gin.Context) {
 		response.ValidationError(c, errs)
 		return
 	}
-	user, err := h.service.ToggleStatus(publicID, req)
+	user, err := h.service.ToggleStatus(h.tenantContext(c), publicID, req)
 	if err != nil {
 		status := apperror.Status(err)
 		if status == http.StatusNotFound {

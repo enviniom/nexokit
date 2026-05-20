@@ -110,7 +110,7 @@ func TestRequirePermission(t *testing.T) {
 		{name: "unauthenticated returns 401", status: http.StatusUnauthorized},
 		{name: "missing permission returns 403", user: &authctx.User{PublicID: "user1", Role: "user", RoleSlug: "user", Permissions: []string{"users.view"}}, status: http.StatusForbidden},
 		{name: "matching permission proceeds", user: &authctx.User{PublicID: "user1", Role: "admin", RoleSlug: "admin", Permissions: []string{"users.create"}}, status: http.StatusOK},
-		{name: "root role bypasses permission check", user: &authctx.User{PublicID: "root1", Role: "root", RoleSlug: "root"}, status: http.StatusOK},
+		{name: "root role bypasses permission check", user: &authctx.User{PublicID: "root1", Role: "root", RoleSlug: "root", IsRoot: true}, status: http.StatusOK},
 	}
 
 	for _, tt := range cases {

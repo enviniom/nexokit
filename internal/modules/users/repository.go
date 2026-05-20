@@ -1,16 +1,20 @@
 package users
 
-import "gorm.io/gorm"
+import (
+	"github.com/enviniom/nexokit/internal/platform/tenant"
+	"gorm.io/gorm"
+)
 
 // Repository defines the persistence contract for users.
 type Repository interface {
-	List(page, perPage int) ([]User, error)
-	Count() (int64, error)
-	GetByPublicID(publicID string) (*User, error)
+	List(tc tenant.TenantContext, page, perPage int) ([]User, error)
+	Count(tc tenant.TenantContext) (int64, error)
+	GetByPublicID(tc tenant.TenantContext, publicID string) (*User, error)
+	GetAuthUser(publicID string) (*User, error)
 	GetByEmail(email string) (*User, error)
 	Create(user *User) error
 	Update(user *User) error
-	Delete(publicID string) error
+	Delete(tc tenant.TenantContext, publicID string) error
 	ListPublicIDsByRoleID(roleID uint) ([]string, error)
 }
 
@@ -25,26 +29,41 @@ func NewRepository(db *gorm.DB) Repository {
 }
 
 // List returns paginated users.
-func (r *GormRepository) List(page, perPage int) ([]User, error) {
+func (r *GormRepository) List(tc tenant.TenantContext, page, perPage int) ([]User, error) {
 	var users []User
 	offset := (page - 1) * perPage
-	if err := r.db.Preload("Role").Limit(perPage).Offset(offset).Order("created_at DESC").Find(&users).Error; err != nil {
+	db := tenant.ApplyTenantScope(r.db, tc)
+	if err := db.Preload("Role").Limit(perPage).Offset(offset).Order("created_at DESC").Find(&users).Error; err != nil {
 		return nil, err
 	}
 	return users, nil
 }
 
 // Count returns the total number of users.
-func (r *GormRepository) Count() (int64, error) {
+func (r *GormRepository) Count(tc tenant.TenantContext) (int64, error) {
 	var count int64
-	if err := r.db.Model(&User{}).Count(&count).Error; err != nil {
+	db := tenant.ApplyTenantScope(r.db.Model(&User{}), tc)
+	if err := db.Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
 }
 
 // GetByPublicID returns a user by its public ID.
-func (r *GormRepository) GetByPublicID(publicID string) (*User, error) {
+func (r *GormRepository) GetByPublicID(tc tenant.TenantContext, publicID string) (*User, error) {
+	var user User
+	db := tenant.ApplyTenantScope(r.db.Preload("Role"), tc)
+	if err := db.Where("public_id = ?", publicID).First(&user).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, err
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+// GetAuthUser returns a user by public ID without tenant scope for auth bootstrap.
+func (r *GormRepository) GetAuthUser(publicID string) (*User, error) {
 	var user User
 	if err := r.db.Preload("Role").Where("public_id = ?", publicID).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -78,8 +97,16 @@ func (r *GormRepository) Update(user *User) error {
 }
 
 // Delete soft-deletes a user by its public ID.
-func (r *GormRepository) Delete(publicID string) error {
-	return r.db.Where("public_id = ?", publicID).Delete(&User{}).Error
+func (r *GormRepository) Delete(tc tenant.TenantContext, publicID string) error {
+	db := tenant.ApplyTenantScope(r.db, tc)
+	result := db.Where("public_id = ?", publicID).Delete(&User{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // ListPublicIDsByRoleID returns public IDs for users assigned to the role.

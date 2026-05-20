@@ -2,10 +2,10 @@ package permissions
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/messages"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
 )
@@ -32,20 +32,13 @@ func (h *Handler) List(c *gin.Context) {
 
 // ListPaginated returns paginated permissions.
 func (h *Handler) ListPaginated(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if page < 1 {
-		page = 1
-	}
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
-	if perPage < 1 {
-		perPage = 20
-	}
-	permissions, total, err := h.service.List(page, perPage)
+	pagination := query.PaginationFromGin(c)
+	permissions, total, err := h.service.List(pagination.Page, pagination.PerPage)
 	if err != nil {
 		response.InternalServerError(c, messages.MsgInternalError)
 		return
 	}
-	response.Paginated(c, messages.MsgSuccess, permissions, page, perPage, total)
+	response.Paginated(c, messages.MsgSuccess, permissions, pagination.Page, pagination.PerPage, total)
 }
 
 // GetByPublicID returns a single permission by public ID.

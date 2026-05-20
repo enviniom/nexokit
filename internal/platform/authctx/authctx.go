@@ -14,8 +14,15 @@ type User struct {
 	RoleSlug    string
 	RoleID      uint
 	CompanyID   *uint
+	CompanySlug string
+	IsRoot      bool
 	IsActive    bool
 	Permissions []string
+}
+
+// HasCompany reports whether the authenticated user is assigned to a company.
+func (u *User) HasCompany() bool {
+	return u != nil && u.CompanyID != nil
 }
 
 // SetGin stores the authenticated user in the Gin context.

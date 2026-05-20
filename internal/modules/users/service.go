@@ -7,6 +7,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
@@ -24,13 +25,13 @@ type RoleResolver interface {
 
 // Service defines the business logic contract for users.
 type Service interface {
-	List(page, perPage int) ([]UserResponse, int64, error)
-	GetByPublicID(publicID string) (*UserResponse, error)
-	Create(req CreateUserRequest) (*UserResponse, error)
-	Update(publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error)
-	Delete(publicID string) error
-	ChangePassword(publicID string, actorPublicID string, req ChangePasswordRequest) error
-	ToggleStatus(publicID string, req UpdateStatusRequest) (*UserResponse, error)
+	List(tc tenant.TenantContext, page, perPage int) ([]UserResponse, int64, error)
+	GetByPublicID(tc tenant.TenantContext, publicID string) (*UserResponse, error)
+	Create(tc tenant.TenantContext, req CreateUserRequest) (*UserResponse, error)
+	Update(tc tenant.TenantContext, publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error)
+	Delete(tc tenant.TenantContext, publicID string) error
+	ChangePassword(tc tenant.TenantContext, publicID string, actorPublicID string, req ChangePasswordRequest) error
+	ToggleStatus(tc tenant.TenantContext, publicID string, req UpdateStatusRequest) (*UserResponse, error)
 }
 
 // userService is the concrete implementation of Service.
@@ -62,13 +63,13 @@ func (s *userService) rootRoleID() (uint, error) {
 }
 
 // List returns paginated users as DTOs.
-func (s *userService) List(page, perPage int) ([]UserResponse, int64, error) {
-	users, err := s.repo.List(page, perPage)
+func (s *userService) List(tc tenant.TenantContext, page, perPage int) ([]UserResponse, int64, error) {
+	users, err := s.repo.List(tc, page, perPage)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	total, err := s.repo.Count()
+	total, err := s.repo.Count(tc)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -82,8 +83,8 @@ func (s *userService) List(page, perPage int) ([]UserResponse, int64, error) {
 }
 
 // GetByPublicID returns a single user by public ID.
-func (s *userService) GetByPublicID(publicID string) (*UserResponse, error) {
-	user, err := s.repo.GetByPublicID(publicID)
+func (s *userService) GetByPublicID(tc tenant.TenantContext, publicID string) (*UserResponse, error) {
+	user, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.ErrNotFound
@@ -95,15 +96,26 @@ func (s *userService) GetByPublicID(publicID string) (*UserResponse, error) {
 }
 
 // Create creates a new user after checking email uniqueness.
-func (s *userService) Create(req CreateUserRequest) (*UserResponse, error) {
+func (s *userService) Create(tc tenant.TenantContext, req CreateUserRequest) (*UserResponse, error) {
 	rootRoleID, err := s.rootRoleID()
 	if err != nil {
 		return nil, err
 	}
 
-	// Rule: API cannot create users with the root role.
 	if req.RoleID == rootRoleID {
-		return nil, apperror.ErrForbidden
+		if !tc.IsRootScope || req.CompanyID != nil {
+			return nil, apperror.ErrForbidden
+		}
+	} else if tc.IsRootScope {
+		if req.CompanyID == nil {
+			return nil, apperror.ErrBadRequest
+		}
+	} else {
+		if req.CompanyID != nil && *req.CompanyID != tc.CompanyID {
+			return nil, apperror.ErrForbidden
+		}
+		companyID := tc.CompanyID
+		req.CompanyID = &companyID
 	}
 
 	if _, err := s.repo.GetByEmail(req.Email); err == nil {
@@ -141,7 +153,7 @@ func (s *userService) Create(req CreateUserRequest) (*UserResponse, error) {
 		return nil, err
 	}
 
-	created, err := s.repo.GetByPublicID(user.PublicID)
+	created, err := s.repo.GetByPublicID(tenant.NewRoot(), user.PublicID)
 	if err != nil {
 		return nil, err
 	}
@@ -150,8 +162,8 @@ func (s *userService) Create(req CreateUserRequest) (*UserResponse, error) {
 }
 
 // Update updates a user if the new email is unique.
-func (s *userService) Update(publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error) {
-	user, err := s.repo.GetByPublicID(publicID)
+func (s *userService) Update(tc tenant.TenantContext, publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error) {
+	user, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.ErrNotFound
@@ -182,6 +194,9 @@ func (s *userService) Update(publicID string, actorPublicID string, req UpdateUs
 		user.Email = req.Email
 		// RoleID and CompanyID are intentionally ignored for root.
 	} else {
+		if req.CompanyID == nil {
+			return nil, apperror.ErrBadRequest
+		}
 		if user.Email != req.Email {
 			existing, err := s.repo.GetByEmail(req.Email)
 			if err == nil {
@@ -206,7 +221,7 @@ func (s *userService) Update(publicID string, actorPublicID string, req UpdateUs
 		return nil, err
 	}
 
-	updated, err := s.repo.GetByPublicID(user.PublicID)
+	updated, err := s.repo.GetByPublicID(tc, user.PublicID)
 	if err != nil {
 		return nil, err
 	}
@@ -215,8 +230,8 @@ func (s *userService) Update(publicID string, actorPublicID string, req UpdateUs
 }
 
 // Delete soft-deletes a user by its public ID.
-func (s *userService) Delete(publicID string) error {
-	user, err := s.repo.GetByPublicID(publicID)
+func (s *userService) Delete(tc tenant.TenantContext, publicID string) error {
+	user, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.ErrNotFound
@@ -225,12 +240,18 @@ func (s *userService) Delete(publicID string) error {
 	}
 
 	_ = user // reserved for future audit logic
-	return s.repo.Delete(publicID)
+	if err := s.repo.Delete(tc, publicID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return apperror.ErrNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 // ChangePassword verifies the current password and updates the hash.
-func (s *userService) ChangePassword(publicID string, actorPublicID string, req ChangePasswordRequest) error {
-	user, err := s.repo.GetByPublicID(publicID)
+func (s *userService) ChangePassword(tc tenant.TenantContext, publicID string, actorPublicID string, req ChangePasswordRequest) error {
+	user, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.ErrNotFound
@@ -264,8 +285,8 @@ func (s *userService) ChangePassword(publicID string, actorPublicID string, req 
 }
 
 // ToggleStatus updates a user's active status.
-func (s *userService) ToggleStatus(publicID string, req UpdateStatusRequest) (*UserResponse, error) {
-	user, err := s.repo.GetByPublicID(publicID)
+func (s *userService) ToggleStatus(tc tenant.TenantContext, publicID string, req UpdateStatusRequest) (*UserResponse, error) {
+	user, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.ErrNotFound
@@ -278,7 +299,7 @@ func (s *userService) ToggleStatus(publicID string, req UpdateStatusRequest) (*U
 		return nil, err
 	}
 
-	updated, err := s.repo.GetByPublicID(user.PublicID)
+	updated, err := s.repo.GetByPublicID(tc, user.PublicID)
 	if err != nil {
 		return nil, err
 	}

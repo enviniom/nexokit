@@ -11,6 +11,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/platform/token"
 	"github.com/gin-gonic/gin"
 )
@@ -97,5 +98,28 @@ func TestAuth(t *testing.T) {
 				t.Fatal("expected error response")
 			}
 		})
+	}
+}
+
+func TestAuthDoesNotSetTenantContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	user := &authctx.User{PublicID: "root1", RoleSlug: "root", IsRoot: true, IsActive: true}
+	r.Use(Auth(fakeAccessParser{claims: &token.AccessClaims{Sub: user.PublicID, TokenType: "access", ExpiresAt: time.Now().Add(time.Hour)}}, fakeAuthUserLookup{user: user}))
+	r.GET("/protected", func(c *gin.Context) {
+		if _, ok := tenant.FromGin(c); ok {
+			t.Fatal("auth middleware must not set tenant context")
+		}
+		response.Success[any](c, "ok", nil)
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.Header.Set("Authorization", "Bearer valid-token")
+	req.Header.Set("X-Company-ID", "company_01")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
 	}
 }

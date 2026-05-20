@@ -7,6 +7,7 @@ import (
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/modules/auth"
+	"github.com/enviniom/nexokit/internal/modules/companies"
 	"github.com/enviniom/nexokit/internal/modules/permissions"
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/modules/users"
@@ -22,6 +23,8 @@ import (
 type Container struct {
 	rolesHandler       *roles.Handler
 	usersHandler       *users.Handler
+	companiesHandler   *companies.Handler
+	companiesRepo      *companies.GormRepository
 	permissionsHandler *permissions.Handler
 	authHandler        *auth.Handler
 	authMW             gin.HandlerFunc
@@ -35,6 +38,10 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	_ = log
 
 	usersRepo := users.NewRepository(db)
+	companiesRepo := companies.NewRepository(db)
+	companiesService := companies.NewService(companiesRepo)
+	companiesHandler := companies.NewHandler(companiesService)
+
 	permissionsRepo := permissions.NewRepository(db)
 	permissionsService := permissions.NewService(permissionsRepo, permissions.WithCache(cache))
 	permissionsHandler := permissions.NewHandler(permissionsService)
@@ -54,17 +61,23 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	authMW := middleware.Auth(tokenManager, userLookup{repo: usersRepo})
 	authzMW := middleware.AttachPermissions(permissionsService)
 
-	return &Container{rolesHandler: rolesHandler, usersHandler: usersHandler, permissionsHandler: permissionsHandler, authHandler: authHandler, authMW: authMW, authzMW: authzMW}
+	return &Container{rolesHandler: rolesHandler, usersHandler: usersHandler, companiesHandler: companiesHandler, companiesRepo: companiesRepo, permissionsHandler: permissionsHandler, authHandler: authHandler, authMW: authMW, authzMW: authzMW}
 }
 
 // RegisterModules mounts all business module routes onto the v1 router group.
 func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
 	auth.Register(v1, c.authHandler, c.authMW, c.authzMW)
-	protected := v1.Group("")
-	protected.Use(c.authMW, c.authzMW)
-	roles.Register(protected, c.rolesHandler, middleware.RequirePermission)
-	users.Register(protected, c.usersHandler, middleware.RequirePermission)
-	permissions.Register(protected, c.permissionsHandler, middleware.RequirePermission)
+	globalProtected := v1.Group("")
+	globalProtected.Use(c.authMW, middleware.AllowRootGlobalScope(c.companiesRepo), c.authzMW)
+	companies.Register(globalProtected, c.companiesHandler, middleware.RequirePermission, middleware.RequireRole)
+	// Roles and permissions are system catalog modules, so root may administer
+	// them globally while non-root requests remain scoped to their company.
+	roles.Register(globalProtected, c.rolesHandler, middleware.RequirePermission)
+	permissions.Register(globalProtected, c.permissionsHandler, middleware.RequirePermission)
+
+	tenantProtected := v1.Group("")
+	tenantProtected.Use(c.authMW, middleware.RequireTenantScope(c.companiesRepo), c.authzMW)
+	users.Register(tenantProtected, c.usersHandler, middleware.RequirePermission)
 }
 
 type userLookup struct {
@@ -72,7 +85,7 @@ type userLookup struct {
 }
 
 func (l userLookup) GetAuthUser(publicID string) (*authctx.User, error) {
-	user, err := l.repo.GetByPublicID(publicID)
+	user, err := l.repo.GetAuthUser(publicID)
 	if err != nil {
 		return nil, err
 	}
@@ -85,6 +98,7 @@ func (l userLookup) GetAuthUser(publicID string) (*authctx.User, error) {
 		RoleSlug:  user.Role.Slug,
 		RoleID:    user.RoleID,
 		CompanyID: user.CompanyID,
+		IsRoot:    user.IsRoot(),
 		IsActive:  user.IsActive,
 	}, nil
 }

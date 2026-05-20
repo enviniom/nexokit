@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	{{- if .Tenant }}
+	"github.com/enviniom/nexokit/internal/platform/tenant"
+	{{- end }}
 	"github.com/google/uuid"
 )
 
@@ -34,17 +37,17 @@ func (s *{{.Struct}}Service) Create(ctx context.Context, req Create{{.Struct}}Re
 }
 
 // Get retrieves a {{.Struct}} by public ID.
-func (s *{{.Struct}}Service) Get(ctx context.Context, publicID string) (*{{.Struct}}, error) {
-	return s.repo.FindByPublicID(ctx, publicID)
+func (s *{{.Struct}}Service) Get(ctx context.Context, {{- if .Tenant }} tc tenant.TenantContext, {{- end }} publicID string) (*{{.Struct}}, error) {
+	return s.repo.FindByPublicID(ctx, {{- if .Tenant }} tc, {{- end }} publicID)
 }
 
 // List returns paginated {{.Table}}.
-func (s *{{.Struct}}Service) List(ctx context.Context, page, perPage int) ([]{{.Struct}}, int64, error) {
-	items, err := s.repo.List(ctx, page, perPage)
+func (s *{{.Struct}}Service) List(ctx context.Context, {{- if .Tenant }} tc tenant.TenantContext, {{- end }} page, perPage int) ([]{{.Struct}}, int64, error) {
+	items, err := s.repo.List(ctx, {{- if .Tenant }} tc, {{- end }} page, perPage)
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.repo.Count(ctx)
+	total, err := s.repo.Count(ctx{{- if .Tenant }}, tc{{- end }})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -52,8 +55,8 @@ func (s *{{.Struct}}Service) List(ctx context.Context, page, perPage int) ([]{{.
 }
 
 // Update modifies a {{.Struct}}.
-func (s *{{.Struct}}Service) Update(ctx context.Context, publicID string, req Update{{.Struct}}Request) (*{{.Struct}}, error) {
-	m, err := s.repo.FindByPublicID(ctx, publicID)
+func (s *{{.Struct}}Service) Update(ctx context.Context, {{- if .Tenant }} tc tenant.TenantContext, {{- end }} publicID string, req Update{{.Struct}}Request) (*{{.Struct}}, error) {
+	m, err := s.repo.FindByPublicID(ctx, {{- if .Tenant }} tc, {{- end }} publicID)
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +71,6 @@ func (s *{{.Struct}}Service) Update(ctx context.Context, publicID string, req Up
 }
 
 // Delete removes a {{.Struct}} by public ID.
-func (s *{{.Struct}}Service) Delete(ctx context.Context, publicID string) error {
-	return s.repo.Delete(ctx, publicID)
+func (s *{{.Struct}}Service) Delete(ctx context.Context, {{- if .Tenant }} tc tenant.TenantContext, {{- end }} publicID string) error {
+	return s.repo.Delete(ctx, {{- if .Tenant }} tc, {{- end }} publicID)
 }

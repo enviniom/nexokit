@@ -8,6 +8,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/modules/users"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
@@ -18,9 +19,14 @@ type fakeUserRepository struct {
 	err        error
 }
 
-func (f *fakeUserRepository) List(page, perPage int) ([]users.User, error) { return nil, nil }
-func (f *fakeUserRepository) Count() (int64, error)                        { return 0, nil }
-func (f *fakeUserRepository) GetByPublicID(publicID string) (*users.User, error) {
+func (f *fakeUserRepository) List(tc tenant.TenantContext, page, perPage int) ([]users.User, error) {
+	return nil, nil
+}
+func (f *fakeUserRepository) Count(tc tenant.TenantContext) (int64, error) { return 0, nil }
+func (f *fakeUserRepository) GetByPublicID(tc tenant.TenantContext, publicID string) (*users.User, error) {
+	return f.GetAuthUser(publicID)
+}
+func (f *fakeUserRepository) GetAuthUser(publicID string) (*users.User, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -40,7 +46,9 @@ func (f *fakeUserRepository) GetByEmail(email string) (*users.User, error) {
 }
 func (f *fakeUserRepository) Create(user *users.User) error { return nil }
 func (f *fakeUserRepository) Update(user *users.User) error { return nil }
-func (f *fakeUserRepository) Delete(publicID string) error  { return nil }
+func (f *fakeUserRepository) Delete(tc tenant.TenantContext, publicID string) error {
+	return nil
+}
 func (f *fakeUserRepository) ListPublicIDsByRoleID(roleID uint) ([]string, error) {
 	return nil, nil
 }

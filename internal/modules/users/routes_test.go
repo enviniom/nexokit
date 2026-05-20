@@ -9,15 +9,22 @@ import (
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
 )
 
 type routeFakeService struct{}
 
-func (routeFakeService) List(page, perPage int) ([]UserResponse, int64, error) { return nil, 0, nil }
-func (routeFakeService) GetByPublicID(publicID string) (*UserResponse, error)  { return nil, nil }
-func (routeFakeService) Create(req CreateUserRequest) (*UserResponse, error)   { return nil, nil }
-func (routeFakeService) Update(publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error) {
+func (routeFakeService) List(tc tenant.TenantContext, page, perPage int) ([]UserResponse, int64, error) {
+	return nil, 0, nil
+}
+func (routeFakeService) GetByPublicID(tc tenant.TenantContext, publicID string) (*UserResponse, error) {
+	return nil, nil
+}
+func (routeFakeService) Create(tc tenant.TenantContext, req CreateUserRequest) (*UserResponse, error) {
+	return nil, nil
+}
+func (routeFakeService) Update(tc tenant.TenantContext, publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error) {
 	return nil, nil
 }
 
@@ -60,11 +67,11 @@ func TestRegisterUserRoutesReturnStandardAuthzEnvelopes(t *testing.T) {
 		})
 	}
 }
-func (routeFakeService) Delete(publicID string) error { return nil }
-func (routeFakeService) ChangePassword(publicID string, actorPublicID string, req ChangePasswordRequest) error {
+func (routeFakeService) Delete(tc tenant.TenantContext, publicID string) error { return nil }
+func (routeFakeService) ChangePassword(tc tenant.TenantContext, publicID string, actorPublicID string, req ChangePasswordRequest) error {
 	return nil
 }
-func (routeFakeService) ToggleStatus(publicID string, req UpdateStatusRequest) (*UserResponse, error) {
+func (routeFakeService) ToggleStatus(tc tenant.TenantContext, publicID string, req UpdateStatusRequest) (*UserResponse, error) {
 	return nil, nil
 }
 

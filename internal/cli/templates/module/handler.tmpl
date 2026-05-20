@@ -6,6 +6,9 @@ import (
 
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	{{- if .Tenant }}
+	"github.com/enviniom/nexokit/internal/platform/tenant"
+	{{- end }}
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,7 +44,14 @@ func (h *{{.Struct}}Handler) Create(c *gin.Context) {
 // Get handles GET /{{.Table}}/:id.
 func (h *{{.Struct}}Handler) Get(c *gin.Context) {
 	publicID := c.Param("id")
-	m, err := h.service.Get(c.Request.Context(), publicID)
+	{{- if .Tenant }}
+	tc, ok := tenant.FromGin(c)
+	if !ok {
+		response.Forbidden(c, "tenant context required")
+		return
+	}
+	{{- end }}
+	m, err := h.service.Get(c.Request.Context(), {{- if .Tenant }} tc, {{- end }} publicID)
 	if err != nil {
 		response.NotFound(c, "{{.Struct}} not found")
 		return
@@ -59,7 +69,14 @@ func (h *{{.Struct}}Handler) List(c *gin.Context) {
 	if perPage < 1 {
 		perPage = 20
 	}
-	items, total, err := h.service.List(c.Request.Context(), page, perPage)
+	{{- if .Tenant }}
+	tc, ok := tenant.FromGin(c)
+	if !ok {
+		response.Forbidden(c, "tenant context required")
+		return
+	}
+	{{- end }}
+	items, total, err := h.service.List(c.Request.Context(), {{- if .Tenant }} tc, {{- end }} page, perPage)
 	if err != nil {
 		response.InternalServerError(c, err.Error())
 		return
@@ -79,7 +96,14 @@ func (h *{{.Struct}}Handler) Update(c *gin.Context) {
 		response.ValidationError(c, errs)
 		return
 	}
-	m, err := h.service.Update(c.Request.Context(), publicID, req)
+	{{- if .Tenant }}
+	tc, ok := tenant.FromGin(c)
+	if !ok {
+		response.Forbidden(c, "tenant context required")
+		return
+	}
+	{{- end }}
+	m, err := h.service.Update(c.Request.Context(), {{- if .Tenant }} tc, {{- end }} publicID, req)
 	if err != nil {
 		response.NotFound(c, "{{.Struct}} not found")
 		return
@@ -90,7 +114,14 @@ func (h *{{.Struct}}Handler) Update(c *gin.Context) {
 // Delete handles DELETE /{{.Table}}/:id.
 func (h *{{.Struct}}Handler) Delete(c *gin.Context) {
 	publicID := c.Param("id")
-	if err := h.service.Delete(c.Request.Context(), publicID); err != nil {
+	{{- if .Tenant }}
+	tc, ok := tenant.FromGin(c)
+	if !ok {
+		response.Forbidden(c, "tenant context required")
+		return
+	}
+	{{- end }}
+	if err := h.service.Delete(c.Request.Context(), {{- if .Tenant }} tc, {{- end }} publicID); err != nil {
 		response.NotFound(c, "{{.Struct}} not found")
 		return
 	}

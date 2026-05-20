@@ -12,6 +12,7 @@ import (
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,30 +39,37 @@ type fakeService struct {
 	toggled           *UserResponse
 	updateActor       string
 	passwordActor     string
+	tenant            tenant.TenantContext
+	createReq         CreateUserRequest
 }
 
-func (f *fakeService) List(page, perPage int) ([]UserResponse, int64, error) {
+func (f *fakeService) List(tc tenant.TenantContext, page, perPage int) ([]UserResponse, int64, error) {
+	f.tenant = tc
 	if f.err != nil {
 		return nil, 0, f.err
 	}
 	return f.users, f.total, nil
 }
 
-func (f *fakeService) GetByPublicID(publicID string) (*UserResponse, error) {
+func (f *fakeService) GetByPublicID(tc tenant.TenantContext, publicID string) (*UserResponse, error) {
+	f.tenant = tc
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.user, nil
 }
 
-func (f *fakeService) Create(req CreateUserRequest) (*UserResponse, error) {
+func (f *fakeService) Create(tc tenant.TenantContext, req CreateUserRequest) (*UserResponse, error) {
+	f.tenant = tc
+	f.createReq = req
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.created, nil
 }
 
-func (f *fakeService) Update(publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error) {
+func (f *fakeService) Update(tc tenant.TenantContext, publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error) {
+	f.tenant = tc
 	f.updateActor = actorPublicID
 	if f.err != nil {
 		return nil, f.err
@@ -72,21 +80,28 @@ func (f *fakeService) Update(publicID string, actorPublicID string, req UpdateUs
 	return f.user, nil
 }
 
-func (f *fakeService) Delete(publicID string) error {
+func (f *fakeService) Delete(tc tenant.TenantContext, publicID string) error {
+	f.tenant = tc
 	f.deletedPID = publicID
 	return f.err
 }
 
-func (f *fakeService) ChangePassword(publicID string, actorPublicID string, req ChangePasswordRequest) error {
+func (f *fakeService) ChangePassword(tc tenant.TenantContext, publicID string, actorPublicID string, req ChangePasswordRequest) error {
+	f.tenant = tc
 	f.passwordActor = actorPublicID
 	return f.changePasswordErr
 }
 
-func (f *fakeService) ToggleStatus(publicID string, req UpdateStatusRequest) (*UserResponse, error) {
+func (f *fakeService) ToggleStatus(tc tenant.TenantContext, publicID string, req UpdateStatusRequest) (*UserResponse, error) {
+	f.tenant = tc
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.toggled, nil
+}
+
+func setTenant(c *gin.Context) {
+	tenant.SetGin(c, tenant.NewScoped(7, "acme"))
 }
 
 func setupHandler(svc Service) (*gin.Engine, *Handler) {
@@ -109,6 +124,7 @@ func TestHandler_List(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request = httptest.NewRequest(http.MethodGet, "/users?page=1&per_page=10", nil)
+		setTenant(c)
 		h.List(c)
 
 		if w.Code != http.StatusOK {
@@ -150,6 +166,7 @@ func TestHandler_List(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request = httptest.NewRequest(http.MethodGet, "/users", nil)
+		setTenant(c)
 		h.List(c)
 
 		if w.Code != http.StatusInternalServerError {
@@ -168,6 +185,7 @@ func TestHandler_GetByPublicID(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
+		setTenant(c)
 		h.GetByPublicID(c)
 
 		if w.Code != http.StatusOK {
@@ -193,6 +211,7 @@ func TestHandler_GetByPublicID(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "missing"}}
+		setTenant(c)
 		h.GetByPublicID(c)
 
 		if w.Code != http.StatusNotFound {
@@ -210,7 +229,8 @@ func TestHandler_Create(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request = jsonRequest(http.MethodPost, "/users", CreateUserRequest{Name: "Charlie", Email: "charlie@example.com", Password: "Password1", RoleID: 2})
+		c.Request = jsonRequest(http.MethodPost, "/users", CreateUserRequest{Name: "Charlie", Email: "charlie@example.com", Password: "Password1", RoleID: 2, CompanyID: uintPtr(7)})
+		setTenant(c)
 		h.Create(c)
 
 		if w.Code != http.StatusCreated {
@@ -229,6 +249,24 @@ func TestHandler_Create(t *testing.T) {
 		}
 	})
 
+	t.Run("passes tenant context to service", func(t *testing.T) {
+		svc := &fakeService{created: &UserResponse{PublicID: "user3", Name: "Charlie", Email: "charlie@example.com", RoleID: 2, RoleName: "user"}}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = jsonRequest(http.MethodPost, "/users", CreateUserRequest{Name: "Charlie", Email: "charlie@example.com", Password: "Password1", RoleID: 2})
+		setTenant(c)
+		h.Create(c)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected status 201, got %d: %s", w.Code, w.Body.String())
+		}
+		if svc.tenant != tenant.NewScoped(7, "acme") {
+			t.Fatalf("expected tenant %#v, got %#v", tenant.NewScoped(7, "acme"), svc.tenant)
+		}
+	})
+
 	t.Run("returns validation error on incomplete body", func(t *testing.T) {
 		svc := &fakeService{}
 		_, h := setupHandler(svc)
@@ -236,6 +274,7 @@ func TestHandler_Create(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request = jsonRequest(http.MethodPost, "/users", map[string]string{"email": "bad"})
+		setTenant(c)
 		h.Create(c)
 
 		if w.Code != http.StatusUnprocessableEntity {
@@ -249,7 +288,8 @@ func TestHandler_Create(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request = jsonRequest(http.MethodPost, "/users", CreateUserRequest{Name: "Charlie", Email: "charlie@example.com", Password: "Password1", RoleID: 2})
+		c.Request = jsonRequest(http.MethodPost, "/users", CreateUserRequest{Name: "Charlie", Email: "charlie@example.com", Password: "Password1", RoleID: 2, CompanyID: uintPtr(7)})
+		setTenant(c)
 		h.Create(c)
 
 		if w.Code != http.StatusConflict {
@@ -264,6 +304,7 @@ func TestHandler_Create(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request = jsonRequest(http.MethodPost, "/users", CreateUserRequest{Name: "", Email: "not-email", Password: "short", RoleID: 0})
+		setTenant(c)
 		h.Create(c)
 
 		if w.Code != http.StatusUnprocessableEntity {
@@ -305,7 +346,8 @@ func TestHandler_Create(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "root1"}}
 		authctx.SetGin(c, &authctx.User{PublicID: "root1", IsActive: true})
-		c.Request = jsonRequest(http.MethodPut, "/users/root1", UpdateUserRequest{Name: "Root", Email: "root@example.com", RoleID: 1})
+		c.Request = jsonRequest(http.MethodPut, "/users/root1", UpdateUserRequest{Name: "Root", Email: "root@example.com", RoleID: RootRoleID})
+		setTenant(c)
 		h.Update(c)
 
 		if w.Code != http.StatusOK {
@@ -327,7 +369,8 @@ func TestHandler_Update(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
-		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", RoleID: 2})
+		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", RoleID: 2, CompanyID: uintPtr(7)})
+		setTenant(c)
 		h.Update(c)
 
 		if w.Code != http.StatusOK {
@@ -350,7 +393,8 @@ func TestHandler_Update(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "missing"}}
-		c.Request = jsonRequest(http.MethodPut, "/users/missing", UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 1})
+		c.Request = jsonRequest(http.MethodPut, "/users/missing", UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 2, CompanyID: uintPtr(7)})
+		setTenant(c)
 		h.Update(c)
 
 		if w.Code != http.StatusNotFound {
@@ -365,7 +409,8 @@ func TestHandler_Update(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
-		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 1})
+		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 2, CompanyID: uintPtr(7)})
+		setTenant(c)
 		h.Update(c)
 
 		if w.Code != http.StatusConflict {
@@ -381,6 +426,7 @@ func TestHandler_Update(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
 		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "", Email: "bad", RoleID: 0})
+		setTenant(c)
 		h.Update(c)
 
 		if w.Code != http.StatusUnprocessableEntity {
@@ -410,6 +456,27 @@ func TestHandler_Update(t *testing.T) {
 	})
 }
 
+func TestHandler_PassesTenantContextToService(t *testing.T) {
+	svc := &fakeService{
+		users: []UserResponse{{PublicID: "user1", Name: "Alice", Email: "alice@example.com", RoleID: 2}},
+		total: 1,
+	}
+	_, h := setupHandler(svc)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/users", nil)
+	tenant.SetGin(c, tenant.NewScoped(42, "acme"))
+	h.List(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	if svc.tenant.CompanyID != 42 || svc.tenant.IsRootScope {
+		t.Fatalf("expected scoped tenant 42, got %#v", svc.tenant)
+	}
+}
+
 func TestHandler_Delete(t *testing.T) {
 	t.Run("deletes user successfully", func(t *testing.T) {
 		svc := &fakeService{}
@@ -419,6 +486,7 @@ func TestHandler_Delete(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
 		c.Request = httptest.NewRequest(http.MethodDelete, "/users/user1", nil)
+		setTenant(c)
 		h.Delete(c)
 
 		if w.Code != http.StatusOK {
@@ -437,6 +505,7 @@ func TestHandler_Delete(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "missing"}}
 		c.Request = httptest.NewRequest(http.MethodDelete, "/users/missing", nil)
+		setTenant(c)
 		h.Delete(c)
 
 		if w.Code != http.StatusNotFound {
@@ -454,6 +523,7 @@ func TestHandler_ChangePassword(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
 		c.Request = jsonRequest(http.MethodPatch, "/users/user1/password", ChangePasswordRequest{CurrentPassword: "old", NewPassword: "NewPassword1"})
+		setTenant(c)
 		h.ChangePassword(c)
 
 		if w.Code != http.StatusOK {
@@ -469,6 +539,7 @@ func TestHandler_ChangePassword(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
 		c.Request = jsonRequest(http.MethodPatch, "/users/user1/password", ChangePasswordRequest{CurrentPassword: "wrong", NewPassword: "NewPassword1"})
+		setTenant(c)
 		h.ChangePassword(c)
 
 		if w.Code != http.StatusUnauthorized {
@@ -484,6 +555,7 @@ func TestHandler_ChangePassword(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "missing"}}
 		c.Request = jsonRequest(http.MethodPatch, "/users/missing/password", ChangePasswordRequest{CurrentPassword: "old", NewPassword: "NewPassword1"})
+		setTenant(c)
 		h.ChangePassword(c)
 
 		if w.Code != http.StatusNotFound {
@@ -499,6 +571,7 @@ func TestHandler_ChangePassword(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
 		c.Request = jsonRequest(http.MethodPatch, "/users/user1/password", ChangePasswordRequest{CurrentPassword: "", NewPassword: "short"})
+		setTenant(c)
 		h.ChangePassword(c)
 
 		if w.Code != http.StatusUnprocessableEntity {
@@ -533,6 +606,7 @@ func TestHandler_ChangePassword(t *testing.T) {
 		c.Params = gin.Params{{Key: "id", Value: "root1"}}
 		authctx.SetGin(c, &authctx.User{PublicID: "root1", IsActive: true})
 		c.Request = jsonRequest(http.MethodPatch, "/users/root1/password", ChangePasswordRequest{CurrentPassword: "old", NewPassword: "NewPassword1"})
+		setTenant(c)
 		h.ChangePassword(c)
 
 		if w.Code != http.StatusOK {
@@ -555,6 +629,7 @@ func TestHandler_ToggleStatus(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
 		c.Request = jsonRequest(http.MethodPatch, "/users/user1/status", UpdateStatusRequest{IsActive: false})
+		setTenant(c)
 		h.ToggleStatus(c)
 
 		if w.Code != http.StatusOK {
@@ -578,6 +653,7 @@ func TestHandler_ToggleStatus(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "missing"}}
 		c.Request = jsonRequest(http.MethodPatch, "/users/missing/status", UpdateStatusRequest{IsActive: false})
+		setTenant(c)
 		h.ToggleStatus(c)
 
 		if w.Code != http.StatusNotFound {

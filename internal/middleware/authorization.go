@@ -87,7 +87,7 @@ func RequireRole(slug string) gin.HandlerFunc {
 }
 
 func isRoot(user *authctx.User) bool {
-	return roleSlug(user) == "root"
+	return user != nil && user.IsRoot
 }
 
 func roleSlug(user *authctx.User) string {

@@ -23,6 +23,10 @@ func NewHandler(service Service) *Handler {
 
 // Login handles POST /auth/login.
 func (h *Handler) Login(c *gin.Context) {
+	// TODO(multitenancy): make login tenant-aware for company domains. When a
+	// request comes from a company host, resolve that host to a company and reject
+	// non-root users whose company_id does not match the resolved tenant, even if
+	// they try to send a different tenant header.
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, messages.MsgBadRequest)

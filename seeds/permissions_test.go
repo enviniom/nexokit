@@ -101,6 +101,25 @@ func TestSeedRolePermissions(t *testing.T) {
 	}
 }
 
+func TestAdminPermissionSlugsExcludeRootOnlyCompanyMutations(t *testing.T) {
+	rootOnlyCompanyMutations := []string{
+		"companies.create",
+		"companies.update",
+		"companies.delete",
+	}
+
+	adminPermissions := make(map[string]struct{})
+	for _, slug := range adminPermissionSlugs() {
+		adminPermissions[slug] = struct{}{}
+	}
+
+	for _, slug := range rootOnlyCompanyMutations {
+		if _, ok := adminPermissions[slug]; ok {
+			t.Fatalf("admin permissions must not include root-only company mutation %q", slug)
+		}
+	}
+}
+
 func TestSystemPermissionsCatalog(t *testing.T) {
 	for _, permission := range systemPermissions() {
 		t.Run(permission.Slug, func(t *testing.T) {

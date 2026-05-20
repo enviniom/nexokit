@@ -16,3 +16,8 @@ type User struct {
 	IsActive     bool `gorm:"not null;default:true"`
 	Role         roles.Role
 }
+
+// IsRoot reports whether this user has the system root role.
+func (u User) IsRoot() bool {
+	return u.Role.Slug == roles.RootRoleSlug
+}

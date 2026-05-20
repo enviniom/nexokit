@@ -1,0 +1,202 @@
+package companies
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/enviniom/nexokit/internal/middleware"
+	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
+	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/gin-gonic/gin"
+)
+
+type fakeCompanyService struct {
+	companies []CompanyResponse
+	company   *CompanyResponse
+	total     int64
+	err       error
+	lastID    string
+	listReq   ListCompaniesRequest
+}
+
+func (f *fakeCompanyService) List(req ListCompaniesRequest) ([]CompanyResponse, int64, error) {
+	f.listReq = req
+	if f.err != nil {
+		return nil, 0, f.err
+	}
+	return f.companies, f.total, nil
+}
+
+func (f *fakeCompanyService) GetByPublicID(publicID string) (*CompanyResponse, error) {
+	f.lastID = publicID
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.company, nil
+}
+
+func (f *fakeCompanyService) Create(req CreateCompanyRequest) (*CompanyResponse, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.company, nil
+}
+
+func (f *fakeCompanyService) Update(publicID string, req UpdateCompanyRequest) (*CompanyResponse, error) {
+	f.lastID = publicID
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.company, nil
+}
+
+func (f *fakeCompanyService) Delete(publicID string) error {
+	f.lastID = publicID
+	return f.err
+}
+
+func companyJSONRequest(method, path string, body any) *http.Request {
+	var buf bytes.Buffer
+	if body != nil {
+		_ = json.NewEncoder(&buf).Encode(body)
+	}
+	req := httptest.NewRequest(method, path, &buf)
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}
+
+func setupCompanyRouter(user *authctx.User, svc Service) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		if user != nil {
+			authctx.SetGin(c, user)
+		}
+		c.Next()
+	})
+	Register(r.Group("/api/v1"), NewHandler(svc), middleware.RequirePermission, middleware.RequireRole)
+	return r
+}
+
+func TestHandler_Create(t *testing.T) {
+	t.Run("root creates company", func(t *testing.T) {
+		svc := &fakeCompanyService{company: &CompanyResponse{PublicID: "01HCOMPANY", Name: "Acme", Slug: "acme", Status: CompanyStatusActive, CreatedAt: time.Now(), UpdatedAt: time.Now()}}
+		r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, companyJSONRequest(http.MethodPost, "/api/v1/companies", CreateCompanyRequest{Name: "Acme", Slug: "acme"}))
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected status 201, got %d body=%s", w.Code, w.Body.String())
+		}
+		var resp response.APIResponse[CompanyResponse]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if !resp.Success || resp.Data.PublicID != "01HCOMPANY" {
+			t.Fatalf("expected created company public id, got %#v", resp)
+		}
+	})
+
+	t.Run("admin and user receive forbidden", func(t *testing.T) {
+		for _, role := range []string{"admin", "user"} {
+			t.Run(role, func(t *testing.T) {
+				svc := &fakeCompanyService{company: &CompanyResponse{PublicID: "01HCOMPANY", Name: "Acme", Slug: "acme"}}
+				r := setupCompanyRouter(&authctx.User{RoleSlug: role, Permissions: []string{"companies.create"}}, svc)
+
+				w := httptest.NewRecorder()
+				r.ServeHTTP(w, companyJSONRequest(http.MethodPost, "/api/v1/companies", CreateCompanyRequest{Name: "Acme", Slug: "acme"}))
+
+				if w.Code != http.StatusForbidden {
+					t.Fatalf("expected status 403 for %s, got %d", role, w.Code)
+				}
+			})
+		}
+	})
+
+	t.Run("duplicate slug returns validation error", func(t *testing.T) {
+		svc := &fakeCompanyService{err: ErrDuplicateSlug}
+		r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, companyJSONRequest(http.MethodPost, "/api/v1/companies", CreateCompanyRequest{Name: "Acme", Slug: "acme"}))
+
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status 422, got %d body=%s", w.Code, w.Body.String())
+		}
+		var resp response.APIResponse[any]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		errs, ok := resp.Errors.(map[string]any)
+		if !ok || errs["slug"] == nil {
+			t.Fatalf("expected slug validation error, got %#v", resp.Errors)
+		}
+	})
+}
+
+func TestHandler_ListFiltersInactive(t *testing.T) {
+	svc := &fakeCompanyService{companies: []CompanyResponse{{PublicID: "01HACTIVE", Name: "Active", Slug: "active", Status: CompanyStatusActive}}, total: 1}
+	r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/companies", nil))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	if svc.listReq.IncludeInactive {
+		t.Fatal("expected inactive companies excluded by default")
+	}
+	var resp response.APIResponse[[]CompanyResponse]
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(resp.Data) != 1 || resp.Data[0].Status != CompanyStatusActive {
+		t.Fatalf("expected active company only, got %#v", resp.Data)
+	}
+}
+
+func TestHandler_UsesPublicIDRoutes(t *testing.T) {
+	svc := &fakeCompanyService{company: &CompanyResponse{PublicID: "01HCOMPANYPUBLICID", Name: "Acme", Slug: "acme", Status: CompanyStatusActive}}
+	r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
+
+	for _, tt := range []struct {
+		name   string
+		method string
+		path   string
+		body   any
+	}{
+		{name: "get", method: http.MethodGet, path: "/api/v1/companies/01HCOMPANYPUBLICID"},
+		{name: "update", method: http.MethodPut, path: "/api/v1/companies/01HCOMPANYPUBLICID", body: UpdateCompanyRequest{Name: "Acme", Slug: "acme", Status: CompanyStatusActive}},
+		{name: "delete", method: http.MethodDelete, path: "/api/v1/companies/01HCOMPANYPUBLICID"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, companyJSONRequest(tt.method, tt.path, tt.body))
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected status 200, got %d body=%s", w.Code, w.Body.String())
+			}
+			if svc.lastID != "01HCOMPANYPUBLICID" {
+				t.Fatalf("expected public id route param, got %q", svc.lastID)
+			}
+		})
+	}
+}
+
+func TestHandler_NotFound(t *testing.T) {
+	svc := &fakeCompanyService{err: apperror.ErrNotFound}
+	r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/companies/missing", nil))
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", w.Code)
+	}
+}

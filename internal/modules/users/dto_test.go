@@ -16,8 +16,12 @@ func TestCreateUserRequest_Validate(t *testing.T) {
 		msg     string
 	}{
 		{
-			name: "valid request",
-			req:  CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 2},
+			name: "valid request with company",
+			req:  CreateUserRequest{Name: "Alice", Email: "alice@example.com", Password: "Password1", RoleID: 2, CompanyID: uintPtr(1)},
+		},
+		{
+			name: "any role can structurally omit company",
+			req:  CreateUserRequest{Name: "Root", Email: "root@example.com", Password: "Password1", RoleID: RootRoleID},
 		},
 		{
 			name:    "missing name",
@@ -114,8 +118,12 @@ func TestUpdateUserRequest_Validate(t *testing.T) {
 		msg     string
 	}{
 		{
-			name: "valid request",
-			req:  UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 2},
+			name: "valid request with company",
+			req:  UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 2, CompanyID: uintPtr(1)},
+		},
+		{
+			name: "any role can structurally omit company",
+			req:  UpdateUserRequest{Name: "Root", Email: "root@example.com", RoleID: RootRoleID},
 		},
 		{
 			name:    "missing name",

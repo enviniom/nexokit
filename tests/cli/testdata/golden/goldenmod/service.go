@@ -3,7 +3,7 @@ package goldenmod
 import (
 	"context"
 	"fmt"
-
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/google/uuid"
 )
 
@@ -32,17 +32,17 @@ func (s *GoldenmodService) Create(ctx context.Context, req CreateGoldenmodReques
 }
 
 // Get retrieves a Goldenmod by public ID.
-func (s *GoldenmodService) Get(ctx context.Context, publicID string) (*Goldenmod, error) {
-	return s.repo.FindByPublicID(ctx, publicID)
+func (s *GoldenmodService) Get(ctx context.Context, tc tenant.TenantContext, publicID string) (*Goldenmod, error) {
+	return s.repo.FindByPublicID(ctx, tc, publicID)
 }
 
 // List returns paginated goldenmod.
-func (s *GoldenmodService) List(ctx context.Context, page, perPage int) ([]Goldenmod, int64, error) {
-	items, err := s.repo.List(ctx, page, perPage)
+func (s *GoldenmodService) List(ctx context.Context, tc tenant.TenantContext, page, perPage int) ([]Goldenmod, int64, error) {
+	items, err := s.repo.List(ctx, tc, page, perPage)
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.repo.Count(ctx)
+	total, err := s.repo.Count(ctx, tc)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -50,8 +50,8 @@ func (s *GoldenmodService) List(ctx context.Context, page, perPage int) ([]Golde
 }
 
 // Update modifies a Goldenmod.
-func (s *GoldenmodService) Update(ctx context.Context, publicID string, req UpdateGoldenmodRequest) (*Goldenmod, error) {
-	m, err := s.repo.FindByPublicID(ctx, publicID)
+func (s *GoldenmodService) Update(ctx context.Context, tc tenant.TenantContext, publicID string, req UpdateGoldenmodRequest) (*Goldenmod, error) {
+	m, err := s.repo.FindByPublicID(ctx, tc, publicID)
 	if err != nil {
 		return nil, err
 	}
@@ -64,6 +64,6 @@ func (s *GoldenmodService) Update(ctx context.Context, publicID string, req Upda
 }
 
 // Delete removes a Goldenmod by public ID.
-func (s *GoldenmodService) Delete(ctx context.Context, publicID string) error {
-	return s.repo.Delete(ctx, publicID)
+func (s *GoldenmodService) Delete(ctx context.Context, tc tenant.TenantContext, publicID string) error {
+	return s.repo.Delete(ctx, tc, publicID)
 }

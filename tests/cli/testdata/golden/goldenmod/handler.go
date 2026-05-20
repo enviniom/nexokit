@@ -6,6 +6,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,7 +42,12 @@ func (h *GoldenmodHandler) Create(c *gin.Context) {
 // Get handles GET /goldenmod/:id.
 func (h *GoldenmodHandler) Get(c *gin.Context) {
 	publicID := c.Param("id")
-	m, err := h.service.Get(c.Request.Context(), publicID)
+	tc, ok := tenant.FromGin(c)
+	if !ok {
+		response.Forbidden(c, "tenant context required")
+		return
+	}
+	m, err := h.service.Get(c.Request.Context(), tc, publicID)
 	if err != nil {
 		response.NotFound(c, "Goldenmod not found")
 		return
@@ -59,7 +65,12 @@ func (h *GoldenmodHandler) List(c *gin.Context) {
 	if perPage < 1 {
 		perPage = 20
 	}
-	items, total, err := h.service.List(c.Request.Context(), page, perPage)
+	tc, ok := tenant.FromGin(c)
+	if !ok {
+		response.Forbidden(c, "tenant context required")
+		return
+	}
+	items, total, err := h.service.List(c.Request.Context(), tc, page, perPage)
 	if err != nil {
 		response.InternalServerError(c, err.Error())
 		return
@@ -79,7 +90,12 @@ func (h *GoldenmodHandler) Update(c *gin.Context) {
 		response.ValidationError(c, errs)
 		return
 	}
-	m, err := h.service.Update(c.Request.Context(), publicID, req)
+	tc, ok := tenant.FromGin(c)
+	if !ok {
+		response.Forbidden(c, "tenant context required")
+		return
+	}
+	m, err := h.service.Update(c.Request.Context(), tc, publicID, req)
 	if err != nil {
 		response.NotFound(c, "Goldenmod not found")
 		return
@@ -90,7 +106,12 @@ func (h *GoldenmodHandler) Update(c *gin.Context) {
 // Delete handles DELETE /goldenmod/:id.
 func (h *GoldenmodHandler) Delete(c *gin.Context) {
 	publicID := c.Param("id")
-	if err := h.service.Delete(c.Request.Context(), publicID); err != nil {
+	tc, ok := tenant.FromGin(c)
+	if !ok {
+		response.Forbidden(c, "tenant context required")
+		return
+	}
+	if err := h.service.Delete(c.Request.Context(), tc, publicID); err != nil {
 		response.NotFound(c, "Goldenmod not found")
 		return
 	}
