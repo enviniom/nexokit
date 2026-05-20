@@ -1,6 +1,6 @@
 > Lee también `_context.md` antes de implementar este change.
 
-# Change 4b: Roles custom administrables
+# Change 9: Roles custom administrables
 
 ## Objetivo
 
@@ -43,6 +43,28 @@ Implementar:
 - No se puede crear un rol con slug duplicado.
 - El slug debe ser estable y usable como identificador de negocio.
 - La asignación de permisos al rol debe seguir usando `PUT /api/v1/roles/:id/permissions`.
+
+## TODO relacionado: cambio de rol de usuarios
+
+Separar la política de actualización general de usuario de la política de cambio de rol.
+
+En el RBAC inicial `PUT /api/v1/users/:id` puede requerir `users.update` y `users.change_role` porque el DTO actual permite cambiar el rol dentro del update general.
+
+Este comportamiento es seguro pero demasiado restrictivo: obliga a tener `users.change_role` incluso cuando solo se edita nombre, email u otros campos no relacionados al rol.
+
+En este change o en uno posterior, definir una de estas estrategias:
+
+```txt
+PATCH /api/v1/users/:id/role -> requiere users.change_role
+PUT   /api/v1/users/:id      -> requiere users.update y no permite cambiar role_id
+```
+
+Regla esperada:
+
+- Editar datos generales de un usuario requiere `users.update`.
+- Cambiar el rol de un usuario requiere `users.change_role`.
+- Un usuario no debe poder escalar privilegios cambiándose a un rol superior.
+- Root conserva bypass según las reglas globales de RBAC.
 
 ## Endpoints
 
