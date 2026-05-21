@@ -42,13 +42,13 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3: Integration Test Suites (PR 3 — targets PR 2 branch)
 
-- [ ] 3.1 Create `tests/integration/auth_test.go` — login success (200), invalid credentials (401), inactive user, valid refresh token, revoked refresh token, logout revocation; use `testing.Short()` skip gate
-- [ ] 3.2 Create `tests/integration/users_test.go` — CRUD endpoints with authenticated requests; list isolation, create, update, delete; seed fixtures via helpers
-- [ ] 3.3 Create `tests/integration/tenant_test.go` — admin cannot access other company data (403/empty), root global access, root scoped access; two-company setup
-- [ ] 3.4 Create `tests/integration/rbac_test.go` — user with permission accesses resource, user without permission gets 403, unauthenticated gets 401, root has all permissions
-- [ ] 3.5 Create `tests/integration/health_test.go` — GET health endpoint returns 200 with healthy status
-- [ ] 3.6 Ensure all integration tests use `NewSQLiteDB` helper, `t.Cleanup` for cleanup, and `gin.SetMode(gin.TestMode)`
-- [ ] 3.7 Run `make test-integration` and verify all suites pass; run `make test-unit` and verify integration tests are skipped
+- [x] 3.1 Create `tests/integration/auth_test.go` — login success (200), invalid credentials (401), inactive user, valid refresh token, revoked refresh token, logout revocation; use `testing.Short()` skip gate
+- [x] 3.2 Create `tests/integration/users_test.go` — CRUD endpoints with authenticated requests; list isolation, create, update, delete; seed fixtures via helpers
+- [x] 3.3 Create `tests/integration/tenant_test.go` — admin cannot access other company data (403/empty), root global access, root scoped access; two-company setup
+- [x] 3.4 Create `tests/integration/rbac_test.go` — user with permission accesses resource, user without permission gets 403, unauthenticated gets 401, root has all permissions
+- [x] 3.5 Create `tests/integration/health_test.go` — GET health endpoint returns 200 with healthy status
+- [x] 3.6 Ensure all integration tests use `NewSQLiteDB` helper, `t.Cleanup` for cleanup, and `gin.SetMode(gin.TestMode)`
+- [x] 3.7 Run `make test-integration` and verify all suites pass; run `make test-unit` and verify integration tests are skipped
 
 ## Phase 4: Documentation (PR 4 — targets PR 3 branch)
 
