@@ -7,6 +7,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
@@ -25,7 +26,7 @@ type RoleResolver interface {
 
 // Service defines the business logic contract for users.
 type Service interface {
-	List(tc tenant.TenantContext, page, perPage int) ([]UserResponse, int64, error)
+	List(tc tenant.TenantContext, params query.ListParams) ([]UserResponse, int64, error)
 	GetByPublicID(tc tenant.TenantContext, publicID string) (*UserResponse, error)
 	Create(tc tenant.TenantContext, req CreateUserRequest) (*UserResponse, error)
 	Update(tc tenant.TenantContext, publicID string, actorPublicID string, req UpdateUserRequest) (*UserResponse, error)
@@ -63,13 +64,13 @@ func (s *userService) rootRoleID() (uint, error) {
 }
 
 // List returns paginated users as DTOs.
-func (s *userService) List(tc tenant.TenantContext, page, perPage int) ([]UserResponse, int64, error) {
-	users, err := s.repo.List(tc, page, perPage)
+func (s *userService) List(tc tenant.TenantContext, params query.ListParams) ([]UserResponse, int64, error) {
+	users, err := s.repo.List(tc, params)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	total, err := s.repo.Count(tc)
+	total, err := s.repo.Count(tc, params)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -46,6 +46,15 @@ func TestOptional_AppliesWhenPresent(t *testing.T) {
 	}
 }
 
+func TestOptional_SkipsInList(t *testing.T) {
+	errs := make(response.ValidationErrors)
+	Field(errs, "status", "").Optional().Apply(InList("active", "inactive"))
+
+	if errs.HasErrors() {
+		t.Fatalf("expected no errors for empty optional InList, got %#v", errs)
+	}
+}
+
 func TestApply_SkipAfterRequiredFailure(t *testing.T) {
 	errs := make(response.ValidationErrors)
 	Field(errs, "name", "").Required().Apply(MinLength(3))

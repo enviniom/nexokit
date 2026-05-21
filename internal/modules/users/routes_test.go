@@ -8,6 +8,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
@@ -15,7 +16,7 @@ import (
 
 type routeFakeService struct{}
 
-func (routeFakeService) List(tc tenant.TenantContext, page, perPage int) ([]UserResponse, int64, error) {
+func (routeFakeService) List(tc tenant.TenantContext, params query.ListParams) ([]UserResponse, int64, error) {
 	return nil, 0, nil
 }
 func (routeFakeService) GetByPublicID(tc tenant.TenantContext, publicID string) (*UserResponse, error) {

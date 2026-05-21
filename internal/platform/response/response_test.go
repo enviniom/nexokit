@@ -2,11 +2,14 @@ package response
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/messages"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/gin-gonic/gin"
 )
 
@@ -250,5 +253,104 @@ func TestRespondIfInvalid_WithErrors(t *testing.T) {
 	}
 	if resp.Message != messages.MsgValidationError {
 		t.Errorf("unexpected message: %s", resp.Message)
+	}
+}
+
+func TestPaginatedWithFilters(t *testing.T) {
+	tests := []struct {
+		name       string
+		pagination query.PaginationParams
+		filters    query.FilterParams
+		sort       query.SortParams
+		search     query.SearchParams
+		wantStatus string
+		wantSort   string
+		wantOrder  string
+		wantSearch string
+	}{
+		{
+			name:       "with filters and search",
+			pagination: query.PaginationParams{Page: 1, PerPage: 10},
+			filters:    query.FilterParams{Status: "active"},
+			sort:       query.SortParams{Sort: "name", Order: "asc"},
+			search:     query.SearchParams{Query: "jhon"},
+			wantStatus: "active",
+			wantSort:   "name",
+			wantOrder:  "asc",
+			wantSearch: "jhon",
+		},
+		{
+			name:       "empty filters include defaults",
+			pagination: query.PaginationParams{Page: 2, PerPage: 25},
+			filters:    query.FilterParams{},
+			sort:       query.SortParams{},
+			search:     query.SearchParams{},
+			wantSort:   "created_at",
+			wantOrder:  "desc",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, w := setupRecorder()
+			PaginatedWithFilters(c, "List retrieved", []string{"a"}, tt.pagination, tt.filters, tt.sort, tt.search, 50)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("status = %d; want %d", w.Code, http.StatusOK)
+			}
+			resp := parseBody(t, w)
+			meta := resp.Meta.(map[string]any)
+			filters := meta["filters"].(map[string]any)
+			if filters["status"] != tt.wantStatus || filters["sort"] != tt.wantSort || filters["order"] != tt.wantOrder || filters["search"] != tt.wantSearch {
+				t.Fatalf("filters = %#v; want status=%q sort=%q order=%q search=%q", filters, tt.wantStatus, tt.wantSort, tt.wantOrder, tt.wantSearch)
+			}
+			pagination := meta["pagination"].(map[string]any)
+			if pagination["total"].(float64) != 50 {
+				t.Fatalf("pagination.total = %#v; want 50", pagination["total"])
+			}
+		})
+	}
+}
+
+func TestHandleError(t *testing.T) {
+	tests := []struct {
+		name        string
+		err         error
+		wantStatus  int
+		wantMessage string
+	}{
+		{"not found", apperror.ErrNotFound, http.StatusNotFound, messages.MsgNotFound},
+		{"validation", apperror.ErrValidation, http.StatusUnprocessableEntity, messages.MsgValidationError},
+		{"unauthorized", apperror.ErrUnauthorized, http.StatusUnauthorized, messages.MsgUnauthorized},
+		{"forbidden", apperror.ErrForbidden, http.StatusForbidden, messages.MsgForbidden},
+		{"conflict", apperror.ErrConflict, http.StatusConflict, messages.MsgConflict},
+		{"unknown", errors.New("database is down"), http.StatusInternalServerError, "database is down"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, w := setupRecorder()
+			HandleError(c, tt.err)
+
+			if w.Code != tt.wantStatus {
+				t.Fatalf("status = %d; want %d", w.Code, tt.wantStatus)
+			}
+			resp := parseBody(t, w)
+			if resp.Message != tt.wantMessage {
+				t.Fatalf("message = %q; want %q", resp.Message, tt.wantMessage)
+			}
+		})
+	}
+}
+
+func TestHandleErrorNilIsNoOp(t *testing.T) {
+	c, w := setupRecorder()
+	HandleError(c, nil)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d; want no response written", w.Code)
+	}
+	if w.Body.Len() != 0 {
+		t.Fatalf("body = %q; want empty", w.Body.String())
 	}
 }

@@ -1,9 +1,6 @@
 package users
 
 import (
-	"net/http"
-
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/query"
@@ -28,15 +25,15 @@ func NewHandler(service Service, actorProvider func(*gin.Context) string) *Handl
 
 // List returns paginated users.
 func (h *Handler) List(c *gin.Context) {
-	pagination := query.PaginationFromGin(c)
+	params := query.ListFromGin(c)
 
 	tc := h.tenantContext(c)
-	users, total, err := h.service.List(tc, pagination.Page, pagination.PerPage)
+	users, total, err := h.service.List(tc, params)
 	if err != nil {
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
-	response.Paginated(c, messages.MsgSuccess, users, pagination.Page, pagination.PerPage, total)
+	response.PaginatedWithFilters(c, messages.MsgSuccess, users, params.Pagination, params.Filters, params.Sort, params.Search, total)
 }
 
 // GetByPublicID returns a single user by its public ID.
@@ -44,11 +41,7 @@ func (h *Handler) GetByPublicID(c *gin.Context) {
 	publicID := c.Param("id")
 	user, err := h.service.GetByPublicID(h.tenantContext(c), publicID)
 	if err != nil {
-		if apperror.Status(err) == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, user)
@@ -67,20 +60,7 @@ func (h *Handler) Create(c *gin.Context) {
 	}
 	user, err := h.service.Create(h.tenantContext(c), req)
 	if err != nil {
-		status := apperror.Status(err)
-		if status == http.StatusConflict {
-			response.Conflict(c, messages.MsgConflict)
-			return
-		}
-		if status == http.StatusBadRequest {
-			response.BadRequest(c, messages.MsgBadRequest)
-			return
-		}
-		if status == http.StatusForbidden {
-			response.Forbidden(c, messages.MsgForbidden)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Created(c, messages.MsgSuccess, user)
@@ -100,16 +80,7 @@ func (h *Handler) Update(c *gin.Context) {
 	}
 	user, err := h.service.Update(h.tenantContext(c), publicID, h.actorPublicID(c), req)
 	if err != nil {
-		status := apperror.Status(err)
-		if status == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		if status == http.StatusConflict {
-			response.Conflict(c, messages.MsgConflict)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, user)
@@ -119,12 +90,7 @@ func (h *Handler) Update(c *gin.Context) {
 func (h *Handler) Delete(c *gin.Context) {
 	publicID := c.Param("id")
 	if err := h.service.Delete(h.tenantContext(c), publicID); err != nil {
-		status := apperror.Status(err)
-		if status == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success[any](c, messages.MsgSuccess, nil)
@@ -143,16 +109,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 	if err := h.service.ChangePassword(h.tenantContext(c), publicID, h.actorPublicID(c), req); err != nil {
-		status := apperror.Status(err)
-		if status == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		if status == http.StatusUnauthorized {
-			response.Unauthorized(c, messages.MsgUnauthorized)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success[any](c, messages.MsgSuccess, nil)
@@ -186,12 +143,7 @@ func (h *Handler) ToggleStatus(c *gin.Context) {
 	}
 	user, err := h.service.ToggleStatus(h.tenantContext(c), publicID, req)
 	if err != nil {
-		status := apperror.Status(err)
-		if status == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, user)

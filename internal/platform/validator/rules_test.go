@@ -148,3 +148,56 @@ func TestRuleMessages(t *testing.T) {
 		t.Errorf("unexpected Matches message: %s", msg)
 	}
 }
+
+func TestValidSlug(t *testing.T) {
+	rule := ValidSlug()
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{"lowercase words with hyphens", "my-awesome-slug", ""},
+		{"numbers allowed", "release-2026", ""},
+		{"uppercase and spaces fail", "My Slug!", messages.MsgValidSlug},
+		{"leading hyphen fails", "-slug", messages.MsgValidSlug},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rule(tt.value); got != tt.want {
+				t.Fatalf("ValidSlug()(%q) = %q; want %q", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidURL(t *testing.T) {
+	rule := ValidURL()
+	tests := []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{"absolute https URL", "https://example.com/path", ""},
+		{"missing scheme fails", "example.com/path", messages.MsgValidURL},
+		{"missing host fails", "https:///path", messages.MsgValidURL},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rule(tt.value); got != tt.want {
+				t.Fatalf("ValidURL()(%q) = %q; want %q", tt.value, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestInList(t *testing.T) {
+	rule := InList("active", "inactive", "suspended")
+	if msg := rule("active"); msg != "" {
+		t.Fatalf("InList() accepted value returned %q; want empty", msg)
+	}
+	if msg := rule("pending"); msg != "debe ser uno de: active, inactive, suspended" {
+		t.Fatalf("InList() rejected value returned %q", msg)
+	}
+}

@@ -3,6 +3,7 @@ package companies
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/query"
@@ -113,7 +114,7 @@ func TestService_List(t *testing.T) {
 		}
 		svc := NewService(repo)
 
-		result, total, err := svc.List(ListCompaniesRequest{Pagination: query.Pagination{Page: 1, PerPage: 20}})
+		result, total, err := svc.List(ListCompaniesRequest{ListParams: query.ListParams{Pagination: query.Pagination{Page: 1, PerPage: 20}}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -132,7 +133,7 @@ func TestService_List(t *testing.T) {
 		}
 		svc := NewService(repo)
 
-		result, _, err := svc.List(ListCompaniesRequest{Pagination: query.Pagination{Page: 1, PerPage: 20}, IncludeInactive: true})
+		result, _, err := svc.List(ListCompaniesRequest{ListParams: query.ListParams{Pagination: query.Pagination{Page: 1, PerPage: 20}}, IncludeInactive: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -143,6 +144,46 @@ func TestService_List(t *testing.T) {
 			t.Fatalf("expected inactive company, got %#v", result)
 		}
 	})
+
+	t.Run("passes shared filters search sorting and dates to repository", func(t *testing.T) {
+		repo := &fakeCompanyRepository{
+			companies: []Company{{BaseModel: shared.BaseModel{PublicID: "01HACME"}, Name: "Acme", Slug: "acme", Status: CompanyStatusActive}},
+			total:     1,
+		}
+		svc := NewService(repo)
+		from := mustCompanyDate(t, "2025-01-01")
+		to := mustCompanyDate(t, "2025-12-31")
+		req := ListCompaniesRequest{
+			ListParams: query.ListParams{
+				Pagination: query.PaginationParams{Page: 2, PerPage: 5},
+				Filters:    query.FilterParams{Status: CompanyStatusActive, CreatedFrom: &from, CreatedTo: &to},
+				Sort:       query.SortParams{Sort: "slug", Order: "asc"},
+				Search:     query.SearchParams{Query: "acme"},
+			},
+			IncludeInactive: true,
+		}
+
+		result, total, err := svc.List(req)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if total != 1 || len(result) != 1 || result[0].Slug != "acme" {
+			t.Fatalf("expected Acme result, total=%d result=%#v", total, result)
+		}
+		if !repo.listReq.IncludeInactive || repo.listReq.ListParams.Sort.Sort != "slug" || repo.listReq.ListParams.Search.Query != "acme" || repo.listReq.ListParams.Filters.Status != CompanyStatusActive {
+			t.Fatalf("expected repository to receive shared and company filters, got %#v", repo.listReq)
+		}
+	})
+}
+
+func mustCompanyDate(t *testing.T, value string) time.Time {
+	t.Helper()
+	parsed, err := time.Parse(time.DateOnly, value)
+	if err != nil {
+		t.Fatalf("parse date %q: %v", value, err)
+	}
+	return parsed
 }
 
 func TestService_GetUpdateDeleteUsePublicID(t *testing.T) {

@@ -45,6 +45,7 @@ func TestStatus(t *testing.T) {
 		{"unauthorized", ErrUnauthorized, http.StatusUnauthorized},
 		{"conflict", ErrConflict, http.StatusConflict},
 		{"bad request", ErrBadRequest, http.StatusBadRequest},
+		{"validation", ErrValidation, http.StatusUnprocessableEntity},
 		{"internal", ErrInternal, http.StatusInternalServerError},
 		{"unknown", errors.New("something else"), http.StatusInternalServerError},
 	}
@@ -93,5 +94,11 @@ func TestSentinels(t *testing.T) {
 	}
 	if ErrForbidden.Error() != messages.MsgForbidden {
 		t.Errorf("unexpected sentinel message: %s", ErrForbidden.Error())
+	}
+	if !errors.Is(ErrValidation, ErrValidation) {
+		t.Error("expected ErrValidation to match with errors.Is")
+	}
+	if ErrValidation.Error() != messages.MsgValidationError {
+		t.Errorf("unexpected validation sentinel message: %s", ErrValidation.Error())
 	}
 }

@@ -27,6 +27,9 @@ const (
 	MsgMinWords       = "debe contener al menos %d palabras"
 	MsgNoNumbers      = "no debe contener números"
 	MsgInvalidFormat  = "formato inválido"
+	MsgValidSlug      = "debe ser un slug válido"
+	MsgValidURL       = "debe ser una URL válida"
+	MsgInList         = "debe ser uno de: %s"
 )
 
 // Middleware messages

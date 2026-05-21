@@ -25,9 +25,8 @@ type CompanyResponse struct {
 
 // ListCompaniesRequest carries list filters and pagination.
 type ListCompaniesRequest struct {
-	query.Pagination
+	query.ListParams
 	IncludeInactive bool
-	Status          string
 }
 
 // CreateCompanyRequest is the DTO for creating a company.

@@ -129,11 +129,11 @@ func (s *service) ensureSlugAvailable(slug, currentPublicID string) error {
 }
 
 func normalizeListRequest(req *ListCompaniesRequest) {
-	if req.Page < 1 {
-		req.Page = 1
+	if req.ListParams.Pagination.Page < 1 {
+		req.ListParams.Pagination.Page = 1
 	}
-	if req.PerPage < 1 {
-		req.PerPage = 20
+	if req.ListParams.Pagination.PerPage < 1 {
+		req.ListParams.Pagination.PerPage = 20
 	}
 }
 

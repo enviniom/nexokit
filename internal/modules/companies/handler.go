@@ -2,9 +2,7 @@ package companies
 
 import (
 	"errors"
-	"net/http"
 
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/response"
@@ -21,13 +19,14 @@ func NewHandler(service Service) *Handler {
 }
 
 func (h *Handler) List(c *gin.Context) {
-	req := ListCompaniesRequest{Pagination: query.PaginationFromGin(c), IncludeInactive: c.Query("include_inactive") == "true", Status: c.Query("status")}
+	params := query.ListFromGin(c)
+	req := ListCompaniesRequest{ListParams: params, IncludeInactive: c.Query("include_inactive") == "true"}
 	companies, total, err := h.service.List(req)
 	if err != nil {
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
-	response.Paginated(c, messages.MsgSuccess, companies, req.Page, req.PerPage, total)
+	response.PaginatedWithFilters(c, messages.MsgSuccess, companies, params.Pagination, params.Filters, params.Sort, params.Search, total)
 }
 
 func (h *Handler) GetByPublicID(c *gin.Context) {
@@ -88,12 +87,5 @@ func (h *Handler) respondError(c *gin.Context, err error) {
 		response.ValidationError(c, errs)
 		return
 	}
-	switch apperror.Status(err) {
-	case http.StatusNotFound:
-		response.NotFound(c, messages.MsgNotFound)
-	case http.StatusForbidden:
-		response.Forbidden(c, messages.MsgForbidden)
-	default:
-		response.InternalServerError(c, messages.MsgInternalError)
-	}
+	response.HandleError(c, err)
 }

@@ -1,6 +1,8 @@
 package companies
 
 import (
+	"github.com/enviniom/nexokit/internal/platform/gormutil"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"gorm.io/gorm"
 )
@@ -28,21 +30,35 @@ func NewRepository(db *gorm.DB) *GormRepository {
 func (r *GormRepository) List(req ListCompaniesRequest) ([]Company, int64, error) {
 	var companies []Company
 	var total int64
-	query := r.db.Model(&Company{})
-	if !req.IncludeInactive {
-		query = query.Where("status = ?", CompanyStatusActive)
-	}
-	if req.Status != "" {
-		query = query.Where("status = ?", req.Status)
-	}
-	if err := query.Count(&total).Error; err != nil {
+	db := applyCompanyListFilters(r.db.Model(&Company{}), req)
+	if err := db.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	offset := (req.Page - 1) * req.PerPage
-	if err := query.Order("created_at DESC").Limit(req.PerPage).Offset(offset).Find(&companies).Error; err != nil {
+	db = gormutil.ApplySorting(db, withDefaultCompanySort(req.ListParams.Sort), "created_at", "name", "slug", "status")
+	db = gormutil.ApplyPagination(db, req.ListParams.Pagination.Page, req.ListParams.Pagination.PerPage)
+	if err := db.Find(&companies).Error; err != nil {
 		return nil, 0, err
 	}
 	return companies, total, nil
+}
+
+func applyCompanyListFilters(db *gorm.DB, req ListCompaniesRequest) *gorm.DB {
+	if !req.IncludeInactive {
+		db = db.Where("status = ?", CompanyStatusActive)
+	}
+	db = gormutil.ApplyStatusFilter(db, req.ListParams.Filters, "status")
+	db = gormutil.ApplyDateRange(db, req.ListParams.Filters, "created_at")
+	return gormutil.ApplySearch(db, req.ListParams.Search, "name", "slug")
+}
+
+func withDefaultCompanySort(sort query.SortParams) query.SortParams {
+	if sort.Sort == "" {
+		sort.Sort = "created_at"
+	}
+	if sort.Order == "" {
+		sort.Order = "desc"
+	}
+	return sort
 }
 
 func (r *GormRepository) GetByPublicID(publicID string) (*Company, error) {

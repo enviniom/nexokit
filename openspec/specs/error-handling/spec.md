@@ -7,7 +7,7 @@ Define typed application errors (`AppError`) and their mapping to HTTP status co
 
 ### Requirement: Typed sentinel errors
 
-The system MUST define exported sentinel errors: `ErrNotFound`, `ErrForbidden`, `ErrUnauthorized`, `ErrConflict`, `ErrBadRequest`, `ErrInternal`.
+The system MUST define exported sentinel errors: `ErrNotFound`, `ErrForbidden`, `ErrUnauthorized`, `ErrConflict`, `ErrBadRequest`, `ErrValidation`, `ErrInternal`.
 
 #### Scenario: ErrNotFound
 
@@ -22,6 +22,28 @@ The system MUST define exported sentinel errors: `ErrNotFound`, `ErrForbidden`, 
 - WHEN it is wrapped as `ErrInternal`
 - THEN the response status is 500
 - AND in `production` the message is generic ("Internal server error")
+
+#### Scenario: ErrValidation
+
+- GIVEN a validation failure occurs in a service
+- WHEN `ErrValidation` is checked with `errors.Is(err, apperror.ErrValidation)`
+- THEN it returns `true`
+
+### Requirement: ErrValidation sentinel
+
+The system MUST define `ErrValidation` as an exported sentinel error in `platform/apperror` mapped to HTTP 422 Unprocessable Entity.
+
+#### Scenario: ErrValidation returns 422
+
+- GIVEN `ErrValidation` is returned from a service
+- WHEN `apperror.Status(err)` is called
+- THEN it returns 422
+
+#### Scenario: HandleError maps ErrValidation to 422
+
+- GIVEN `ErrValidation` is passed to `HandleError`
+- WHEN the handler processes the error
+- THEN the response status is 422 and the message is the validation error message
 
 ### Requirement: Error wrapping
 
@@ -44,6 +66,7 @@ The system MUST map each sentinel to a fixed HTTP status:
 | ErrUnauthorized | 401 |
 | ErrConflict | 409 |
 | ErrBadRequest | 400 |
+| ErrValidation | 422 |
 | ErrInternal | 500 |
 
 #### Scenario: Unknown error

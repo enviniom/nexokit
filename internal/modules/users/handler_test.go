@@ -11,6 +11,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
@@ -41,10 +42,12 @@ type fakeService struct {
 	passwordActor     string
 	tenant            tenant.TenantContext
 	createReq         CreateUserRequest
+	listParams        query.ListParams
 }
 
-func (f *fakeService) List(tc tenant.TenantContext, page, perPage int) ([]UserResponse, int64, error) {
+func (f *fakeService) List(tc tenant.TenantContext, params query.ListParams) ([]UserResponse, int64, error) {
 	f.tenant = tc
+	f.listParams = params
 	if f.err != nil {
 		return nil, 0, f.err
 	}
@@ -156,6 +159,43 @@ func TestHandler_List(t *testing.T) {
 		}
 		if len(resp.Data) != 2 {
 			t.Errorf("expected 2 users, got %d", len(resp.Data))
+		}
+	})
+
+	t.Run("passes filters search and sorting params to service and returns filter metadata", func(t *testing.T) {
+		svc := &fakeService{
+			users: []UserResponse{{PublicID: "user1", Name: "Alice", Email: "alice@example.com", IsActive: true, RoleID: 2, RoleName: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()}},
+			total: 1,
+		}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/users?page=2&per_page=5&status=active&created_from=2025-01-01&created_to=2025-12-31&sort=name&order=asc&search=ali", nil)
+		setTenant(c)
+		h.List(c)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d body=%s", w.Code, w.Body.String())
+		}
+		if svc.listParams.Pagination.Page != 2 || svc.listParams.Pagination.PerPage != 5 {
+			t.Fatalf("expected parsed pagination, got %#v", svc.listParams.Pagination)
+		}
+		if svc.listParams.Filters.Status != "active" || svc.listParams.Filters.CreatedFrom == nil || svc.listParams.Filters.CreatedTo == nil {
+			t.Fatalf("expected status and date filters, got %#v", svc.listParams.Filters)
+		}
+		if svc.listParams.Sort.Sort != "name" || svc.listParams.Sort.Order != "asc" || svc.listParams.Search.Query != "ali" {
+			t.Fatalf("expected sort/search params, got sort=%#v search=%#v", svc.listParams.Sort, svc.listParams.Search)
+		}
+
+		var resp response.APIResponse[[]UserResponse]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		metaMap := resp.Meta.(map[string]any)
+		filters := metaMap["filters"].(map[string]any)
+		if filters["status"] != "active" || filters["sort"] != "name" || filters["order"] != "asc" || filters["search"] != "ali" {
+			t.Fatalf("expected filter metadata to reflect query, got %#v", filters)
 		}
 	})
 

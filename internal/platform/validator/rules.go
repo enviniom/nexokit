@@ -3,6 +3,7 @@ package validator
 import (
 	"fmt"
 	"net/mail"
+	"net/url"
 	"regexp"
 	"strings"
 	"unicode"
@@ -107,5 +108,39 @@ func Matches(pattern string) Rule {
 			return messages.MsgInvalidFormat
 		}
 		return ""
+	}
+}
+
+// ValidSlug returns a rule that validates lowercase slugs with hyphen separators.
+func ValidSlug() Rule {
+	re := regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+	return func(v string) string {
+		if !re.MatchString(v) {
+			return messages.MsgValidSlug
+		}
+		return ""
+	}
+}
+
+// ValidURL returns a rule that validates absolute URLs with scheme and host.
+func ValidURL() Rule {
+	return func(v string) string {
+		parsed, err := url.Parse(v)
+		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+			return messages.MsgValidURL
+		}
+		return ""
+	}
+}
+
+// InList returns a rule that validates values against an explicit allowlist.
+func InList(values ...string) Rule {
+	return func(v string) string {
+		for _, value := range values {
+			if v == value {
+				return ""
+			}
+		}
+		return fmt.Sprintf(messages.MsgInList, strings.Join(values, ", "))
 	}
 }

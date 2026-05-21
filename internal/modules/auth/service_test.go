@@ -8,6 +8,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/modules/users"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
@@ -19,10 +20,12 @@ type fakeUserRepository struct {
 	err        error
 }
 
-func (f *fakeUserRepository) List(tc tenant.TenantContext, page, perPage int) ([]users.User, error) {
+func (f *fakeUserRepository) List(tc tenant.TenantContext, params query.ListParams) ([]users.User, error) {
 	return nil, nil
 }
-func (f *fakeUserRepository) Count(tc tenant.TenantContext) (int64, error) { return 0, nil }
+func (f *fakeUserRepository) Count(tc tenant.TenantContext, params query.ListParams) (int64, error) {
+	return 0, nil
+}
 func (f *fakeUserRepository) GetByPublicID(tc tenant.TenantContext, publicID string) (*users.User, error) {
 	return f.GetAuthUser(publicID)
 }

@@ -141,25 +141,60 @@ func TestHandler_Create(t *testing.T) {
 }
 
 func TestHandler_ListFiltersInactive(t *testing.T) {
-	svc := &fakeCompanyService{companies: []CompanyResponse{{PublicID: "01HACTIVE", Name: "Active", Slug: "active", Status: CompanyStatusActive}}, total: 1}
-	r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
+	t.Run("defaults to excluding inactive companies", func(t *testing.T) {
+		svc := &fakeCompanyService{companies: []CompanyResponse{{PublicID: "01HACTIVE", Name: "Active", Slug: "active", Status: CompanyStatusActive}}, total: 1}
+		r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
 
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/companies", nil))
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/companies", nil))
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", w.Code)
-	}
-	if svc.listReq.IncludeInactive {
-		t.Fatal("expected inactive companies excluded by default")
-	}
-	var resp response.APIResponse[[]CompanyResponse]
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if len(resp.Data) != 1 || resp.Data[0].Status != CompanyStatusActive {
-		t.Fatalf("expected active company only, got %#v", resp.Data)
-	}
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w.Code)
+		}
+		if svc.listReq.IncludeInactive {
+			t.Fatal("expected inactive companies excluded by default")
+		}
+		var resp response.APIResponse[[]CompanyResponse]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		if len(resp.Data) != 1 || resp.Data[0].Status != CompanyStatusActive {
+			t.Fatalf("expected active company only, got %#v", resp.Data)
+		}
+	})
+
+	t.Run("passes shared list params and returns filter metadata", func(t *testing.T) {
+		svc := &fakeCompanyService{companies: []CompanyResponse{{PublicID: "01HACME", Name: "Acme", Slug: "acme", Status: CompanyStatusActive}}, total: 1}
+		r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/companies?page=2&per_page=5&status=active&created_from=2025-01-01&created_to=2025-12-31&sort=name&order=asc&search=acme&include_inactive=true", nil))
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d body=%s", w.Code, w.Body.String())
+		}
+		if !svc.listReq.IncludeInactive {
+			t.Fatal("expected include_inactive to remain company-specific")
+		}
+		if svc.listReq.ListParams.Pagination.Page != 2 || svc.listReq.ListParams.Pagination.PerPage != 5 {
+			t.Fatalf("expected parsed pagination, got %#v", svc.listReq.ListParams.Pagination)
+		}
+		if svc.listReq.ListParams.Filters.Status != "active" || svc.listReq.ListParams.Filters.CreatedFrom == nil || svc.listReq.ListParams.Filters.CreatedTo == nil {
+			t.Fatalf("expected status/date filters, got %#v", svc.listReq.ListParams.Filters)
+		}
+		if svc.listReq.ListParams.Sort.Sort != "name" || svc.listReq.ListParams.Sort.Order != "asc" || svc.listReq.ListParams.Search.Query != "acme" {
+			t.Fatalf("expected sort/search params, got sort=%#v search=%#v", svc.listReq.ListParams.Sort, svc.listReq.ListParams.Search)
+		}
+
+		var resp response.APIResponse[[]CompanyResponse]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response: %v", err)
+		}
+		filters := resp.Meta.(map[string]any)["filters"].(map[string]any)
+		if filters["status"] != "active" || filters["sort"] != "name" || filters["order"] != "asc" || filters["search"] != "acme" {
+			t.Fatalf("expected filter metadata to reflect query, got %#v", filters)
+		}
+	})
 }
 
 func TestHandler_UsesPublicIDRoutes(t *testing.T) {

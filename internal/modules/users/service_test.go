@@ -6,6 +6,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
@@ -26,6 +27,7 @@ type fakeRepository struct {
 	createErr      error
 	updateErr      error
 	lastTenant     tenant.TenantContext
+	listParams     query.ListParams
 }
 
 // fakeRoleResolver is a test double for the role resolver.
@@ -41,16 +43,18 @@ func (f *fakeRoleResolver) GetBySlug(slug string) (*roles.Role, error) {
 	return f.role, nil
 }
 
-func (f *fakeRepository) List(tc tenant.TenantContext, page, perPage int) ([]User, error) {
+func (f *fakeRepository) List(tc tenant.TenantContext, params query.ListParams) ([]User, error) {
 	f.lastTenant = tc
+	f.listParams = params
 	if f.err != nil {
 		return nil, f.err
 	}
 	return filterUsersByTenant(f.users, tc), nil
 }
 
-func (f *fakeRepository) Count(tc tenant.TenantContext) (int64, error) {
+func (f *fakeRepository) Count(tc tenant.TenantContext, params query.ListParams) (int64, error) {
 	f.lastTenant = tc
+	f.listParams = params
 	if f.err != nil {
 		return 0, f.err
 	}
@@ -211,7 +215,8 @@ func TestService_List(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		result, total, err := svc.List(tenant.NewRoot(), 1, 10)
+		params := query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}}
+		result, total, err := svc.List(tenant.NewRoot(), params)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -233,7 +238,7 @@ func TestService_List(t *testing.T) {
 		repo := &fakeRepository{users: []User{}, total: 0}
 		svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		result, total, err := svc.List(tenant.NewRoot(), 1, 10)
+		result, total, err := svc.List(tenant.NewRoot(), query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -249,9 +254,34 @@ func TestService_List(t *testing.T) {
 		repo := &fakeRepository{err: apperror.ErrInternal}
 		svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		_, _, err := svc.List(tenant.NewRoot(), 1, 10)
+		_, _, err := svc.List(tenant.NewRoot(), query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}})
 		if err == nil {
 			t.Error("expected error")
+		}
+	})
+
+	t.Run("passes filters search sorting and dates to repository", func(t *testing.T) {
+		repo := &fakeRepository{users: []User{{BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", IsActive: true, Role: roles.Role{Name: "admin"}}}, total: 1}
+		svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
+		from := mustDate(t, "2025-01-01")
+		to := mustDate(t, "2025-12-31")
+		params := query.ListParams{
+			Pagination: query.PaginationParams{Page: 2, PerPage: 5},
+			Filters:    query.FilterParams{Status: "active", CreatedFrom: &from, CreatedTo: &to},
+			Sort:       query.SortParams{Sort: "email", Order: "asc"},
+			Search:     query.SearchParams{Query: "alice"},
+		}
+
+		result, total, err := svc.List(tenant.NewRoot(), params)
+
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if total != 1 || len(result) != 1 || result[0].Email != "alice@example.com" {
+			t.Fatalf("expected Alice result, total=%d result=%#v", total, result)
+		}
+		if repo.listParams.Sort.Sort != "email" || repo.listParams.Search.Query != "alice" || repo.listParams.Filters.Status != "active" {
+			t.Fatalf("expected repository to receive list params, got %#v", repo.listParams)
 		}
 	})
 }
@@ -308,7 +338,7 @@ func TestService_TenantScopedReads(t *testing.T) {
 	svc := NewService(repo, &fakeHasher{hash: "fakehash"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}})
 
 	t.Run("admin sees only own company users", func(t *testing.T) {
-		result, total, err := svc.List(tenant.NewScoped(companyOne, "acme"), 1, 10)
+		result, total, err := svc.List(tenant.NewScoped(companyOne, "acme"), query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -318,7 +348,7 @@ func TestService_TenantScopedReads(t *testing.T) {
 	})
 
 	t.Run("root global sees all users", func(t *testing.T) {
-		result, total, err := svc.List(tenant.NewRoot(), 1, 10)
+		result, total, err := svc.List(tenant.NewRoot(), query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -328,7 +358,7 @@ func TestService_TenantScopedReads(t *testing.T) {
 	})
 
 	t.Run("root scoped sees one company", func(t *testing.T) {
-		result, total, err := svc.List(tenant.NewScoped(companyTwo, "globex"), 1, 10)
+		result, total, err := svc.List(tenant.NewScoped(companyTwo, "globex"), query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

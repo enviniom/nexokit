@@ -48,6 +48,7 @@ var (
 	ErrUnauthorized = &AppError{Message: messages.MsgUnauthorized}
 	ErrConflict     = &AppError{Message: messages.MsgConflict}
 	ErrBadRequest   = &AppError{Message: messages.MsgBadRequest}
+	ErrValidation   = &AppError{Message: messages.MsgValidationError}
 	ErrInternal     = &AppError{Message: messages.MsgInternalError}
 )
 
@@ -79,6 +80,9 @@ func Status(err error) int {
 	}
 	if errors.Is(err, ErrBadRequest) {
 		return http.StatusBadRequest
+	}
+	if errors.Is(err, ErrValidation) {
+		return http.StatusUnprocessableEntity
 	}
 	return http.StatusInternalServerError
 }

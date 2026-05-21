@@ -2,13 +2,43 @@ package response
 
 import (
 	"net/http"
+	"time"
 
+	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/messages"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/gin-gonic/gin"
 )
 
 // APIResponse is the standard envelope for all API responses.
 type APIResponse[T any] struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Data    T      `json:"data"`
+	Meta    any    `json:"meta"`
+	Errors  any    `json:"errors"`
+}
+
+// ErrorResponse is the standard envelope for non-validation errors.
+type ErrorResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Data    any    `json:"data"`
+	Meta    any    `json:"meta"`
+	Errors  any    `json:"errors"`
+}
+
+// ValidationErrorResponse is the standard envelope for field-keyed validation errors.
+type ValidationErrorResponse struct {
+	Success bool             `json:"success"`
+	Message string           `json:"message"`
+	Data    any              `json:"data"`
+	Meta    any              `json:"meta"`
+	Errors  ValidationErrors `json:"errors"`
+}
+
+// PaginatedResponse is the standard envelope for paginated list responses.
+type PaginatedResponse[T any] struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 	Data    T      `json:"data"`
@@ -22,6 +52,16 @@ type PaginationMeta struct {
 	PerPage    int   `json:"per_page"`
 	Total      int64 `json:"total"`
 	TotalPages int   `json:"total_pages"`
+}
+
+// FiltersMeta holds generic list filters reflected back to API consumers.
+type FiltersMeta struct {
+	Status      string `json:"status"`
+	CreatedFrom string `json:"created_from"`
+	CreatedTo   string `json:"created_to"`
+	Sort        string `json:"sort"`
+	Order       string `json:"order"`
+	Search      string `json:"search"`
 }
 
 // ValidationErrors accumulates validation errors per field.
@@ -61,7 +101,7 @@ func Created[T any](c *gin.Context, message string, data T) {
 
 // Error returns a generic error response with the given status code.
 func Error(c *gin.Context, status int, message string, errs any) {
-	c.JSON(status, APIResponse[any]{
+	c.JSON(status, ErrorResponse{
 		Success: false,
 		Message: message,
 		Data:    nil,
@@ -102,16 +142,39 @@ func InternalServerError(c *gin.Context, message string) {
 
 // ValidationError returns a 422 Unprocessable Entity response with field errors.
 func ValidationError(c *gin.Context, errs any) {
-	Error(c, http.StatusUnprocessableEntity, messages.MsgValidationError, errs)
+	validationErrs := ValidationErrors{}
+	switch typed := errs.(type) {
+	case ValidationErrors:
+		validationErrs = typed
+	case map[string][]string:
+		validationErrs = ValidationErrors(typed)
+	}
+	if validationErrs == nil {
+		validationErrs = ValidationErrors{}
+	}
+	c.JSON(http.StatusUnprocessableEntity, ValidationErrorResponse{
+		Success: false,
+		Message: messages.MsgValidationError,
+		Data:    nil,
+		Meta:    nil,
+		Errors:  validationErrs,
+	})
 }
 
 // Paginated returns a 200 OK response with pagination metadata.
 func Paginated[T any](c *gin.Context, message string, data T, page, perPage int, total int64) {
+	PaginatedWithFilters(c, message, data, query.PaginationParams{Page: page, PerPage: perPage}, query.FilterParams{}, query.SortParams{}, query.SearchParams{}, total)
+}
+
+// PaginatedWithFilters returns a 200 OK response with pagination and filter metadata.
+func PaginatedWithFilters[T any](c *gin.Context, message string, data T, pagination query.PaginationParams, filters query.FilterParams, sort query.SortParams, search query.SearchParams, total int64) {
+	page := pagination.Page
+	perPage := pagination.PerPage
 	totalPages := 0
 	if perPage > 0 {
 		totalPages = int((total + int64(perPage) - 1) / int64(perPage))
 	}
-	c.JSON(http.StatusOK, APIResponse[T]{
+	c.JSON(http.StatusOK, PaginatedResponse[T]{
 		Success: true,
 		Message: message,
 		Data:    data,
@@ -122,9 +185,18 @@ func Paginated[T any](c *gin.Context, message string, data T, page, perPage int,
 				Total:      total,
 				TotalPages: totalPages,
 			},
+			"filters": filtersMeta(filters, sort, search),
 		},
 		Errors: nil,
 	})
+}
+
+// HandleError maps application errors to standard API error responses.
+func HandleError(c *gin.Context, err error) {
+	if err == nil {
+		return
+	}
+	Error(c, apperror.Status(err), apperror.PublicMessage(err, gin.Mode()), nil)
 }
 
 // RespondIfInvalid writes a 422 validation error response and returns true if errs has errors.
@@ -135,4 +207,28 @@ func RespondIfInvalid(c *gin.Context, errs ValidationErrors) bool {
 	}
 	ValidationError(c, errs)
 	return true
+}
+
+func filtersMeta(filters query.FilterParams, sort query.SortParams, search query.SearchParams) FiltersMeta {
+	if sort.Sort == "" {
+		sort.Sort = "created_at"
+	}
+	if sort.Order != "asc" && sort.Order != "desc" {
+		sort.Order = "desc"
+	}
+	return FiltersMeta{
+		Status:      filters.Status,
+		CreatedFrom: formatDate(filters.CreatedFrom),
+		CreatedTo:   formatDate(filters.CreatedTo),
+		Sort:        sort.Sort,
+		Order:       sort.Order,
+		Search:      search.Query,
+	}
+}
+
+func formatDate(value *time.Time) string {
+	if value == nil {
+		return ""
+	}
+	return value.Format(time.DateOnly)
 }

@@ -1,14 +1,16 @@
 package users
 
 import (
+	"github.com/enviniom/nexokit/internal/platform/gormutil"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"gorm.io/gorm"
 )
 
 // Repository defines the persistence contract for users.
 type Repository interface {
-	List(tc tenant.TenantContext, page, perPage int) ([]User, error)
-	Count(tc tenant.TenantContext) (int64, error)
+	List(tc tenant.TenantContext, params query.ListParams) ([]User, error)
+	Count(tc tenant.TenantContext, params query.ListParams) (int64, error)
 	GetByPublicID(tc tenant.TenantContext, publicID string) (*User, error)
 	GetAuthUser(publicID string) (*User, error)
 	GetByEmail(email string) (*User, error)
@@ -29,24 +31,52 @@ func NewRepository(db *gorm.DB) Repository {
 }
 
 // List returns paginated users.
-func (r *GormRepository) List(tc tenant.TenantContext, page, perPage int) ([]User, error) {
+func (r *GormRepository) List(tc tenant.TenantContext, params query.ListParams) ([]User, error) {
 	var users []User
-	offset := (page - 1) * perPage
-	db := tenant.ApplyTenantScope(r.db, tc)
-	if err := db.Preload("Role").Limit(perPage).Offset(offset).Order("created_at DESC").Find(&users).Error; err != nil {
+	db := applyUserListFilters(tenant.ApplyTenantScope(r.db, tc), params)
+	db = gormutil.ApplySorting(db, withDefaultUserSort(params.Sort), "created_at", "name", "email")
+	db = gormutil.ApplyPagination(db, params.Pagination.Page, params.Pagination.PerPage)
+	if err := db.Preload("Role").Find(&users).Error; err != nil {
 		return nil, err
 	}
 	return users, nil
 }
 
 // Count returns the total number of users.
-func (r *GormRepository) Count(tc tenant.TenantContext) (int64, error) {
+func (r *GormRepository) Count(tc tenant.TenantContext, params query.ListParams) (int64, error) {
 	var count int64
-	db := tenant.ApplyTenantScope(r.db.Model(&User{}), tc)
+	db := applyUserListFilters(tenant.ApplyTenantScope(r.db.Model(&User{}), tc), params)
 	if err := db.Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
+}
+
+func applyUserListFilters(db *gorm.DB, params query.ListParams) *gorm.DB {
+	db = applyUserStatusFilter(db, params.Filters.Status)
+	db = gormutil.ApplyDateRange(db, params.Filters, "created_at")
+	return gormutil.ApplySearch(db, params.Search, "name", "email")
+}
+
+func applyUserStatusFilter(db *gorm.DB, status string) *gorm.DB {
+	switch status {
+	case "active":
+		return db.Where("is_active = ?", true)
+	case "inactive":
+		return db.Where("is_active = ?", false)
+	default:
+		return db
+	}
+}
+
+func withDefaultUserSort(sort query.SortParams) query.SortParams {
+	if sort.Sort == "" {
+		sort.Sort = "created_at"
+	}
+	if sort.Order == "" {
+		sort.Order = "desc"
+	}
+	return sort
 }
 
 // GetByPublicID returns a user by its public ID.
