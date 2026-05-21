@@ -21,7 +21,7 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn}))
 
-	r := NewRouter(cfg, log, os.Stdout, nil)
+	r := NewRouter(cfg, log, os.Stdout, HealthDeps{}, nil)
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/health", nil)
 	r.ServeHTTP(w, req)
@@ -47,7 +47,7 @@ func TestNotFound(t *testing.T) {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn}))
 
-	r := NewRouter(cfg, log, os.Stdout, nil)
+	r := NewRouter(cfg, log, os.Stdout, HealthDeps{}, nil)
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/unknown", nil)
 	r.ServeHTTP(w, req)
@@ -75,6 +75,48 @@ func TestServerStartStop(t *testing.T) {
 	defer cancel()
 	if err := srv.Stop(ctx); err != nil {
 		t.Fatalf("unexpected error stopping server: %v", err)
+	}
+}
+
+func TestLiveEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfg := &config.Config{
+		App:  config.AppConfig{Env: "test"},
+		CORS: config.CORSConfig{AllowedOrigins: "*"},
+	}
+	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	r := NewRouter(cfg, log, os.Stdout, HealthDeps{}, nil)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/health/live", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	if !contains(w.Body.String(), `"status":"alive"`) {
+		t.Fatalf("expected status alive response, got: %s", w.Body.String())
+	}
+}
+
+func TestReadyEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfg := &config.Config{
+		App:  config.AppConfig{Env: "test"},
+		CORS: config.CORSConfig{AllowedOrigins: "*"},
+	}
+	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	r := NewRouter(cfg, log, os.Stdout, HealthDeps{}, nil)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/health/ready", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503 for nil DB dependency, got %d", w.Code)
+	}
+	if !contains(w.Body.String(), `"name":"database"`) {
+		t.Fatalf("expected database dependency in response, got: %s", w.Body.String())
 	}
 }
 

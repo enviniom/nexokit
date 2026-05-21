@@ -36,12 +36,23 @@ func Bootstrap(ctx context.Context) (*App, error) {
 
 	container := NewContainer(cfg, database, log, c)
 
+	sqlDB, err := database.DB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
+	}
+
+	healthDeps := server.HealthDeps{
+		DB:           sqlDB,
+		Cache:        c,
+		CacheEnabled: cfg.Cache.Driver != "none",
+	}
+
 	ginWriter, err := logger.GinWriter(cfg.Log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gin writer: %w", err)
 	}
 
-	router := server.NewRouter(cfg, log, ginWriter, container.RegisterModules)
+	router := server.NewRouter(cfg, log, ginWriter, healthDeps, container.RegisterModules)
 
 	srv := server.New(cfg, router)
 
