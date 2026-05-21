@@ -13,8 +13,8 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/users"
 	"github.com/enviniom/nexokit/internal/platform/password"
 	"github.com/enviniom/nexokit/internal/platform/response"
-	"github.com/enviniom/nexokit/internal/shared"
 	"github.com/enviniom/nexokit/internal/platform/token"
+	"github.com/enviniom/nexokit/internal/shared"
 	"github.com/enviniom/nexokit/tests/helpers"
 	"github.com/gin-gonic/gin"
 )
