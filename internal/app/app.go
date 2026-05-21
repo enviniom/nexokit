@@ -7,6 +7,7 @@ import (
 	"github.com/enviniom/nexokit/internal/config"
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/infra/db"
+	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/server"
 	"gorm.io/gorm"
 	"log/slog"
@@ -19,6 +20,7 @@ type App struct {
 	DB        *gorm.DB
 	Server    *server.Server
 	Cache     cache.Cache
+	Limiter   middleware.Limiter
 	Container *Container
 }
 
@@ -43,6 +45,11 @@ func (a *App) Stop(ctx context.Context) error {
 	a.Logger.Info("closing cache connection")
 	if err := a.Cache.Close(); err != nil {
 		return fmt.Errorf("cache close failed: %w", err)
+	}
+
+	a.Logger.Info("closing limiter")
+	if err := a.Limiter.Close(); err != nil {
+		return fmt.Errorf("limiter close failed: %w", err)
 	}
 
 	a.Logger.Info("shutdown complete")

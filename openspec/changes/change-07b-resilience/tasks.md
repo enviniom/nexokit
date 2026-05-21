@@ -47,18 +47,18 @@ Chain strategy: stacked-to-main
 
 ## Phase 3: Rate Limiting + Wiring (PR 3)
 
-- [ ] 3.1 Define `Limiter` interface (`Allow(ctx, key) (bool, error)`, `Close() error`) and `NoopLimiter` in `internal/middleware/rate_limit.go`
-- [ ] 3.2 Implement `LocalLimiter` using `golang.org/x/time/rate`: per-IP token bucket map, configurable rate/burst, `Allow()`, `Close()` stops cleanup goroutine
-- [ ] 3.3 Implement periodic cleanup in `LocalLimiter`: configurable interval (default 5m), remove expired buckets, stop on `Close()`
-- [ ] 3.4 Write `internal/middleware/rate_limit_test.go` — LocalLimiter: table-driven Allow under/over limit, token refill after wait, cleanup removes expired entries, Close stops goroutine
-- [ ] 3.5 Implement `RedisLimiter`: Lua script for atomic INCR + conditional EXPIRE, key prefix `rl:{scope}:{ip}`, return `{allowed, count, ttl}`, fail on Redis error (caller decides)
-- [ ] 3.6 Write RedisLimiter tests: Lua atomic increment, TTL on first request, exceeded limit returns false, connection error propagation; skip via `testing.Short()`
-- [ ] 3.7 Implement `RateLimitMiddleware(limiter, enabled, scope, limit, window)` in `internal/middleware/rate_limit.go`: IP extraction (X-Forwarded-For first, fallback RemoteAddr stripped of port), call Allow, return `response.TooManyRequests` on false, pass-through when disabled
-- [ ] 3.8 Write middleware HTTP tests via `httptest`: request within limit passes, over limit returns 429 with MsgTooManyRequests, disabled limiter bypasses, IP extraction from X-Forwarded-For and RemoteAddr
-- [ ] 3.9 Add limiter factory in `internal/app/bootstrap.go`: select driver (memory/redis), fall back to LocalLimiter on Redis failure with warning
-- [ ] 3.10 Update `App.Stop()` in `internal/app/app.go` to call `Limiter.Close()` after cache close
-- [ ] 3.11 Update `Container` in `internal/app/container.go` to build login/refresh rate-limit middleware funcs from limiter + config
-- [ ] 3.12 Update `auth.Register()` in `internal/modules/auth/routes.go` to accept login/refresh middleware funcs and apply before handlers
-- [ ] 3.13 Update `readyHandler` in `internal/server/health.go`: RedisCache.Get normalizes redis.Nil as healthy miss (already handled by 2.4); no additional change needed if redis.Nil → nil,nil
-- [ ] 3.14 Add Redis/Valkey service to `docker-compose.yml` with healthcheck and volume
-- [ ] 3.15 Add `go-redis/v9` dependency: `go get github.com/redis/go-redis/v9` and `go mod tidy`
+- [x] 3.1 Define `Limiter` interface (`Allow(ctx, key) (bool, error)`, `Close() error`) and `NoopLimiter` in `internal/middleware/rate_limit.go`
+- [x] 3.2 Implement `LocalLimiter` using `golang.org/x/time/rate`: per-IP token bucket map, configurable rate/burst, `Allow()`, `Close()` stops cleanup goroutine
+- [x] 3.3 Implement periodic cleanup in `LocalLimiter`: configurable interval (default 5m), remove expired buckets, stop on `Close()`
+- [x] 3.4 Write `internal/middleware/rate_limit_test.go` — LocalLimiter: table-driven Allow under/over limit, token refill after wait, cleanup removes expired entries, Close stops goroutine
+- [x] 3.5 Implement `RedisLimiter`: Lua script for atomic INCR + conditional EXPIRE, key prefix `rl:{scope}:{ip}`, return `{allowed, count, ttl}`, fail on Redis error (caller decides)
+- [x] 3.6 Write RedisLimiter tests: Lua atomic increment, TTL on first request, exceeded limit returns false, connection error propagation; skip via `testing.Short()`
+- [x] 3.7 Implement `RateLimitMiddleware(limiter, enabled, scope, limit, window)` in `internal/middleware/rate_limit.go`: IP extraction (X-Forwarded-For first, fallback RemoteAddr stripped of port), call Allow, return `response.TooManyRequests` on false, pass-through when disabled
+- [x] 3.8 Write middleware HTTP tests via `httptest`: request within limit passes, over limit returns 429 with MsgTooManyRequests, disabled limiter bypasses, IP extraction from X-Forwarded-For and RemoteAddr
+- [x] 3.9 Add limiter factory in `internal/app/bootstrap.go`: select driver (memory/redis), fall back to LocalLimiter on Redis failure with warning
+- [x] 3.10 Update `App.Stop()` in `internal/app/app.go` to call `Limiter.Close()` after cache close
+- [x] 3.11 Update `Container` in `internal/app/container.go` to build login/refresh rate-limit middleware funcs from limiter + config
+- [x] 3.12 Update `auth.Register()` in `internal/modules/auth/routes.go` to accept login/refresh middleware funcs and apply before handlers
+- [x] 3.13 Update `readyHandler` in `internal/server/health.go`: RedisCache.Get normalizes redis.Nil as healthy miss (already handled by 2.4); no additional change needed if redis.Nil → nil,nil
+- [x] 3.14 Add Redis/Valkey service to `docker-compose.yml` with healthcheck and volume
+- [x] 3.15 Add `go-redis/v9` dependency: `go get github.com/redis/go-redis/v9` and `go mod tidy`

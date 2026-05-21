@@ -29,12 +29,14 @@ type Container struct {
 	authHandler        *auth.Handler
 	authMW             gin.HandlerFunc
 	authzMW            gin.HandlerFunc
+	loginRateLimitMW   gin.HandlerFunc
+	refreshRateLimitMW gin.HandlerFunc
 }
 
 // NewContainer creates a new Container with the given dependencies.
 // Config, DB, Logger and Cache are passed as constructor parameters but are NOT
 // stored as public fields; they are only used during module wiring.
-func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache.Cache) *Container {
+func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache.Cache, limiter middleware.Limiter) *Container {
 	_ = log
 
 	usersRepo := users.NewRepository(db)
@@ -60,13 +62,16 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	authHandler := auth.NewHandler(authService)
 	authMW := middleware.Auth(tokenManager, userLookup{repo: usersRepo})
 	authzMW := middleware.AttachPermissions(permissionsService)
+	window := time.Duration(cfg.RateLimit.WindowSeconds) * time.Second
+	loginRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "login", cfg.RateLimit.LoginRPM, window)
+	refreshRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "refresh", cfg.RateLimit.RefreshRPM, window)
 
-	return &Container{rolesHandler: rolesHandler, usersHandler: usersHandler, companiesHandler: companiesHandler, companiesRepo: companiesRepo, permissionsHandler: permissionsHandler, authHandler: authHandler, authMW: authMW, authzMW: authzMW}
+	return &Container{rolesHandler: rolesHandler, usersHandler: usersHandler, companiesHandler: companiesHandler, companiesRepo: companiesRepo, permissionsHandler: permissionsHandler, authHandler: authHandler, authMW: authMW, authzMW: authzMW, loginRateLimitMW: loginRateLimitMW, refreshRateLimitMW: refreshRateLimitMW}
 }
 
 // RegisterModules mounts all business module routes onto the v1 router group.
 func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
-	auth.Register(v1, c.authHandler, c.authMW, c.authzMW)
+	auth.Register(v1, c.authHandler, c.authMW, c.authzMW, c.loginRateLimitMW, c.refreshRateLimitMW)
 	globalProtected := v1.Group("")
 	globalProtected.Use(c.authMW, middleware.AllowRootGlobalScope(c.companiesRepo), c.authzMW)
 	companies.Register(globalProtected, c.companiesHandler, middleware.RequirePermission, middleware.RequireRole)
