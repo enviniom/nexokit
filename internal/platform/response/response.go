@@ -135,6 +135,11 @@ func Conflict(c *gin.Context, message string) {
 	Error(c, http.StatusConflict, message, nil)
 }
 
+// TooManyRequests returns a 429 Too Many Requests response.
+func TooManyRequests(c *gin.Context, message string) {
+	Error(c, http.StatusTooManyRequests, message, nil)
+}
+
 // InternalServerError returns a 500 Internal Server Error response.
 func InternalServerError(c *gin.Context, message string) {
 	Error(c, http.StatusInternalServerError, message, nil)

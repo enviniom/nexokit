@@ -137,6 +137,21 @@ func TestConflict(t *testing.T) {
 	}
 }
 
+func TestTooManyRequests(t *testing.T) {
+	c, w := setupRecorder()
+	TooManyRequests(c, messages.MsgTooManyRequests)
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status %d, got %d", http.StatusTooManyRequests, w.Code)
+	}
+	resp := parseBody(t, w)
+	if resp.Message != messages.MsgTooManyRequests {
+		t.Fatalf("message = %q; want %q", resp.Message, messages.MsgTooManyRequests)
+	}
+	if resp.Success {
+		t.Fatal("expected success false")
+	}
+}
+
 func TestInternalServerError(t *testing.T) {
 	c, w := setupRecorder()
 	InternalServerError(c, "Internal error")

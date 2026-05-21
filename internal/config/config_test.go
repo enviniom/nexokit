@@ -32,6 +32,42 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.Cache.Driver != "none" {
 		t.Errorf("expected default CACHE_DRIVER 'none', got %s", cfg.Cache.Driver)
 	}
+	if cfg.Redis.Host != "localhost" {
+		t.Errorf("expected default REDIS_HOST 'localhost', got %s", cfg.Redis.Host)
+	}
+	if cfg.Redis.Port != 6379 {
+		t.Errorf("expected default REDIS_PORT 6379, got %d", cfg.Redis.Port)
+	}
+	if cfg.Redis.Password != "" {
+		t.Errorf("expected default REDIS_PASSWORD empty, got %s", cfg.Redis.Password)
+	}
+	if cfg.Redis.DB != 0 {
+		t.Errorf("expected default REDIS_DB 0, got %d", cfg.Redis.DB)
+	}
+	if cfg.Redis.DialTimeout.Seconds() != 2 {
+		t.Errorf("expected default REDIS_DIAL_TIMEOUT_SECONDS 2, got %v", cfg.Redis.DialTimeout)
+	}
+	if !cfg.RateLimit.Enabled {
+		t.Error("expected default RATE_LIMIT_ENABLED true")
+	}
+	if cfg.RateLimit.Driver != "memory" {
+		t.Errorf("expected default RATE_LIMIT_DRIVER 'memory', got %s", cfg.RateLimit.Driver)
+	}
+	if cfg.RateLimit.GlobalRPM != 0 {
+		t.Errorf("expected default RATE_LIMIT_GLOBAL_RPM 0, got %d", cfg.RateLimit.GlobalRPM)
+	}
+	if cfg.RateLimit.LoginRPM != 5 {
+		t.Errorf("expected default RATE_LIMIT_LOGIN_RPM 5, got %d", cfg.RateLimit.LoginRPM)
+	}
+	if cfg.RateLimit.RefreshRPM != 10 {
+		t.Errorf("expected default RATE_LIMIT_REFRESH_RPM 10, got %d", cfg.RateLimit.RefreshRPM)
+	}
+	if cfg.RateLimit.WindowSeconds != 60 {
+		t.Errorf("expected default RATE_LIMIT_WINDOW_SECONDS 60, got %d", cfg.RateLimit.WindowSeconds)
+	}
+	if cfg.RateLimit.CleanupIntervalMinutes != 5 {
+		t.Errorf("expected default RATE_LIMIT_CLEANUP_INTERVAL_MINUTES 5, got %d", cfg.RateLimit.CleanupIntervalMinutes)
+	}
 	if cfg.Log.Level != "info" {
 		t.Errorf("expected default LOG_LEVEL 'info', got %s", cfg.Log.Level)
 	}
@@ -198,5 +234,31 @@ func TestLoad_InvalidLogMaxSize(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("expected error for invalid LOG_MAX_SIZE")
+	}
+}
+
+func TestLoad_InvalidRedisPort(t *testing.T) {
+	os.Clearenv()
+	os.Setenv("REDIS_PORT", "invalid")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("expected error for invalid REDIS_PORT")
+	}
+}
+
+func TestLoad_InvalidRateLimitRPMFields(t *testing.T) {
+	tests := []string{"RATE_LIMIT_GLOBAL_RPM", "RATE_LIMIT_LOGIN_RPM", "RATE_LIMIT_REFRESH_RPM"}
+
+	for _, envName := range tests {
+		t.Run(envName, func(t *testing.T) {
+			os.Clearenv()
+			os.Setenv(envName, "invalid")
+
+			_, err := Load()
+			if err == nil {
+				t.Fatalf("expected error for invalid %s", envName)
+			}
+		})
 	}
 }

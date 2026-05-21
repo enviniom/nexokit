@@ -45,6 +45,7 @@ func TestStatus(t *testing.T) {
 		{"unauthorized", ErrUnauthorized, http.StatusUnauthorized},
 		{"conflict", ErrConflict, http.StatusConflict},
 		{"bad request", ErrBadRequest, http.StatusBadRequest},
+		{"too many requests", ErrTooManyRequests, http.StatusTooManyRequests},
 		{"validation", ErrValidation, http.StatusUnprocessableEntity},
 		{"internal", ErrInternal, http.StatusInternalServerError},
 		{"unknown", errors.New("something else"), http.StatusInternalServerError},
@@ -100,5 +101,8 @@ func TestSentinels(t *testing.T) {
 	}
 	if ErrValidation.Error() != messages.MsgValidationError {
 		t.Errorf("unexpected validation sentinel message: %s", ErrValidation.Error())
+	}
+	if ErrTooManyRequests.Error() != messages.MsgTooManyRequests {
+		t.Errorf("unexpected too many requests sentinel message: %s", ErrTooManyRequests.Error())
 	}
 }

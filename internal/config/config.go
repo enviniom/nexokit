@@ -11,13 +11,15 @@ import (
 
 // Config holds all application configuration loaded from environment variables.
 type Config struct {
-	App      AppConfig
-	DB       DBConfig
-	CORS     CORSConfig
-	Log      LogConfig
-	Shutdown ShutdownConfig
-	Cache    CacheConfig
-	Auth     AuthConfig
+	App       AppConfig
+	DB        DBConfig
+	CORS      CORSConfig
+	Log       LogConfig
+	Shutdown  ShutdownConfig
+	Cache     CacheConfig
+	Redis     RedisConfig
+	RateLimit RateLimitConfig
+	Auth      AuthConfig
 }
 
 // AppConfig holds application-level settings.
@@ -68,6 +70,26 @@ type ShutdownConfig struct {
 // CacheConfig holds cache settings.
 type CacheConfig struct {
 	Driver string
+}
+
+// RedisConfig holds Redis connection settings.
+type RedisConfig struct {
+	Host        string
+	Port        int
+	Password    string
+	DB          int
+	DialTimeout time.Duration
+}
+
+// RateLimitConfig holds rate limiting settings.
+type RateLimitConfig struct {
+	Enabled                bool
+	Driver                 string
+	GlobalRPM              int
+	LoginRPM               int
+	RefreshRPM             int
+	WindowSeconds          int
+	CleanupIntervalMinutes int
 }
 
 // AuthConfig holds authentication-related settings.
@@ -137,6 +159,46 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid REFRESH_TTL_DAYS: %w", err)
 	}
 
+	redisPort, err := getInt("REDIS_PORT", 6379)
+	if err != nil {
+		return nil, fmt.Errorf("invalid REDIS_PORT: %w", err)
+	}
+
+	redisDB, err := getInt("REDIS_DB", 0)
+	if err != nil {
+		return nil, fmt.Errorf("invalid REDIS_DB: %w", err)
+	}
+
+	redisDialTimeoutSeconds, err := getInt("REDIS_DIAL_TIMEOUT_SECONDS", 2)
+	if err != nil {
+		return nil, fmt.Errorf("invalid REDIS_DIAL_TIMEOUT_SECONDS: %w", err)
+	}
+
+	rateLimitGlobalRPM, err := getInt("RATE_LIMIT_GLOBAL_RPM", 0)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RATE_LIMIT_GLOBAL_RPM: %w", err)
+	}
+
+	rateLimitLoginRPM, err := getInt("RATE_LIMIT_LOGIN_RPM", 5)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RATE_LIMIT_LOGIN_RPM: %w", err)
+	}
+
+	rateLimitRefreshRPM, err := getInt("RATE_LIMIT_REFRESH_RPM", 10)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RATE_LIMIT_REFRESH_RPM: %w", err)
+	}
+
+	rateLimitWindowSeconds, err := getInt("RATE_LIMIT_WINDOW_SECONDS", 60)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RATE_LIMIT_WINDOW_SECONDS: %w", err)
+	}
+
+	rateLimitCleanupIntervalMinutes, err := getInt("RATE_LIMIT_CLEANUP_INTERVAL_MINUTES", 5)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RATE_LIMIT_CLEANUP_INTERVAL_MINUTES: %w", err)
+	}
+
 	cfg := &Config{
 		App: AppConfig{
 			Name: getString("APP_NAME", "nexokit"),
@@ -175,6 +237,22 @@ func Load() (*Config, error) {
 		},
 		Cache: CacheConfig{
 			Driver: getString("CACHE_DRIVER", "none"),
+		},
+		Redis: RedisConfig{
+			Host:        getString("REDIS_HOST", "localhost"),
+			Port:        redisPort,
+			Password:    getString("REDIS_PASSWORD", ""),
+			DB:          redisDB,
+			DialTimeout: time.Duration(redisDialTimeoutSeconds) * time.Second,
+		},
+		RateLimit: RateLimitConfig{
+			Enabled:                getBool("RATE_LIMIT_ENABLED", true),
+			Driver:                 getString("RATE_LIMIT_DRIVER", "memory"),
+			GlobalRPM:              rateLimitGlobalRPM,
+			LoginRPM:               rateLimitLoginRPM,
+			RefreshRPM:             rateLimitRefreshRPM,
+			WindowSeconds:          rateLimitWindowSeconds,
+			CleanupIntervalMinutes: rateLimitCleanupIntervalMinutes,
 		},
 		Auth: AuthConfig{
 			PASETOKey:        getString("PASETO_KEY", ""),

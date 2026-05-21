@@ -13,6 +13,7 @@ const (
 	MsgForbidden       = "Acceso denegado"
 	MsgConflict        = "El recurso ya existe"
 	MsgBadRequest      = "Solicitud inválida"
+	MsgTooManyRequests = "Demasiadas solicitudes. Intente nuevamente más tarde."
 )
 
 // Validation rule messages

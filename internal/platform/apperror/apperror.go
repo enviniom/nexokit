@@ -43,13 +43,14 @@ func (ae *AppError) Is(target error) bool {
 
 // Sentinel errors for common application states.
 var (
-	ErrNotFound     = &AppError{Message: messages.MsgNotFound}
-	ErrForbidden    = &AppError{Message: messages.MsgForbidden}
-	ErrUnauthorized = &AppError{Message: messages.MsgUnauthorized}
-	ErrConflict     = &AppError{Message: messages.MsgConflict}
-	ErrBadRequest   = &AppError{Message: messages.MsgBadRequest}
-	ErrValidation   = &AppError{Message: messages.MsgValidationError}
-	ErrInternal     = &AppError{Message: messages.MsgInternalError}
+	ErrNotFound        = &AppError{Message: messages.MsgNotFound}
+	ErrForbidden       = &AppError{Message: messages.MsgForbidden}
+	ErrUnauthorized    = &AppError{Message: messages.MsgUnauthorized}
+	ErrConflict        = &AppError{Message: messages.MsgConflict}
+	ErrBadRequest      = &AppError{Message: messages.MsgBadRequest}
+	ErrTooManyRequests = &AppError{Message: messages.MsgTooManyRequests}
+	ErrValidation      = &AppError{Message: messages.MsgValidationError}
+	ErrInternal        = &AppError{Message: messages.MsgInternalError}
 )
 
 // Wrap creates a new AppError wrapping an existing error.
@@ -80,6 +81,9 @@ func Status(err error) int {
 	}
 	if errors.Is(err, ErrBadRequest) {
 		return http.StatusBadRequest
+	}
+	if errors.Is(err, ErrTooManyRequests) {
+		return http.StatusTooManyRequests
 	}
 	if errors.Is(err, ErrValidation) {
 		return http.StatusUnprocessableEntity
