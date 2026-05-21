@@ -67,6 +67,7 @@ The system MUST map each sentinel to a fixed HTTP status:
 | ErrConflict | 409 |
 | ErrBadRequest | 400 |
 | ErrValidation | 422 |
+| ErrTooManyRequests | 429 |
 | ErrInternal | 500 |
 
 #### Scenario: Unknown error
@@ -74,6 +75,22 @@ The system MUST map each sentinel to a fixed HTTP status:
 - GIVEN an error without a known sentinel
 - WHEN the HTTP layer handles it
 - THEN it defaults to 500 with generic message
+
+### Requirement: ErrTooManyRequests sentinel
+
+The system MUST define `ErrTooManyRequests` as an exported sentinel error in `platform/apperror` mapped to HTTP 429 Too Many Requests.
+
+#### Scenario: ErrTooManyRequests returns 429
+
+- GIVEN `ErrTooManyRequests` is returned from a handler
+- WHEN `apperror.Status(err)` is called
+- THEN it returns 429
+
+#### Scenario: HandleError maps ErrTooManyRequests to 429
+
+- GIVEN `ErrTooManyRequests` is passed to `HandleError`
+- WHEN the handler processes the error
+- THEN the response status is 429 and the message is `MsgTooManyRequests`
 
 ## Constraints and Edge Cases
 

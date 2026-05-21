@@ -7,17 +7,17 @@ Define the `App` type, bootstrap sequence, dependency container, and lifecycle m
 
 ### Requirement: App struct
 
-The system MUST define an `App` struct that holds references to the server, database, logger, and configuration.
+The system MUST define an `App` struct that holds references to the server, database, logger, configuration, and cache.
 
 #### Scenario: Access dependencies
 
 - GIVEN a successfully bootstrapped `App`
-- WHEN `app.DB`, `app.Server`, `app.Logger`, or `app.Config` are accessed
+- WHEN `app.DB`, `app.Server`, `app.Logger`, `app.Config`, or `app.Cache` are accessed
 - THEN they are non-nil and initialized
 
 ### Requirement: Bootstrap sequence
 
-The system MUST enforce the bootstrap order: load config → initialize logger → connect database → build container → setup router → start server.
+The system MUST enforce the bootstrap order: load config → initialize logger → connect database → initialize cache (driver-based factory) → build container → setup router → start server.
 
 #### Scenario: Valid environment
 
@@ -33,6 +33,19 @@ The system MUST enforce the bootstrap order: load config → initialize logger �
 - THEN it returns an error
 - AND the server is never started
 
+#### Scenario: Cache initialized during bootstrap
+
+- GIVEN `CACHE_DRIVER=redis` and Redis is reachable
+- WHEN `Bootstrap()` reaches the cache step
+- THEN a `RedisCache` is created and assigned to `app.Cache`
+
+#### Scenario: Cache fallback on connection failure
+
+- GIVEN `CACHE_DRIVER=redis` but Redis is unreachable
+- WHEN `Bootstrap()` reaches the cache step
+- THEN a `NoopCache` is assigned to `app.Cache` and a warning is logged
+- AND bootstrap continues (does not fail)
+
 ### Requirement: Dependency container
 
 The system MUST provide a `Container` type that wires repositories, services, and handlers, and is built during bootstrap.
@@ -45,7 +58,7 @@ The system MUST provide a `Container` type that wires repositories, services, an
 
 ### Requirement: Start and Stop lifecycle
 
-The system MUST expose `Start()` to run the server and `Stop(ctx)` to release resources.
+The system MUST expose `Start()` to run the server and `Stop(ctx)` to release resources including the cache connection.
 
 #### Scenario: Start server
 
@@ -53,12 +66,19 @@ The system MUST expose `Start()` to run the server and `Stop(ctx)` to release re
 - WHEN `Start()` is called
 - THEN the HTTP server begins listening
 
-#### Scenario: Stop server
+#### Scenario: Stop server closes cache
 
-- GIVEN a running `App`
+- GIVEN a running `App` with an active `RedisCache`
 - WHEN `Stop(ctx)` is called
 - THEN the HTTP server shuts down gracefully
 - AND the database connection is closed
+- AND `Cache.Close()` is called
+
+#### Scenario: Stop with NoopCache is safe
+
+- GIVEN a running `App` with `NoopCache`
+- WHEN `Stop(ctx)` is called
+- THEN `Cache.Close()` returns `nil` without error
 
 ## Constraints and Edge Cases
 

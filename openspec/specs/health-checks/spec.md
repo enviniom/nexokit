@@ -56,6 +56,13 @@ The system MUST expose `GET /health/ready` that verifies connectivity to all act
 - THEN the response status is 503
 - AND the body reports both dependencies as unhealthy individually
 
+#### Scenario: Redis cache healthy
+
+- GIVEN the cache driver is "redis" and Redis responds to ping
+- WHEN `GET /health/ready` is requested
+- THEN the response status is 200
+- AND the cache dependency is marked healthy
+
 ### Requirement: Per-dependency status reporting
 
 The `/health/ready` response MUST include a structured JSON object with each dependency's name and status (`"healthy"` or `"unhealthy"`), and optionally an error message for unhealthy dependencies.

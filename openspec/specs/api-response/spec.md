@@ -109,6 +109,22 @@ The system MUST provide `HandleError(c *gin.Context, err error)` that maps any `
 - WHEN `HandleError(c, nil)` is called
 - THEN no response is written
 
+### Requirement: TooManyRequests response helper
+
+The system MUST provide a `TooManyRequests(c *gin.Context, message string)` helper that returns HTTP 429 with the standard error envelope using `MsgTooManyRequests` as the default message.
+
+#### Scenario: TooManyRequests returns standard envelope
+
+- GIVEN a rate limit is exceeded
+- WHEN `TooManyRequests(c, "")` is called
+- THEN the response is 429 with `success: false`, `message: MsgTooManyRequests`, `data: null`, `errors: null`
+
+#### Scenario: TooManyRequests with custom message
+
+- GIVEN a rate limit is exceeded
+- WHEN `TooManyRequests(c, "Please wait before retrying")` is called
+- THEN the response is 429 with `message: "Please wait before retrying"`
+
 ## Constraints and Edge Cases
 
 - All handlers MUST use `platform/response`; direct `gin.H` is prohibited.
