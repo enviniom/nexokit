@@ -52,6 +52,6 @@ Chain strategy: feature-branch-chain
 
 ## Phase 4: Documentation (PR 4 — targets PR 3 branch)
 
-- [ ] 4.1 Create `docs/testing.md` with: Quick path (running tests), folder conventions (unit vs integration), Makefile targets table, Go testing patterns (table-driven, `t.Run`, `t.TempDir`, `testing.Short()`), integration test guidelines (helpers, fixtures, cleanup), SQLite/PostgreSQL limits, Redis skip behavior, coverage policy, conventions checklist
-- [ ] 4.2 Include code examples matching existing codebase patterns (stdlib-only, no testify)
-- [ ] 4.3 Document CI workflow: what each check validates, how to reproduce failures locally
+- [x] 4.1 Create `docs/testing.md` with: Quick path (running tests), folder conventions (unit vs integration), Makefile targets table, Go testing patterns (table-driven, `t.Run`, `t.TempDir`, `testing.Short()`), integration test guidelines (helpers, fixtures, cleanup), SQLite/PostgreSQL limits, Redis skip behavior, coverage policy, conventions checklist
+- [x] 4.2 Include code examples matching existing codebase patterns (stdlib-only, no testify)
+- [x] 4.3 Document CI workflow: what each check validates, how to reproduce failures locally
