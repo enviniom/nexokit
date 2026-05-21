@@ -37,13 +37,13 @@ Chain strategy: stacked-to-main
 
 ## Phase 2: Cache Infrastructure (PR 2)
 
-- [ ] 2.1 Add `Exists(ctx context.Context, key string) (bool, error)` to `Cache` interface in `internal/infra/cache/cache.go`; define `ErrCacheMiss` sentinel
-- [ ] 2.2 Add `Exists(ctx, key) (false, nil)` stub to `NoopCache` in `internal/infra/cache/noop.go`; fix `Get` to return `("", ErrCacheMiss)` per spec
-- [ ] 2.3 Extend `TestNoopCache` in `internal/infra/cache/noop_test.go`: test `Exists` returns false, test `Get` returns ErrCacheMiss
-- [ ] 2.4 Implement `RedisCache` in `internal/infra/cache/redis.go`: constructor with `go-redis/v9`, Get/Set/Delete/Exists/Close, JSON serialization, TTL clamp ≥1s, redis.Nil → ErrCacheMiss normalization, idempotent Close
-- [ ] 2.5 Write `internal/infra/cache/redis_test.go`: table-driven tests for Get roundtrip, Get miss → ErrCacheMiss, TTL expiry, Delete, Exists true/false, Close idempotency, post-close error; skip real Redis tests via `testing.Short()`
-- [ ] 2.6 Add driver-based cache factory in `internal/app/bootstrap.go`: switch on `CACHE_DRIVER` ("redis" → RedisCache with dial timeout, "none" → NoopCache); log warning and fall back to NoopCache on connection failure
-- [ ] 2.7 Verify `go build ./...` passes with both cache implementations satisfying the interface
+- [x] 2.1 Add `Exists(ctx context.Context, key string) (bool, error)` to `Cache` interface in `internal/infra/cache/cache.go`; define `ErrCacheMiss` sentinel
+- [x] 2.2 Add `Exists(ctx, key) (false, nil)` stub to `NoopCache` in `internal/infra/cache/noop.go`; fix `Get` to return `("", ErrCacheMiss)` per spec
+- [x] 2.3 Extend `TestNoopCache` in `internal/infra/cache/noop_test.go`: test `Exists` returns false, test `Get` returns ErrCacheMiss
+- [x] 2.4 Implement `RedisCache` in `internal/infra/cache/redis.go`: constructor with `go-redis/v9`, Get/Set/Delete/Exists/Close, JSON serialization, TTL clamp ≥1s, redis.Nil → ErrCacheMiss normalization, idempotent Close
+- [x] 2.5 Write `internal/infra/cache/redis_test.go`: table-driven tests for Get roundtrip, Get miss → ErrCacheMiss, TTL expiry, Delete, Exists true/false, Close idempotency, post-close error; skip real Redis tests via `testing.Short()`
+- [x] 2.6 Add driver-based cache factory in `internal/app/bootstrap.go`: switch on `CACHE_DRIVER` ("redis" → RedisCache with dial timeout, "none" → NoopCache); log warning and fall back to NoopCache on connection failure
+- [x] 2.7 Verify `go build ./...` passes with both cache implementations satisfying the interface
 
 ## Phase 3: Rate Limiting + Wiring (PR 3)
 

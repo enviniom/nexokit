@@ -124,6 +124,13 @@ func (c *resolverCache) Set(ctx context.Context, key string, value []byte, ttl t
 }
 
 func (c *resolverCache) Delete(ctx context.Context, key string) error { return nil }
+func (c *resolverCache) Exists(ctx context.Context, key string) (bool, error) {
+	if c.values == nil {
+		return false, nil
+	}
+	_, ok := c.values[key]
+	return ok, nil
+}
 func (c *resolverCache) Close() error                                 { return nil }
 
 func TestPermissionFieldsAndSlugUniqueness(t *testing.T) {

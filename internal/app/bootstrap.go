@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"github.com/enviniom/nexokit/internal/config"
 	"github.com/enviniom/nexokit/internal/infra/cache"
@@ -32,7 +33,27 @@ func Bootstrap(ctx context.Context) (*App, error) {
 	}
 	log.Info("database connected")
 
-	c := cache.NewNoop()
+	var c cache.Cache = cache.NewNoop()
+
+	switch cfg.Cache.Driver {
+	case "redis":
+		redisAddr := net.JoinHostPort(cfg.Redis.Host, fmt.Sprintf("%d", cfg.Redis.Port))
+		redisCache, redisErr := cache.NewRedis(cache.RedisConfig{
+			Addr:        redisAddr,
+			Password:    cfg.Redis.Password,
+			DB:          cfg.Redis.DB,
+			DialTimeout: cfg.Redis.DialTimeout,
+		})
+		if redisErr != nil {
+			log.Warn("failed to connect to redis cache, falling back to noop cache", slog.String("error", redisErr.Error()))
+		} else {
+			c = redisCache
+		}
+	case "none":
+		// no-op cache by design
+	default:
+		log.Warn("unsupported cache driver, falling back to noop cache", slog.String("driver", cfg.Cache.Driver))
+	}
 
 	container := NewContainer(cfg, database, log, c)
 

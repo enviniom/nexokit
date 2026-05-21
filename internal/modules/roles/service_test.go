@@ -164,6 +164,7 @@ func (f *fakeCache) Delete(ctx context.Context, key string) error {
 	f.deleted = append(f.deleted, key)
 	return nil
 }
+func (f *fakeCache) Exists(ctx context.Context, key string) (bool, error) { return false, nil }
 func (f *fakeCache) Close() error { return nil }
 
 func TestService_List(t *testing.T) {
