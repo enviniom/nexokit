@@ -34,11 +34,11 @@ Chain strategy: feature-branch-chain
 
 ## Phase 2: Test Helpers & Fixtures (PR 2 — targets PR 1 branch)
 
-- [ ] 2.1 Create `tests/helpers/database.go` with `NewSQLiteDB(t *testing.T, models ...any) *gorm.DB` — opens SQLite `:memory:`, auto-migrates models, registers `t.Cleanup` to close connection
-- [ ] 2.2 Create `tests/helpers/auth.go` with `SeedUser(t, db, opts)`, `CreateTestToken(t, db, user)`, `AuthenticatedRequest(t, method, path, body, actor) *http.Request` helpers
-- [ ] 2.3 Create `tests/helpers/fixtures.go` with factory functions: `SeedRole`, `SeedCompany`, `SeedUserWithRole`, `SeedPermission` — deterministic, relationship-aware
-- [ ] 2.4 Create `tests/fixtures/` directory with Go fixture builder files (not static JSON/YAML)
-- [ ] 2.5 Write table-driven unit tests for each helper in `tests/helpers/*_test.go` — verify DB isolation, token generation, fixture determinism
+- [x] 2.1 Create `tests/helpers/database.go` with `NewSQLiteDB(t *testing.T, models ...any) *gorm.DB` — opens SQLite `:memory:`, auto-migrates models, registers `t.Cleanup` to close connection
+- [x] 2.2 Create `tests/helpers/auth.go` with `SeedUser(t, db, opts)`, `CreateTestToken(t, db, user)`, `AuthenticatedRequest(t, method, path, body, actor) *http.Request` helpers
+- [x] 2.3 Create `tests/helpers/fixtures.go` with factory functions: `SeedRole`, `SeedCompany`, `SeedUserWithRole`, `SeedPermission` — deterministic, relationship-aware
+- [x] 2.4 Create `tests/fixtures/` directory with Go fixture builder files (not static JSON/YAML)
+- [x] 2.5 Write table-driven unit tests for each helper in `tests/helpers/*_test.go` — verify DB isolation, token generation, fixture determinism
 
 ## Phase 3: Integration Test Suites (PR 3 — targets PR 2 branch)
 
