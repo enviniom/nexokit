@@ -21,7 +21,7 @@ func NewGoldenmodService(repo *GoldenmodRepository) *GoldenmodService {
 func (s *GoldenmodService) Create(ctx context.Context, req CreateGoldenmodRequest) (*Goldenmod, error) {
 	// TODO: add domain validation before persistence
 	m := &Goldenmod{
-		Name: req.Name,
+		Name:      req.Name,
 		CompanyID: req.CompanyID,
 	}
 	m.PublicID = uuid.NewString() // TODO: switch to ULID when identity package is ready

@@ -16,8 +16,10 @@ import (
 // StatusCommand prints application status.
 type StatusCommand struct{}
 
-func (c *StatusCommand) Name() string        { return "status" }
-func (c *StatusCommand) Description() string { return "Print app version, DB status, and migration count" }
+func (c *StatusCommand) Name() string { return "status" }
+func (c *StatusCommand) Description() string {
+	return "Print app version, DB status, and migration count"
+}
 
 func (c *StatusCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) error {
 	version := "dev"

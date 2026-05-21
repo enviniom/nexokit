@@ -8,8 +8,8 @@ import (
 
 // CreateGoldenmodRequest is the payload for creating a Goldenmod.
 type CreateGoldenmodRequest struct {
-	Name string `json:"name"`
-	CompanyID uint `json:"company_id"`
+	Name      string `json:"name"`
+	CompanyID uint   `json:"company_id"`
 }
 
 // Validate performs field-level validation for CreateGoldenmodRequest.
@@ -24,8 +24,8 @@ func (r CreateGoldenmodRequest) Validate() response.ValidationErrors {
 
 // UpdateGoldenmodRequest is the payload for updating a Goldenmod.
 type UpdateGoldenmodRequest struct {
-	Name string `json:"name"`
-	CompanyID uint `json:"company_id"`
+	Name      string `json:"name"`
+	CompanyID uint   `json:"company_id"`
 }
 
 // Validate performs field-level validation for UpdateGoldenmodRequest.

@@ -13,8 +13,10 @@ import (
 // MigrateCommand handles database migrations.
 type MigrateCommand struct{}
 
-func (c *MigrateCommand) Name() string        { return "migrate" }
-func (c *MigrateCommand) Description() string { return "Run database migrations (up, down, status, reset, create)" }
+func (c *MigrateCommand) Name() string { return "migrate" }
+func (c *MigrateCommand) Description() string {
+	return "Run database migrations (up, down, status, reset, create)"
+}
 
 func (c *MigrateCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) error {
 	if len(args) == 0 {

@@ -70,40 +70,40 @@ func TestReadyHandler(t *testing.T) {
 		wantDeps   map[string]string
 	}{
 		{
-			name: "all healthy",
-			deps: HealthDeps{DB: fakeDB{}, CacheEnabled: false},
+			name:       "all healthy",
+			deps:       HealthDeps{DB: fakeDB{}, CacheEnabled: false},
 			wantStatus: http.StatusOK,
-			wantDeps: map[string]string{"database": "healthy", "cache": "healthy"},
+			wantDeps:   map[string]string{"database": "healthy", "cache": "healthy"},
 		},
 		{
-			name: "db fail",
-			deps: HealthDeps{DB: fakeDB{err: errors.New("connection refused")}, CacheEnabled: false},
+			name:       "db fail",
+			deps:       HealthDeps{DB: fakeDB{err: errors.New("connection refused")}, CacheEnabled: false},
 			wantStatus: http.StatusServiceUnavailable,
-			wantDeps: map[string]string{"database": "unhealthy", "cache": "healthy"},
+			wantDeps:   map[string]string{"database": "unhealthy", "cache": "healthy"},
 		},
 		{
-			name: "cache fail",
-			deps: HealthDeps{DB: fakeDB{}, Cache: fakeCache{err: errors.New("cache unavailable")}, CacheEnabled: true},
+			name:       "cache fail",
+			deps:       HealthDeps{DB: fakeDB{}, Cache: fakeCache{err: errors.New("cache unavailable")}, CacheEnabled: true},
 			wantStatus: http.StatusServiceUnavailable,
-			wantDeps: map[string]string{"database": "healthy", "cache": "unhealthy"},
+			wantDeps:   map[string]string{"database": "healthy", "cache": "unhealthy"},
 		},
 		{
-			name: "cache disabled",
-			deps: HealthDeps{DB: fakeDB{}, CacheEnabled: false},
+			name:       "cache disabled",
+			deps:       HealthDeps{DB: fakeDB{}, CacheEnabled: false},
 			wantStatus: http.StatusOK,
-			wantDeps: map[string]string{"database": "healthy", "cache": "healthy"},
+			wantDeps:   map[string]string{"database": "healthy", "cache": "healthy"},
 		},
 		{
-			name: "nil db",
-			deps: HealthDeps{CacheEnabled: false},
+			name:       "nil db",
+			deps:       HealthDeps{CacheEnabled: false},
 			wantStatus: http.StatusServiceUnavailable,
-			wantDeps: map[string]string{"database": "unhealthy", "cache": "healthy"},
+			wantDeps:   map[string]string{"database": "unhealthy", "cache": "healthy"},
 		},
 		{
-			name: "nil cache when enabled",
-			deps: HealthDeps{DB: fakeDB{}, CacheEnabled: true},
+			name:       "nil cache when enabled",
+			deps:       HealthDeps{DB: fakeDB{}, CacheEnabled: true},
 			wantStatus: http.StatusServiceUnavailable,
-			wantDeps: map[string]string{"database": "healthy", "cache": "unhealthy"},
+			wantDeps:   map[string]string{"database": "healthy", "cache": "unhealthy"},
 		},
 	}
 

@@ -165,7 +165,7 @@ func (f *fakeCache) Delete(ctx context.Context, key string) error {
 	return nil
 }
 func (f *fakeCache) Exists(ctx context.Context, key string) (bool, error) { return false, nil }
-func (f *fakeCache) Close() error { return nil }
+func (f *fakeCache) Close() error                                         { return nil }
 
 func TestService_List(t *testing.T) {
 	t.Run("returns paginated roles", func(t *testing.T) {

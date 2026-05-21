@@ -1,7 +1,10 @@
 package identity
 
 import (
+	"slices"
 	"testing"
+
+	"github.com/oklog/ulid/v2"
 )
 
 func TestGenerate(t *testing.T) {
@@ -30,18 +33,30 @@ func TestGenerate(t *testing.T) {
 	})
 
 	t.Run("generates sortable ids", func(t *testing.T) {
-		// ULIDs are lexicographically sortable by time.
-		// Two consecutive generations should produce ids where id2 > id1.
-		id1, err := Generate()
-		if err != nil {
-			t.Fatalf("Generate failed: %v", err)
+		const count = 64
+		ids := make([]string, 0, count)
+		for range count {
+			id, err := Generate()
+			if err != nil {
+				t.Fatalf("Generate failed: %v", err)
+			}
+			ids = append(ids, id)
 		}
-		id2, err := Generate()
-		if err != nil {
-			t.Fatalf("Generate failed: %v", err)
-		}
-		if id2 <= id1 {
-			t.Errorf("expected id2 > id1 for sortability, got id1=%s id2=%s", id1, id2)
+
+		sorted := append([]string(nil), ids...)
+		slices.Sort(sorted)
+
+		var previous uint64
+		for i, raw := range sorted {
+			parsed, err := ulid.Parse(raw)
+			if err != nil {
+				t.Fatalf("generated id is not a valid ULID: %v", err)
+			}
+			ts := parsed.Time()
+			if i > 0 && ts < previous {
+				t.Fatalf("lexicographic order broke timestamp monotonicity: prev=%d curr=%d (id=%s)", previous, ts, raw)
+			}
+			previous = ts
 		}
 	})
 }

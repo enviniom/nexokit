@@ -12,14 +12,14 @@ var moduleFS embed.FS
 
 // ModuleData holds template values for module generation.
 type ModuleData struct {
-	Name       string // original module name, e.g. "products"
-	Package    string // snake_case package name, same as Name
-	Struct     string // PascalCase module name, e.g. "Products"
-	Plural     string // PascalCase plural, e.g. "Products"
-	Table      string // snake_case plural table name, e.g. "products"
-	CRUD       bool
-	Migration  bool
-	Tenant     bool
+	Name      string // original module name, e.g. "products"
+	Package   string // snake_case package name, same as Name
+	Struct    string // PascalCase module name, e.g. "Products"
+	Plural    string // PascalCase plural, e.g. "Products"
+	Table     string // snake_case plural table name, e.g. "products"
+	CRUD      bool
+	Migration bool
+	Tenant    bool
 }
 
 // ParseModuleTemplate loads and parses a named template from the embedded FS.

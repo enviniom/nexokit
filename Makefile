@@ -1,4 +1,4 @@
-.PHONY: dev build test migrate-up migrate-down migrate-create migrate-status migrate-reset seed create-root lint fmt vet install-hooks uninstall-hooks check-env
+.PHONY: dev build test test-unit test-integration test-coverage migrate-up migrate-down migrate-create migrate-status migrate-reset seed create-root lint fmt vet install-hooks uninstall-hooks check-env
 
 # Load .env if present for Makefile variable expansion.
 # Export only the variables the app/CLI reads, avoiding accidental env bleed.
@@ -20,6 +20,16 @@ build:
 
 test:
 	go test ./...
+
+test-unit:
+	go test -short $(shell go list ./... | grep -v '/tests/integration$$')
+
+test-integration:
+	go test ./tests/integration/...
+
+test-coverage:
+	go test ./... -coverprofile=coverage.out
+	go tool cover -func=coverage.out
 
 migrate-up:
 	@if [ -z "$(DATABASE_URL)" ] && [ -z "$(DB_HOST)" ]; then \

@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"go/format"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,7 +71,17 @@ func TestGolden_ModuleWithAllFlags(t *testing.T) {
 		}
 
 		if string(got) != string(want) {
-			t.Errorf("golden mismatch for %s:\ngot:\n%s\nwant:\n%s", f, got, want)
+			formattedGot, err := format.Source(got)
+			if err != nil {
+				t.Fatalf("format generated %s: %v", f, err)
+			}
+			formattedWant, err := format.Source(want)
+			if err != nil {
+				t.Fatalf("format golden %s: %v", f, err)
+			}
+			if string(formattedGot) != string(formattedWant) {
+				t.Errorf("golden mismatch for %s:\ngot:\n%s\nwant:\n%s", f, formattedGot, formattedWant)
+			}
 		}
 	}
 

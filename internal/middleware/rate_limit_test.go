@@ -183,7 +183,9 @@ func TestRateLimitMiddlewareHTTP(t *testing.T) {
 	}
 }
 
-func contains(s, sub string) bool { return len(sub) == 0 || (len(s) >= len(sub) && stringContains(s, sub)) }
+func contains(s, sub string) bool {
+	return len(sub) == 0 || (len(s) >= len(sub) && stringContains(s, sub))
+}
 
 func stringContains(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {

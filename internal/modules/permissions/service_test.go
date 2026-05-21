@@ -131,7 +131,7 @@ func (c *resolverCache) Exists(ctx context.Context, key string) (bool, error) {
 	_, ok := c.values[key]
 	return ok, nil
 }
-func (c *resolverCache) Close() error                                 { return nil }
+func (c *resolverCache) Close() error { return nil }
 
 func TestPermissionFieldsAndSlugUniqueness(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})

@@ -16,8 +16,10 @@ import (
 // MakeCommand handles code generation subcommands.
 type MakeCommand struct{}
 
-func (c *MakeCommand) Name() string        { return "make" }
-func (c *MakeCommand) Description() string { return "Generate modules, migrations, and seeds (module, migration, seed)" }
+func (c *MakeCommand) Name() string { return "make" }
+func (c *MakeCommand) Description() string {
+	return "Generate modules, migrations, and seeds (module, migration, seed)"
+}
 
 func (c *MakeCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) error {
 	if len(args) == 0 {
