@@ -8,6 +8,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/modules/permissions"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
@@ -25,21 +26,21 @@ type fakeRepository struct {
 	assignedPermissionIDs []uint
 }
 
-func (f *fakeRepository) List(page, perPage int) ([]Role, error) {
+func (f *fakeRepository) List(_ tenant.TenantContext, page, perPage int) ([]Role, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.roles, nil
 }
 
-func (f *fakeRepository) Count() (int64, error) {
+func (f *fakeRepository) Count(_ tenant.TenantContext) (int64, error) {
 	if f.err != nil {
 		return 0, f.err
 	}
 	return f.total, nil
 }
 
-func (f *fakeRepository) GetByPublicID(publicID string) (*Role, error) {
+func (f *fakeRepository) GetByPublicID(_ tenant.TenantContext, publicID string) (*Role, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -51,7 +52,7 @@ func (f *fakeRepository) GetByPublicID(publicID string) (*Role, error) {
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeRepository) GetByName(name string) (*Role, error) {
+func (f *fakeRepository) GetByName(_ tenant.TenantContext, name string) (*Role, error) {
 	if f.getByNameErr != nil {
 		return nil, f.getByNameErr
 	}
@@ -64,7 +65,7 @@ func (f *fakeRepository) GetByName(name string) (*Role, error) {
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeRepository) GetBySlug(slug string) (*Role, error) {
+func (f *fakeRepository) GetBySlug(_ tenant.TenantContext, slug string) (*Role, error) {
 	if f.getByNameErr != nil {
 		return nil, f.getByNameErr
 	}
@@ -106,7 +107,7 @@ func (f *fakeRepository) Update(role *Role) error {
 	return gorm.ErrRecordNotFound
 }
 
-func (f *fakeRepository) Delete(publicID string) error {
+func (f *fakeRepository) Delete(_ tenant.TenantContext, publicID string) error {
 	if f.err != nil {
 		return f.err
 	}
@@ -132,6 +133,28 @@ func (f *fakeRepository) ReplacePermissions(roleID uint, permissionIDs []uint) e
 		}
 	}
 	return gorm.ErrRecordNotFound
+}
+
+func (f *fakeRepository) ExistsByName(_ tenant.TenantContext, name string) (bool, error) {
+	_, err := f.GetByName(tenant.NewRoot(), name)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return false, err
+}
+
+func (f *fakeRepository) ExistsBySlug(_ tenant.TenantContext, slug string) (bool, error) {
+	_, err := f.GetBySlug(tenant.NewRoot(), slug)
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	return false, err
 }
 
 type fakePermissionCatalogRepository struct {

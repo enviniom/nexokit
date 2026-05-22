@@ -14,11 +14,14 @@ const (
 	UserRoleSlug = "user"
 )
 
+var ReservedSlugs = []string{RootRoleSlug, AdminRoleSlug, UserRoleSlug}
+
 // Role represents a user role in the system.
 type Role struct {
 	shared.BaseModel
-	Name        string `gorm:"uniqueIndex;not null"`
-	Slug        string `gorm:"uniqueIndex;not null"`
+	Name        string `gorm:"not null"`
+	Slug        string `gorm:"not null"`
+	CompanyID   *uint
 	Description string
 	IsSystem    bool                     `gorm:"not null;default:false"`
 	Permissions []permissions.Permission `gorm:"many2many:role_permissions;joinForeignKey:RoleID;joinReferences:PermissionID"`

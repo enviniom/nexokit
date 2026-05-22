@@ -1,17 +1,22 @@
 package roles
 
-import "gorm.io/gorm"
+import (
+	"github.com/enviniom/nexokit/internal/platform/tenant"
+	"gorm.io/gorm"
+)
 
 // Repository defines the persistence contract for roles.
 type Repository interface {
-	List(page, perPage int) ([]Role, error)
-	Count() (int64, error)
-	GetByPublicID(publicID string) (*Role, error)
-	GetByName(name string) (*Role, error)
-	GetBySlug(slug string) (*Role, error)
+	List(tc tenant.TenantContext, page, perPage int) ([]Role, error)
+	Count(tc tenant.TenantContext) (int64, error)
+	GetByPublicID(tc tenant.TenantContext, publicID string) (*Role, error)
+	GetByName(tc tenant.TenantContext, name string) (*Role, error)
+	GetBySlug(tc tenant.TenantContext, slug string) (*Role, error)
 	Create(role *Role) error
 	Update(role *Role) error
-	Delete(publicID string) error
+	Delete(tc tenant.TenantContext, publicID string) error
+	ExistsByName(tc tenant.TenantContext, name string) (bool, error)
+	ExistsBySlug(tc tenant.TenantContext, slug string) (bool, error)
 	ReplacePermissions(roleID uint, permissionIDs []uint) error
 }
 
@@ -26,28 +31,31 @@ func NewRepository(db *gorm.DB) Repository {
 }
 
 // List returns paginated roles.
-func (r *GormRepository) List(page, perPage int) ([]Role, error) {
+func (r *GormRepository) List(tc tenant.TenantContext, page, perPage int) ([]Role, error) {
 	var roles []Role
 	offset := (page - 1) * perPage
-	if err := r.db.Preload("Permissions").Limit(perPage).Offset(offset).Order("created_at DESC").Find(&roles).Error; err != nil {
+	db := tenant.ApplyTenantScope(r.db, tc)
+	if err := db.Preload("Permissions").Limit(perPage).Offset(offset).Order("created_at DESC").Find(&roles).Error; err != nil {
 		return nil, err
 	}
 	return roles, nil
 }
 
 // Count returns the total number of roles.
-func (r *GormRepository) Count() (int64, error) {
+func (r *GormRepository) Count(tc tenant.TenantContext) (int64, error) {
 	var count int64
-	if err := r.db.Model(&Role{}).Count(&count).Error; err != nil {
+	db := tenant.ApplyTenantScope(r.db.Model(&Role{}), tc)
+	if err := db.Count(&count).Error; err != nil {
 		return 0, err
 	}
 	return count, nil
 }
 
 // GetByPublicID returns a role by its public ID.
-func (r *GormRepository) GetByPublicID(publicID string) (*Role, error) {
+func (r *GormRepository) GetByPublicID(tc tenant.TenantContext, publicID string) (*Role, error) {
 	var role Role
-	if err := r.db.Preload("Permissions").Where("public_id = ?", publicID).First(&role).Error; err != nil {
+	db := tenant.ApplyTenantScope(r.db.Preload("Permissions"), tc)
+	if err := db.Where("public_id = ?", publicID).First(&role).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, err
 		}
@@ -57,9 +65,10 @@ func (r *GormRepository) GetByPublicID(publicID string) (*Role, error) {
 }
 
 // GetByName returns a role by its name.
-func (r *GormRepository) GetByName(name string) (*Role, error) {
+func (r *GormRepository) GetByName(tc tenant.TenantContext, name string) (*Role, error) {
 	var role Role
-	if err := r.db.Preload("Permissions").Where("name = ?", name).First(&role).Error; err != nil {
+	db := tenant.ApplyTenantScope(r.db.Preload("Permissions"), tc)
+	if err := db.Where("name = ?", name).First(&role).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, err
 		}
@@ -69,9 +78,10 @@ func (r *GormRepository) GetByName(name string) (*Role, error) {
 }
 
 // GetBySlug returns a role by its slug.
-func (r *GormRepository) GetBySlug(slug string) (*Role, error) {
+func (r *GormRepository) GetBySlug(tc tenant.TenantContext, slug string) (*Role, error) {
 	var role Role
-	if err := r.db.Preload("Permissions").Where("slug = ?", slug).First(&role).Error; err != nil {
+	db := tenant.ApplyTenantScope(r.db.Preload("Permissions"), tc)
+	if err := db.Where("slug = ?", slug).First(&role).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, err
 		}
@@ -91,8 +101,29 @@ func (r *GormRepository) Update(role *Role) error {
 }
 
 // Delete soft-deletes a role by its public ID.
-func (r *GormRepository) Delete(publicID string) error {
-	return r.db.Where("public_id = ?", publicID).Delete(&Role{}).Error
+func (r *GormRepository) Delete(tc tenant.TenantContext, publicID string) error {
+	db := tenant.ApplyTenantScope(r.db, tc)
+	return db.Where("public_id = ?", publicID).Delete(&Role{}).Error
+}
+
+// ExistsByName returns true when a role with name exists in tenant scope.
+func (r *GormRepository) ExistsByName(tc tenant.TenantContext, name string) (bool, error) {
+	var count int64
+	db := tenant.ApplyTenantScope(r.db.Model(&Role{}), tc)
+	if err := db.Where("name = ?", name).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// ExistsBySlug returns true when a role with slug exists in tenant scope.
+func (r *GormRepository) ExistsBySlug(tc tenant.TenantContext, slug string) (bool, error) {
+	var count int64
+	db := tenant.ApplyTenantScope(r.db.Model(&Role{}), tc)
+	if err := db.Where("slug = ?", slug).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // ReplacePermissions replaces the role permission join rows exactly.

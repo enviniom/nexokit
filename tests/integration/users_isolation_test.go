@@ -134,7 +134,7 @@ func seedUser(t *testing.T, db *gorm.DB, publicID, email string, roleID uint, co
 func usersIsolationRouter(db *gorm.DB) *gin.Engine {
 	repo := users.NewRepository(db)
 	rolesRepo := roles.NewRepository(db)
-	svc := users.NewService(repo, password.Manager{}, rolesRepo)
+	svc := users.NewService(repo, password.Manager{}, roleResolverAdapter{repo: rolesRepo})
 	handler := users.NewHandler(svc, authctx.PublicIDFromGin)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {

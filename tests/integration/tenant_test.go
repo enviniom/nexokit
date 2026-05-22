@@ -34,7 +34,7 @@ func TestTenantIsolationIntegration(t *testing.T) {
 	userB := helpers.SeedUserWithRole(t, db, "user-b", adminRole, &companyB)
 	root := helpers.SeedUserWithRole(t, db, "root-user", rootRole, nil)
 
-	svc := users.NewService(users.NewRepository(db), password.Manager{}, roles.NewRepository(db))
+	svc := users.NewService(users.NewRepository(db), password.Manager{}, roleResolverAdapter{repo: roles.NewRepository(db)})
 	h := users.NewHandler(svc, authctx.PublicIDFromGin)
 	r := gin.New()
 	r.Use(func(c *gin.Context) {

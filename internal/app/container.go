@@ -13,6 +13,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/users"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/password"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/platform/token"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -53,7 +54,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	rolesHandler := roles.NewHandler(rolesService)
 
 	passwordManager := password.Manager{}
-	usersService := users.NewService(usersRepo, passwordManager, rolesRepo)
+	usersService := users.NewService(usersRepo, passwordManager, roleResolverAdapter{repo: rolesRepo})
 	usersHandler := users.NewHandler(usersService, authctx.PublicIDFromGin)
 
 	tokenManager := token.NewManager(cfg.Auth.PASETOKey, time.Duration(cfg.Auth.AccessTTLMinutes)*time.Minute)
@@ -87,6 +88,14 @@ func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
 
 type userLookup struct {
 	repo users.Repository
+}
+
+type roleResolverAdapter struct {
+	repo roles.Repository
+}
+
+func (r roleResolverAdapter) GetBySlug(slug string) (*roles.Role, error) {
+	return r.repo.GetBySlug(tenant.NewRoot(), slug)
 }
 
 func (l userLookup) GetAuthUser(publicID string) (*authctx.User, error) {

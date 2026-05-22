@@ -30,7 +30,7 @@ func TestUsersCRUDIntegration(t *testing.T) {
 	_ = helpers.SeedRole(t, db, roles.RootRoleSlug)
 
 	actor := helpers.SeedUserWithRole(t, db, "actor-admin", adminRole, &company)
-	svc := users.NewService(users.NewRepository(db), password.Manager{}, roles.NewRepository(db))
+	svc := users.NewService(users.NewRepository(db), password.Manager{}, roleResolverAdapter{repo: roles.NewRepository(db)})
 	h := users.NewHandler(svc, authctx.PublicIDFromGin)
 
 	r := gin.New()
