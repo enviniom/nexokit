@@ -145,11 +145,16 @@ func (f fakePermissionCatalogRepository) ListAll() ([]permissions.Permission, er
 
 type fakeRoleMemberRepository struct {
 	publicIDs []string
+	count     int64
 	err       error
 }
 
 func (f fakeRoleMemberRepository) ListPublicIDsByRoleID(roleID uint) ([]string, error) {
 	return f.publicIDs, f.err
+}
+
+func (f fakeRoleMemberRepository) CountByRoleID(roleID uint) (int64, error) {
+	return f.count, f.err
 }
 
 type fakeCache struct {
@@ -291,6 +296,38 @@ func TestService_Create(t *testing.T) {
 		}
 	})
 
+	t.Run("returns conflict when slug already exists", func(t *testing.T) {
+		repo := &fakeRepository{roles: []Role{{BaseModel: shared.BaseModel{PublicID: "r1"}, Name: "admin", Slug: "editor"}}}
+		svc := NewService(repo)
+
+		req := CreateRoleRequest{Name: "manager", Slug: "editor"}
+		_, err := svc.Create(req)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !errors.Is(err, apperror.ErrConflict) {
+			t.Errorf("expected ErrConflict, got %v", err)
+		}
+	})
+
+	t.Run("returns conflict when creating reserved root role", func(t *testing.T) {
+		repo := &fakeRepository{roles: []Role{}}
+		svc := NewService(repo)
+
+		tests := []CreateRoleRequest{
+			{Name: "root", Slug: "custom-role"},
+			{Name: "Root", Slug: "custom-role"},
+			{Name: "custom", Slug: "root"},
+		}
+
+		for _, req := range tests {
+			_, err := svc.Create(req)
+			if !errors.Is(err, apperror.ErrConflict) {
+				t.Fatalf("expected ErrConflict for %+v, got %v", req, err)
+			}
+		}
+	})
+
 	t.Run("returns repository error when uniqueness check fails", func(t *testing.T) {
 		repo := &fakeRepository{getByNameErr: apperror.ErrInternal}
 		svc := NewService(repo)
@@ -358,6 +395,23 @@ func TestService_Update(t *testing.T) {
 		}
 	})
 
+	t.Run("returns forbidden when updating root role even if not system", func(t *testing.T) {
+		tests := []Role{
+			{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "root", Slug: "custom-role", IsSystem: false},
+			{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "custom-role", Slug: RootRoleSlug, IsSystem: false},
+		}
+
+		for _, role := range tests {
+			repo := &fakeRepository{roles: []Role{role}}
+			svc := NewService(repo)
+			req := UpdateRoleRequest{Name: "renamed-root", Slug: "renamed-root"}
+			_, err := svc.Update("role1", req)
+			if !errors.Is(err, apperror.ErrForbidden) {
+				t.Fatalf("expected ErrForbidden for role %+v, got %v", role, err)
+			}
+		}
+	})
+
 	t.Run("returns conflict when updating to an existing name", func(t *testing.T) {
 		repo := &fakeRepository{
 			roles: []Role{
@@ -371,6 +425,25 @@ func TestService_Update(t *testing.T) {
 		svc := NewService(repo)
 
 		req := UpdateRoleRequest{Name: "admin"}
+		_, err := svc.Update("role1", req)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !errors.Is(err, apperror.ErrConflict) {
+			t.Errorf("expected ErrConflict, got %v", err)
+		}
+	})
+
+	t.Run("returns conflict when updating slug to one used by another role", func(t *testing.T) {
+		repo := &fakeRepository{
+			roles: []Role{
+				{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "editor", Slug: "editor", IsSystem: false},
+				{BaseModel: shared.BaseModel{PublicID: "role2"}, Name: "admin", Slug: "admin", IsSystem: false},
+			},
+		}
+		svc := NewService(repo)
+
+		req := UpdateRoleRequest{Name: "editor", Slug: "admin"}
 		_, err := svc.Update("role1", req)
 		if err == nil {
 			t.Fatal("expected error")
@@ -449,6 +522,35 @@ func TestService_Delete(t *testing.T) {
 		}
 		if !errors.Is(err, apperror.ErrForbidden) {
 			t.Errorf("expected ErrForbidden, got %v", err)
+		}
+	})
+
+	t.Run("returns forbidden when deleting root role even if not system", func(t *testing.T) {
+		tests := []Role{
+			{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "root", Slug: "custom-role", IsSystem: false},
+			{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: " Root ", Slug: "custom-role", IsSystem: false},
+			{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "custom-role", Slug: RootRoleSlug, IsSystem: false},
+			{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "custom-role", Slug: " ROOT ", IsSystem: false},
+		}
+
+		for _, role := range tests {
+			repo := &fakeRepository{roles: []Role{role}}
+			svc := NewService(repo)
+
+			err := svc.Delete("role1")
+			if !errors.Is(err, apperror.ErrForbidden) {
+				t.Fatalf("expected ErrForbidden for role %+v, got %v", role, err)
+			}
+		}
+	})
+
+	t.Run("returns unprocessable when role has assigned users", func(t *testing.T) {
+		repo := &fakeRepository{roles: []Role{{BaseModel: shared.BaseModel{ID: 9, PublicID: "role1"}, Name: "editor", IsSystem: false}}}
+		svc := NewService(repo, WithRoleMembers(fakeRoleMemberRepository{count: 2}))
+
+		err := svc.Delete("role1")
+		if !errors.Is(err, apperror.ErrUnprocessable) {
+			t.Fatalf("expected ErrUnprocessable, got %v", err)
 		}
 	})
 }

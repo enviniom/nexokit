@@ -242,6 +242,20 @@ func TestHandler_Create(t *testing.T) {
 		}
 	})
 
+	t.Run("returns conflict when creating reserved root role", func(t *testing.T) {
+		svc := &fakeService{err: apperror.ErrConflict}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = jsonRequest(http.MethodPost, "/roles", CreateRoleRequest{Name: "root", Slug: "root"})
+		h.Create(c)
+
+		if w.Code != http.StatusConflict {
+			t.Fatalf("expected status 409, got %d", w.Code)
+		}
+	})
+
 	t.Run("returns validation error on invalid fields", func(t *testing.T) {
 		svc := &fakeService{created: &RoleResponse{PublicID: "role3", Name: "editor", Slug: "editor"}}
 		_, h := setupHandler(svc)
@@ -316,6 +330,21 @@ func TestHandler_Update(t *testing.T) {
 		}
 	})
 
+	t.Run("returns forbidden when editing root role", func(t *testing.T) {
+		svc := &fakeService{err: apperror.ErrForbidden}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "role-root"}}
+		c.Request = jsonRequest(http.MethodPut, "/roles/role-root", UpdateRoleRequest{Name: "renamed-root", Slug: "renamed-root"})
+		h.Update(c)
+
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("expected status 403, got %d", w.Code)
+		}
+	})
+
 	t.Run("returns validation error on invalid fields", func(t *testing.T) {
 		svc := &fakeService{updated: &RoleResponse{PublicID: "role1", Name: "editor", Slug: "editor"}}
 		_, h := setupHandler(svc)
@@ -361,8 +390,8 @@ func TestHandler_Delete(t *testing.T) {
 		c.Request = httptest.NewRequest(http.MethodDelete, "/roles/role1", nil)
 		h.Delete(c)
 
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", w.Code)
+		if w.Code != http.StatusNoContent {
+			t.Fatalf("expected status 204, got %d", w.Code)
 		}
 		if svc.deletedPID != "role1" {
 			t.Errorf("expected deleted public_id 'role1', got %s", svc.deletedPID)
@@ -381,6 +410,21 @@ func TestHandler_Delete(t *testing.T) {
 
 		if w.Code != http.StatusForbidden {
 			t.Fatalf("expected status 403, got %d", w.Code)
+		}
+	})
+
+	t.Run("returns unprocessable when role has assigned users", func(t *testing.T) {
+		svc := &fakeService{err: apperror.ErrUnprocessable}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Params = gin.Params{{Key: "id", Value: "role1"}}
+		c.Request = httptest.NewRequest(http.MethodDelete, "/roles/role1", nil)
+		h.Delete(c)
+
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status 422, got %d", w.Code)
 		}
 	})
 }

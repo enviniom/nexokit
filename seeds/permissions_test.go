@@ -41,6 +41,13 @@ func TestSeedPermissions(t *testing.T) {
 		if readCount != 0 {
 			t.Fatalf("expected no ambiguous read permissions, got %d", readCount)
 		}
+
+		for _, slug := range []string{"roles.create", "roles.update", "roles.delete"} {
+			var rolePermission permissions.Permission
+			if err := database.Where("slug = ?", slug).First(&rolePermission).Error; err != nil {
+				t.Fatalf("expected %s permission: %v", slug, err)
+			}
+		}
 	})
 
 	t.Run("is idempotent", func(t *testing.T) {
@@ -116,6 +123,19 @@ func TestAdminPermissionSlugsExcludeRootOnlyCompanyMutations(t *testing.T) {
 	for _, slug := range rootOnlyCompanyMutations {
 		if _, ok := adminPermissions[slug]; ok {
 			t.Fatalf("admin permissions must not include root-only company mutation %q", slug)
+		}
+	}
+}
+
+func TestAdminPermissionSlugsIncludesRoleCRUD(t *testing.T) {
+	adminPermissions := make(map[string]struct{})
+	for _, slug := range adminPermissionSlugs() {
+		adminPermissions[slug] = struct{}{}
+	}
+
+	for _, slug := range []string{"roles.create", "roles.update", "roles.delete"} {
+		if _, ok := adminPermissions[slug]; !ok {
+			t.Fatalf("expected admin permissions to include %q", slug)
 		}
 	}
 }

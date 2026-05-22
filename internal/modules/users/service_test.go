@@ -181,6 +181,19 @@ func (f *fakeRepository) ListPublicIDsByRoleID(roleID uint) ([]string, error) {
 	return ids, nil
 }
 
+func (f *fakeRepository) CountByRoleID(roleID uint) (int64, error) {
+	if f.err != nil {
+		return 0, f.err
+	}
+	var count int64
+	for _, user := range f.users {
+		if user.RoleID == roleID {
+			count++
+		}
+	}
+	return count, nil
+}
+
 // fakeHasher is a test double for the password hasher.
 type fakeHasher struct {
 	hash string

@@ -55,6 +55,9 @@ func (f *fakeUserRepository) Delete(tc tenant.TenantContext, publicID string) er
 func (f *fakeUserRepository) ListPublicIDsByRoleID(roleID uint) ([]string, error) {
 	return nil, nil
 }
+func (f *fakeUserRepository) CountByRoleID(roleID uint) (int64, error) {
+	return 0, nil
+}
 
 type fakePasswordVerifier struct{ err error }
 

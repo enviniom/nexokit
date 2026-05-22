@@ -172,10 +172,14 @@ func (h *Handler) Delete(c *gin.Context) {
 			response.Forbidden(c, messages.MsgForbidden)
 			return
 		}
+		if status == http.StatusUnprocessableEntity {
+			response.Error(c, http.StatusUnprocessableEntity, messages.MsgRoleHasAssignedUsers, nil)
+			return
+		}
 		response.InternalServerError(c, messages.MsgInternalError)
 		return
 	}
-	response.Success[any](c, messages.MsgSuccess, nil)
+	c.AbortWithStatus(http.StatusNoContent)
 }
 
 func permissionSlugsFromContext(c *gin.Context) []string {

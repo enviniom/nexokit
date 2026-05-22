@@ -73,7 +73,7 @@ The system MUST seed base permissions on startup or via seed command using expli
 | Module | Actions | Business Actions |
 |--------|---------|------------------|
 | users | index, view, create, update, delete | change_role |
-| roles | index, view | assign_permissions |
+| roles | index, view, create, update, delete | assign_permissions |
 | companies | index, view, create, update, delete | — |
 | settings | view, update | — |
 | auth | view | — |

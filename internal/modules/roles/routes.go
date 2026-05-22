@@ -8,6 +8,9 @@ func Register(v1 *gin.RouterGroup, handler *Handler, requirePermission func(stri
 	{
 		roles.GET("", requirePermission("roles.index"), handler.List)
 		roles.GET("/:id", requirePermission("roles.view"), handler.GetByPublicID)
+		roles.POST("", requirePermission("roles.create"), handler.Create)
+		roles.PUT("/:id", requirePermission("roles.update"), handler.Update)
+		roles.DELETE("/:id", requirePermission("roles.delete"), handler.Delete)
 		roles.GET("/:id/permissions", requirePermission("roles.view"), handler.GetPermissionCatalog)
 		roles.PUT("/:id/permissions", requirePermission("roles.assign_permissions"), handler.AssignPermissions)
 	}

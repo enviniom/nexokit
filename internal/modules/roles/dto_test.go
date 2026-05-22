@@ -40,6 +40,27 @@ func TestCreateRoleRequest_Validate(t *testing.T) {
 			field:   "slug",
 			msg:     messages.MsgRequired,
 		},
+		{
+			name:    "invalid uppercase slug",
+			req:     CreateRoleRequest{Name: "Editor", Slug: "UPPER-CASE"},
+			wantErr: true,
+			field:   "slug",
+			msg:     messages.MsgValidSlug,
+		},
+		{
+			name:    "invalid leading hyphen slug",
+			req:     CreateRoleRequest{Name: "Editor", Slug: "-leading"},
+			wantErr: true,
+			field:   "slug",
+			msg:     messages.MsgValidSlug,
+		},
+		{
+			name:    "invalid trailing hyphen slug",
+			req:     CreateRoleRequest{Name: "Editor", Slug: "trailing-"},
+			wantErr: true,
+			field:   "slug",
+			msg:     messages.MsgValidSlug,
+		},
 	}
 
 	for _, tt := range tests {
@@ -102,6 +123,27 @@ func TestUpdateRoleRequest_Validate(t *testing.T) {
 			wantErr: true,
 			field:   "slug",
 			msg:     messages.MsgRequired,
+		},
+		{
+			name:    "invalid uppercase slug",
+			req:     UpdateRoleRequest{Name: "Editor", Slug: "UPPER-CASE"},
+			wantErr: true,
+			field:   "slug",
+			msg:     messages.MsgValidSlug,
+		},
+		{
+			name:    "invalid leading hyphen slug",
+			req:     UpdateRoleRequest{Name: "Editor", Slug: "-leading"},
+			wantErr: true,
+			field:   "slug",
+			msg:     messages.MsgValidSlug,
+		},
+		{
+			name:    "invalid trailing hyphen slug",
+			req:     UpdateRoleRequest{Name: "Editor", Slug: "trailing-"},
+			wantErr: true,
+			field:   "slug",
+			msg:     messages.MsgValidSlug,
 		},
 	}
 

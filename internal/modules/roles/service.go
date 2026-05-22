@@ -32,6 +32,7 @@ type permissionCatalogRepository interface {
 
 type roleMemberRepository interface {
 	ListPublicIDsByRoleID(roleID uint) ([]string, error)
+	CountByRoleID(roleID uint) (int64, error)
 }
 
 // ServiceOption configures optional role service collaborators.
@@ -104,7 +105,17 @@ func (s *roleService) GetByPublicID(publicID string) (*RoleResponse, error) {
 
 // Create creates a new role after checking name uniqueness.
 func (s *roleService) Create(req CreateRoleRequest) (*RoleResponse, error) {
+	if isRootRole(req.Name, req.Slug) {
+		return nil, apperror.ErrConflict
+	}
+
 	if _, err := s.repo.GetByName(req.Name); err == nil {
+		return nil, apperror.ErrConflict
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	if _, err := s.repo.GetBySlug(req.Slug); err == nil {
 		return nil, apperror.ErrConflict
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
@@ -148,9 +159,22 @@ func (s *roleService) Update(publicID string, req UpdateRoleRequest) (*RoleRespo
 	if role.IsSystem {
 		return nil, apperror.ErrForbidden
 	}
+	if isRootRole(role.Name, role.Slug) {
+		return nil, apperror.ErrForbidden
+	}
 
 	if role.Name != req.Name {
 		existing, err := s.repo.GetByName(req.Name)
+		if err == nil {
+			if existing.PublicID != publicID {
+				return nil, apperror.ErrConflict
+			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+	if role.Slug != req.Slug {
+		existing, err := s.repo.GetBySlug(req.Slug)
 		if err == nil {
 			if existing.PublicID != publicID {
 				return nil, apperror.ErrConflict
@@ -174,6 +198,10 @@ func (s *roleService) Update(publicID string, req UpdateRoleRequest) (*RoleRespo
 	return toResponse(role), nil
 }
 
+func isRootRole(name, slug string) bool {
+	return strings.EqualFold(strings.TrimSpace(name), RootRoleSlug) || strings.EqualFold(strings.TrimSpace(slug), RootRoleSlug)
+}
+
 // Delete deletes a role if it is not a system role.
 func (s *roleService) Delete(publicID string) error {
 	role, err := s.repo.GetByPublicID(publicID)
@@ -186,6 +214,19 @@ func (s *roleService) Delete(publicID string) error {
 
 	if role.IsSystem {
 		return apperror.ErrForbidden
+	}
+	if isRootRole(role.Name, role.Slug) {
+		return apperror.ErrForbidden
+	}
+
+	if s.roleMembers != nil {
+		count, err := s.roleMembers.CountByRoleID(role.ID)
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			return apperror.ErrUnprocessable
+		}
 	}
 
 	return s.repo.Delete(publicID)

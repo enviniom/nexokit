@@ -50,6 +50,7 @@ var (
 	ErrBadRequest      = &AppError{Message: messages.MsgBadRequest}
 	ErrTooManyRequests = &AppError{Message: messages.MsgTooManyRequests}
 	ErrValidation      = &AppError{Message: messages.MsgValidationError}
+	ErrUnprocessable   = &AppError{Message: messages.MsgRoleHasAssignedUsers}
 	ErrInternal        = &AppError{Message: messages.MsgInternalError}
 )
 
@@ -86,6 +87,9 @@ func Status(err error) int {
 		return http.StatusTooManyRequests
 	}
 	if errors.Is(err, ErrValidation) {
+		return http.StatusUnprocessableEntity
+	}
+	if errors.Is(err, ErrUnprocessable) {
 		return http.StatusUnprocessableEntity
 	}
 	return http.StatusInternalServerError

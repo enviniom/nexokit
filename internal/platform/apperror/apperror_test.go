@@ -47,6 +47,7 @@ func TestStatus(t *testing.T) {
 		{"bad request", ErrBadRequest, http.StatusBadRequest},
 		{"too many requests", ErrTooManyRequests, http.StatusTooManyRequests},
 		{"validation", ErrValidation, http.StatusUnprocessableEntity},
+		{"unprocessable", ErrUnprocessable, http.StatusUnprocessableEntity},
 		{"internal", ErrInternal, http.StatusInternalServerError},
 		{"unknown", errors.New("something else"), http.StatusInternalServerError},
 	}

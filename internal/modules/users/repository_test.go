@@ -116,6 +116,36 @@ func TestGormRepository_DeleteSoftDeletesUsers(t *testing.T) {
 	}
 }
 
+func TestGormRepository_CountByRoleID(t *testing.T) {
+	db := newUserRepositoryTestDB(t)
+	roleOne := roles.Role{BaseModel: shared.BaseModel{PublicID: "role_admin"}, Name: "Admin", Slug: "admin"}
+	roleTwo := roles.Role{BaseModel: shared.BaseModel{PublicID: "role_user"}, Name: "User", Slug: "user"}
+	if err := db.Create(&roleOne).Error; err != nil {
+		t.Fatalf("create role one: %v", err)
+	}
+	if err := db.Create(&roleTwo).Error; err != nil {
+		t.Fatalf("create role two: %v", err)
+	}
+	companyID := uint(1)
+	users := []User{
+		{BaseModel: shared.BaseModel{PublicID: "u1"}, Name: "One", Email: "one@example.com", PasswordHash: "hash", RoleID: roleOne.ID, CompanyID: &companyID, IsActive: true},
+		{BaseModel: shared.BaseModel{PublicID: "u2"}, Name: "Two", Email: "two@example.com", PasswordHash: "hash", RoleID: roleOne.ID, CompanyID: &companyID, IsActive: true},
+		{BaseModel: shared.BaseModel{PublicID: "u3"}, Name: "Three", Email: "three@example.com", PasswordHash: "hash", RoleID: roleTwo.ID, CompanyID: &companyID, IsActive: true},
+	}
+	if err := db.Create(&users).Error; err != nil {
+		t.Fatalf("create users: %v", err)
+	}
+
+	repo := NewRepository(db)
+	count, err := repo.CountByRoleID(roleOne.ID)
+	if err != nil {
+		t.Fatalf("count users by role id: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("expected count 2 for role one, got %d", count)
+	}
+}
+
 func newUserRepositoryTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})

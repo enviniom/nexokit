@@ -72,7 +72,7 @@ type CreateRoleRequest struct {
 func (r CreateRoleRequest) Validate() response.ValidationErrors {
 	errs := make(response.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
-	validator.Field(errs, "slug", r.Slug).Required()
+	validator.Field(errs, "slug", r.Slug).Required().Apply(validator.ValidSlug())
 	return errs
 }
 
@@ -87,6 +87,6 @@ type UpdateRoleRequest struct {
 func (r UpdateRoleRequest) Validate() response.ValidationErrors {
 	errs := make(response.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
-	validator.Field(errs, "slug", r.Slug).Required()
+	validator.Field(errs, "slug", r.Slug).Required().Apply(validator.ValidSlug())
 	return errs
 }

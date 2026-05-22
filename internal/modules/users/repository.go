@@ -18,6 +18,7 @@ type Repository interface {
 	Update(user *User) error
 	Delete(tc tenant.TenantContext, publicID string) error
 	ListPublicIDsByRoleID(roleID uint) ([]string, error)
+	CountByRoleID(roleID uint) (int64, error)
 }
 
 // GormRepository is the GORM implementation of Repository.
@@ -147,4 +148,11 @@ func (r *GormRepository) ListPublicIDsByRoleID(roleID uint) ([]string, error) {
 		Order("public_id ASC").
 		Pluck("public_id", &publicIDs).Error
 	return publicIDs, err
+}
+
+// CountByRoleID returns the number of users assigned to the role.
+func (r *GormRepository) CountByRoleID(roleID uint) (int64, error) {
+	var count int64
+	err := r.db.Model(&User{}).Where("role_id = ?", roleID).Count(&count).Error
+	return count, err
 }

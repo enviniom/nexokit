@@ -14,6 +14,7 @@ const (
 	MsgConflict        = "El recurso ya existe"
 	MsgBadRequest      = "Solicitud inválida"
 	MsgTooManyRequests = "Demasiadas solicitudes. Intente nuevamente más tarde."
+	MsgRoleHasAssignedUsers = "El rol tiene usuarios asignados"
 )
 
 // Validation rule messages
