@@ -64,21 +64,21 @@ Chain strategy: feature-branch-chain
 
 ## Phase 5: Seeds (Data Changes)
 
-- [ ] 5.1 Modify `seeds/roles.go` — seed only root role (global, `company_id NULL`); remove admin and user from seed list.
-- [ ] 5.2 Modify `seeds/role_permissions.go` — remove `adminPermissionSlugs()` and `userPermissionSlugs()` assignments; keep only root with `allSystemPermissionSlugs()` (root still gets `"*"` via middleware, but seed rows are removed per design decision).
-- [ ] 5.3 Update `seeds/roles_test.go` — assert only 1 role (root) exists after seed; update idempotency test.
-- [ ] 5.4 Update `seeds/role_permissions_test.go` (if exists) — verify only root has permission rows, or no role_permissions rows needed for root.
+- [x] 5.1 Modify `seeds/roles.go` — seed only root role (global, `company_id NULL`); remove admin and user from seed list.
+- [x] 5.2 Modify `seeds/role_permissions.go` — remove `adminPermissionSlugs()` and `userPermissionSlugs()` assignments; keep only root with `allSystemPermissionSlugs()` (root still gets `"*"` via middleware, but seed rows are removed per design decision).
+- [x] 5.3 Update `seeds/roles_test.go` — assert only 1 role (root) exists after seed; update idempotency test.
+- [x] 5.4 Update `seeds/role_permissions_test.go` (if exists) — verify only root has permission rows, or no role_permissions rows needed for root.
 
 ## Phase 6: Testing (Verification)
 
-- [ ] 6.1 Update `internal/modules/roles/service_test.go` fake repository — add `tenant.TenantContext` to all interface methods; implement scoped filtering in fake.
-- [ ] 6.2 Add service tests: tenant-scoped list returns only roles for current company.
-- [ ] 6.3 Add service tests: root scope (`IsRootScope=true`) lists all roles globally.
-- [ ] 6.4 Add service tests: `Create` with tenant context sets `CompanyID`; root scope creates global role (`CompanyID=nil`).
-- [ ] 6.5 Add service tests: `isReservedIdentity` rejects `root`, `admin`, `user` by name and slug (case-insensitive).
-- [ ] 6.6 Add service tests: cross-tenant `GetByPublicID` returns `ErrNotFound`.
-- [ ] 6.7 Add service tests: cross-tenant `Update`/`Delete` returns `ErrNotFound` or `ErrForbidden`.
-- [ ] 6.8 Update `internal/modules/roles/handler_test.go` fake service — add `tenant.TenantContext` to all interface methods.
-- [ ] 6.9 Add handler tests: verify `tenant.SetGin` context is passed through to service calls using `tenant.NewScoped()` and `tenant.NewRoot()`.
-- [ ] 6.10 Run `go test ./...` — verify all existing and new tests pass.
-- [ ] 6.11 Run `go build ./...` — verify compilation.
+- [x] 6.1 Update `internal/modules/roles/service_test.go` fake repository — add `tenant.TenantContext` to all interface methods; implement scoped filtering in fake.
+- [x] 6.2 Add service tests: tenant-scoped list returns only roles for current company.
+- [x] 6.3 Add service tests: root scope (`IsRootScope=true`) lists all roles globally.
+- [x] 6.4 Add service tests: `Create` with tenant context sets `CompanyID`; root scope creates global role (`CompanyID=nil`).
+- [x] 6.5 Add service tests: `isReservedIdentity` rejects `root`, `admin`, `user` by name and slug (case-insensitive).
+- [x] 6.6 Add service tests: cross-tenant `GetByPublicID` returns `ErrNotFound`.
+- [x] 6.7 Add service tests: cross-tenant `Update`/`Delete` returns `ErrNotFound` or `ErrForbidden`.
+- [x] 6.8 Update `internal/modules/roles/handler_test.go` fake service — add `tenant.TenantContext` to all interface methods.
+- [x] 6.9 Add handler tests: verify `tenant.SetGin` context is passed through to service calls using `tenant.NewScoped()` and `tenant.NewRoot()`.
+- [x] 6.10 Run `go test ./...` — verify all existing and new tests pass.
+- [x] 6.11 Run `go build ./...` — verify compilation.

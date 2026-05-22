@@ -26,33 +26,73 @@ type fakeRepository struct {
 	assignedPermissionIDs []uint
 }
 
-func (f *fakeRepository) List(_ tenant.TenantContext, page, perPage int) ([]Role, error) {
+func roleMatchesTenantScope(role Role, tc tenant.TenantContext) bool {
+	if tc.IsRootScope {
+		return true
+	}
+	if role.CompanyID == nil {
+		return false
+	}
+	return *role.CompanyID == tc.CompanyID
+}
+
+func (f *fakeRepository) List(tc tenant.TenantContext, page, perPage int) ([]Role, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	return f.roles, nil
+
+	if tc.IsRootScope {
+		return f.roles, nil
+	}
+
+	items := make([]Role, 0, len(f.roles))
+	for _, role := range f.roles {
+		if roleMatchesTenantScope(role, tc) {
+			items = append(items, role)
+		}
+	}
+	return items, nil
 }
 
-func (f *fakeRepository) Count(_ tenant.TenantContext) (int64, error) {
+func (f *fakeRepository) Count(tc tenant.TenantContext) (int64, error) {
 	if f.err != nil {
 		return 0, f.err
 	}
-	return f.total, nil
+	if tc.IsRootScope {
+		if f.total > 0 {
+			return f.total, nil
+		}
+		return int64(len(f.roles)), nil
+	}
+
+	var count int64
+	for _, role := range f.roles {
+		if roleMatchesTenantScope(role, tc) {
+			count++
+		}
+	}
+	if f.total > 0 {
+		return f.total, nil
+	}
+	return count, nil
 }
 
-func (f *fakeRepository) GetByPublicID(_ tenant.TenantContext, publicID string) (*Role, error) {
+func (f *fakeRepository) GetByPublicID(tc tenant.TenantContext, publicID string) (*Role, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	for i := range f.roles {
 		if f.roles[i].PublicID == publicID {
+			if !roleMatchesTenantScope(f.roles[i], tc) {
+				return nil, gorm.ErrRecordNotFound
+			}
 			return &f.roles[i], nil
 		}
 	}
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeRepository) GetByName(_ tenant.TenantContext, name string) (*Role, error) {
+func (f *fakeRepository) GetByName(tc tenant.TenantContext, name string) (*Role, error) {
 	if f.getByNameErr != nil {
 		return nil, f.getByNameErr
 	}
@@ -60,12 +100,23 @@ func (f *fakeRepository) GetByName(_ tenant.TenantContext, name string) (*Role, 
 		return nil, f.err
 	}
 	if r, ok := f.roleByName[name]; ok {
+		if !roleMatchesTenantScope(*r, tc) {
+			return nil, gorm.ErrRecordNotFound
+		}
 		return r, nil
+	}
+	for i := range f.roles {
+		if f.roles[i].Name == name {
+			if !roleMatchesTenantScope(f.roles[i], tc) {
+				return nil, gorm.ErrRecordNotFound
+			}
+			return &f.roles[i], nil
+		}
 	}
 	return nil, gorm.ErrRecordNotFound
 }
 
-func (f *fakeRepository) GetBySlug(_ tenant.TenantContext, slug string) (*Role, error) {
+func (f *fakeRepository) GetBySlug(tc tenant.TenantContext, slug string) (*Role, error) {
 	if f.getByNameErr != nil {
 		return nil, f.getByNameErr
 	}
@@ -74,6 +125,9 @@ func (f *fakeRepository) GetBySlug(_ tenant.TenantContext, slug string) (*Role, 
 	}
 	for i := range f.roles {
 		if f.roles[i].Slug == slug {
+			if !roleMatchesTenantScope(f.roles[i], tc) {
+				return nil, gorm.ErrRecordNotFound
+			}
 			return &f.roles[i], nil
 		}
 	}
@@ -107,12 +161,15 @@ func (f *fakeRepository) Update(role *Role) error {
 	return gorm.ErrRecordNotFound
 }
 
-func (f *fakeRepository) Delete(_ tenant.TenantContext, publicID string) error {
+func (f *fakeRepository) Delete(tc tenant.TenantContext, publicID string) error {
 	if f.err != nil {
 		return f.err
 	}
 	for i := range f.roles {
 		if f.roles[i].PublicID == publicID {
+			if !roleMatchesTenantScope(f.roles[i], tc) {
+				return gorm.ErrRecordNotFound
+			}
 			f.roles = append(f.roles[:i], f.roles[i+1:]...)
 			return nil
 		}
@@ -135,8 +192,8 @@ func (f *fakeRepository) ReplacePermissions(roleID uint, permissionIDs []uint) e
 	return gorm.ErrRecordNotFound
 }
 
-func (f *fakeRepository) ExistsByName(_ tenant.TenantContext, name string) (bool, error) {
-	_, err := f.GetByName(tenant.NewRoot(), name)
+func (f *fakeRepository) ExistsByName(tc tenant.TenantContext, name string) (bool, error) {
+	_, err := f.GetByName(tc, name)
 	if err == nil {
 		return true, nil
 	}
@@ -146,8 +203,8 @@ func (f *fakeRepository) ExistsByName(_ tenant.TenantContext, name string) (bool
 	return false, err
 }
 
-func (f *fakeRepository) ExistsBySlug(_ tenant.TenantContext, slug string) (bool, error) {
-	_, err := f.GetBySlug(tenant.NewRoot(), slug)
+func (f *fakeRepository) ExistsBySlug(tc tenant.TenantContext, slug string) (bool, error) {
+	_, err := f.GetBySlug(tc, slug)
 	if err == nil {
 		return true, nil
 	}
@@ -206,7 +263,7 @@ func TestService_List(t *testing.T) {
 		}
 		svc := NewService(repo)
 
-		result, total, err := svc.List(1, 10)
+		result, total, err := svc.List(tenant.NewRoot(), 1, 10)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -228,7 +285,7 @@ func TestService_List(t *testing.T) {
 		repo := &fakeRepository{roles: []Role{}, total: 0}
 		svc := NewService(repo)
 
-		result, total, err := svc.List(1, 10)
+		result, total, err := svc.List(tenant.NewRoot(), 1, 10)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -244,7 +301,7 @@ func TestService_List(t *testing.T) {
 		repo := &fakeRepository{err: apperror.ErrInternal}
 		svc := NewService(repo)
 
-		_, _, err := svc.List(1, 10)
+		_, _, err := svc.List(tenant.NewRoot(), 1, 10)
 		if err == nil {
 			t.Error("expected error")
 		}
@@ -260,7 +317,7 @@ func TestService_GetByPublicID(t *testing.T) {
 		}
 		svc := NewService(repo)
 
-		result, err := svc.GetByPublicID("role1")
+		result, err := svc.GetByPublicID(tenant.NewRoot(), "role1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -273,7 +330,7 @@ func TestService_GetByPublicID(t *testing.T) {
 		repo := &fakeRepository{roles: []Role{}}
 		svc := NewService(repo)
 
-		_, err := svc.GetByPublicID("missing")
+		_, err := svc.GetByPublicID(tenant.NewRoot(), "missing")
 		if err == nil {
 			t.Error("expected error for missing role")
 		}
@@ -289,7 +346,7 @@ func TestService_Create(t *testing.T) {
 		svc := NewService(repo)
 
 		req := CreateRoleRequest{Name: "editor", Slug: "editor", Description: "Can edit content"}
-		result, err := svc.Create(req)
+		result, err := svc.Create(tenant.NewRoot(), req)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -310,7 +367,7 @@ func TestService_Create(t *testing.T) {
 		svc := NewService(repo)
 
 		req := CreateRoleRequest{Name: "editor", Slug: "editor"}
-		_, err := svc.Create(req)
+		_, err := svc.Create(tenant.NewRoot(), req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -324,7 +381,7 @@ func TestService_Create(t *testing.T) {
 		svc := NewService(repo)
 
 		req := CreateRoleRequest{Name: "manager", Slug: "editor"}
-		_, err := svc.Create(req)
+		_, err := svc.Create(tenant.NewRoot(), req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -344,7 +401,7 @@ func TestService_Create(t *testing.T) {
 		}
 
 		for _, req := range tests {
-			_, err := svc.Create(req)
+			_, err := svc.Create(tenant.NewRoot(), req)
 			if !errors.Is(err, apperror.ErrConflict) {
 				t.Fatalf("expected ErrConflict for %+v, got %v", req, err)
 			}
@@ -356,7 +413,7 @@ func TestService_Create(t *testing.T) {
 		svc := NewService(repo)
 
 		req := CreateRoleRequest{Name: "editor", Slug: "editor"}
-		_, err := svc.Create(req)
+		_, err := svc.Create(tenant.NewRoot(), req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -370,7 +427,7 @@ func TestService_Create(t *testing.T) {
 		svc := NewService(repo)
 
 		req := CreateRoleRequest{Name: "editor", Slug: "editor"}
-		_, err := svc.Create(req)
+		_, err := svc.Create(tenant.NewRoot(), req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -391,7 +448,7 @@ func TestService_Update(t *testing.T) {
 		svc := NewService(repo)
 
 		req := UpdateRoleRequest{Name: "senior-editor", Slug: "senior-editor"}
-		result, err := svc.Update("role1", req)
+		result, err := svc.Update(tenant.NewRoot(), "role1", req)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -409,7 +466,7 @@ func TestService_Update(t *testing.T) {
 		svc := NewService(repo)
 
 		req := UpdateRoleRequest{Name: "super-root"}
-		_, err := svc.Update("role1", req)
+		_, err := svc.Update(tenant.NewRoot(), "role1", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -428,7 +485,7 @@ func TestService_Update(t *testing.T) {
 			repo := &fakeRepository{roles: []Role{role}}
 			svc := NewService(repo)
 			req := UpdateRoleRequest{Name: "renamed-root", Slug: "renamed-root"}
-			_, err := svc.Update("role1", req)
+			_, err := svc.Update(tenant.NewRoot(), "role1", req)
 			if !errors.Is(err, apperror.ErrForbidden) {
 				t.Fatalf("expected ErrForbidden for role %+v, got %v", role, err)
 			}
@@ -439,16 +496,16 @@ func TestService_Update(t *testing.T) {
 		repo := &fakeRepository{
 			roles: []Role{
 				{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "editor", IsSystem: false},
-				{BaseModel: shared.BaseModel{PublicID: "role2"}, Name: "admin", IsSystem: false},
+				{BaseModel: shared.BaseModel{PublicID: "role2"}, Name: "manager", IsSystem: false},
 			},
 			roleByName: map[string]*Role{
-				"admin": {BaseModel: shared.BaseModel{PublicID: "role2"}, Name: "admin"},
+				"manager": {BaseModel: shared.BaseModel{PublicID: "role2"}, Name: "manager"},
 			},
 		}
 		svc := NewService(repo)
 
-		req := UpdateRoleRequest{Name: "admin"}
-		_, err := svc.Update("role1", req)
+		req := UpdateRoleRequest{Name: "manager"}
+		_, err := svc.Update(tenant.NewRoot(), "role1", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -461,13 +518,13 @@ func TestService_Update(t *testing.T) {
 		repo := &fakeRepository{
 			roles: []Role{
 				{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "editor", Slug: "editor", IsSystem: false},
-				{BaseModel: shared.BaseModel{PublicID: "role2"}, Name: "admin", Slug: "admin", IsSystem: false},
+				{BaseModel: shared.BaseModel{PublicID: "role2"}, Name: "manager", Slug: "manager", IsSystem: false},
 			},
 		}
 		svc := NewService(repo)
 
-		req := UpdateRoleRequest{Name: "editor", Slug: "admin"}
-		_, err := svc.Update("role1", req)
+		req := UpdateRoleRequest{Name: "editor", Slug: "manager"}
+		_, err := svc.Update(tenant.NewRoot(), "role1", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -485,8 +542,8 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo)
 
-		req := UpdateRoleRequest{Name: "admin"}
-		_, err := svc.Update("role1", req)
+		req := UpdateRoleRequest{Name: "manager"}
+		_, err := svc.Update(tenant.NewRoot(), "role1", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -505,8 +562,8 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo)
 
-		req := UpdateRoleRequest{Name: "admin"}
-		_, err := svc.Update("role1", req)
+		req := UpdateRoleRequest{Name: "manager"}
+		_, err := svc.Update(tenant.NewRoot(), "role1", req)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -525,7 +582,7 @@ func TestService_Delete(t *testing.T) {
 		}
 		svc := NewService(repo)
 
-		err := svc.Delete("role1")
+		err := svc.Delete(tenant.NewRoot(), "role1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -539,7 +596,7 @@ func TestService_Delete(t *testing.T) {
 		}
 		svc := NewService(repo)
 
-		err := svc.Delete("role1")
+		err := svc.Delete(tenant.NewRoot(), "role1")
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -560,7 +617,7 @@ func TestService_Delete(t *testing.T) {
 			repo := &fakeRepository{roles: []Role{role}}
 			svc := NewService(repo)
 
-			err := svc.Delete("role1")
+			err := svc.Delete(tenant.NewRoot(), "role1")
 			if !errors.Is(err, apperror.ErrForbidden) {
 				t.Fatalf("expected ErrForbidden for role %+v, got %v", role, err)
 			}
@@ -571,7 +628,7 @@ func TestService_Delete(t *testing.T) {
 		repo := &fakeRepository{roles: []Role{{BaseModel: shared.BaseModel{ID: 9, PublicID: "role1"}, Name: "editor", IsSystem: false}}}
 		svc := NewService(repo, WithRoleMembers(fakeRoleMemberRepository{count: 2}))
 
-		err := svc.Delete("role1")
+		err := svc.Delete(tenant.NewRoot(), "role1")
 		if !errors.Is(err, apperror.ErrUnprocessable) {
 			t.Fatalf("expected ErrUnprocessable, got %v", err)
 		}
@@ -588,7 +645,7 @@ func TestService_GetPermissionCatalog(t *testing.T) {
 		}}
 		svc := NewService(repo, WithPermissionCatalog(catalog))
 
-		groups, err := svc.GetPermissionCatalog("role-admin")
+		groups, err := svc.GetPermissionCatalog(tenant.NewRoot(), "role-admin")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -602,7 +659,7 @@ func TestService_GetPermissionCatalog(t *testing.T) {
 
 	t.Run("returns not found for missing role", func(t *testing.T) {
 		svc := NewService(&fakeRepository{roles: []Role{}}, WithPermissionCatalog(fakePermissionCatalogRepository{}))
-		_, err := svc.GetPermissionCatalog("missing")
+		_, err := svc.GetPermissionCatalog(tenant.NewRoot(), "missing")
 		if !errors.Is(err, apperror.ErrNotFound) {
 			t.Fatalf("expected not found, got %v", err)
 		}
@@ -661,7 +718,7 @@ func TestService_AssignPermissions(t *testing.T) {
 			cache := &fakeCache{}
 			svc := NewService(repo, WithPermissionCatalog(fakePermissionCatalogRepository{permissions: tt.catalog}), WithRoleMembers(fakeRoleMemberRepository{publicIDs: []string{"user-one", "user-two"}}), WithCache(cache))
 
-			_, err := svc.AssignPermissions(tt.role.PublicID, tt.req, tt.actorPerms)
+			_, err := svc.AssignPermissions(tenant.NewRoot(), tt.role.PublicID, tt.req, tt.actorPerms)
 			if tt.wantErr != nil {
 				if !errors.Is(err, tt.wantErr) {
 					t.Fatalf("expected %v, got %v", tt.wantErr, err)
@@ -681,6 +738,104 @@ func TestService_AssignPermissions(t *testing.T) {
 				t.Fatalf("expected deleted keys %v, got %v", tt.wantDelete, cache.deleted)
 			}
 		})
+	}
+}
+
+func TestService_TenantScopedBehavior(t *testing.T) {
+	companyA := uint(10)
+	companyB := uint(20)
+
+	repo := &fakeRepository{roles: []Role{
+		{BaseModel: shared.BaseModel{PublicID: "global-root"}, Name: "root", Slug: "root", IsSystem: true},
+		{BaseModel: shared.BaseModel{PublicID: "a-role"}, Name: "manager-a", Slug: "manager", CompanyID: &companyA},
+		{BaseModel: shared.BaseModel{PublicID: "b-role"}, Name: "manager-b", Slug: "manager", CompanyID: &companyB},
+	}}
+	svc := NewService(repo)
+
+	t.Run("list returns only current company roles for non-root", func(t *testing.T) {
+		items, total, err := svc.List(tenant.NewScoped(companyA, "company-a"), 1, 10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if total != 1 || len(items) != 1 || items[0].PublicID != "a-role" {
+			t.Fatalf("expected only company A role, got total=%d items=%+v", total, items)
+		}
+	})
+
+	t.Run("list returns all roles for root scope", func(t *testing.T) {
+		items, total, err := svc.List(tenant.NewRoot(), 1, 10)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if total != 3 || len(items) != 3 {
+			t.Fatalf("expected 3 roles for root scope, got total=%d len=%d", total, len(items))
+		}
+	})
+
+	t.Run("cross-tenant get returns not found", func(t *testing.T) {
+		_, err := svc.GetByPublicID(tenant.NewScoped(companyA, "company-a"), "b-role")
+		if !errors.Is(err, apperror.ErrNotFound) {
+			t.Fatalf("expected not found, got %v", err)
+		}
+	})
+
+	t.Run("cross-tenant update returns not found", func(t *testing.T) {
+		_, err := svc.Update(tenant.NewScoped(companyA, "company-a"), "b-role", UpdateRoleRequest{Name: "new", Slug: "new"})
+		if !errors.Is(err, apperror.ErrNotFound) {
+			t.Fatalf("expected not found, got %v", err)
+		}
+	})
+
+	t.Run("cross-tenant delete returns not found", func(t *testing.T) {
+		err := svc.Delete(tenant.NewScoped(companyA, "company-a"), "b-role")
+		if !errors.Is(err, apperror.ErrNotFound) {
+			t.Fatalf("expected not found, got %v", err)
+		}
+	})
+}
+
+func TestService_CreateSetsCompanyIDByScope(t *testing.T) {
+	companyID := uint(77)
+	repo := &fakeRepository{roles: []Role{}}
+	svc := NewService(repo)
+
+	t.Run("scoped create sets company id", func(t *testing.T) {
+		res, err := svc.Create(tenant.NewScoped(companyID, "acme"), CreateRoleRequest{Name: "editor", Slug: "editor"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res.CompanyID == nil || *res.CompanyID != companyID {
+			t.Fatalf("expected company id %d, got %+v", companyID, res.CompanyID)
+		}
+	})
+
+	t.Run("root create remains global", func(t *testing.T) {
+		res, err := svc.Create(tenant.NewRoot(), CreateRoleRequest{Name: "auditor", Slug: "auditor"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res.CompanyID != nil {
+			t.Fatalf("expected nil company id for root scope, got %+v", res.CompanyID)
+		}
+	})
+}
+
+func TestIsReservedIdentity(t *testing.T) {
+	cases := []struct {
+		name string
+		slug string
+		want bool
+	}{
+		{name: "Root", slug: "team", want: true},
+		{name: "lead", slug: "ADMIN", want: true},
+		{name: " manager ", slug: " user ", want: true},
+		{name: "custom", slug: "custom", want: false},
+	}
+
+	for _, tc := range cases {
+		if got := isReservedIdentity(tc.name, tc.slug); got != tc.want {
+			t.Fatalf("isReservedIdentity(%q,%q) = %v, want %v", tc.name, tc.slug, got, tc.want)
+		}
 	}
 }
 

@@ -37,30 +37,35 @@ type fakeService struct {
 	deletedPID string
 	catalog    []RolePermissionGroupResponse
 	assigned   *RolePermissionAssignmentResponse
+	lastTC     tenant.TenantContext
 }
 
-func (f *fakeService) List(_ tenant.TenantContext, page, perPage int) ([]RoleResponse, int64, error) {
+func (f *fakeService) List(tc tenant.TenantContext, page, perPage int) ([]RoleResponse, int64, error) {
+	f.lastTC = tc
 	if f.err != nil {
 		return nil, 0, f.err
 	}
 	return f.roles, f.total, nil
 }
 
-func (f *fakeService) GetByPublicID(_ tenant.TenantContext, publicID string) (*RoleResponse, error) {
+func (f *fakeService) GetByPublicID(tc tenant.TenantContext, publicID string) (*RoleResponse, error) {
+	f.lastTC = tc
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.role, nil
 }
 
-func (f *fakeService) Create(_ tenant.TenantContext, req CreateRoleRequest) (*RoleResponse, error) {
+func (f *fakeService) Create(tc tenant.TenantContext, req CreateRoleRequest) (*RoleResponse, error) {
+	f.lastTC = tc
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.created, nil
 }
 
-func (f *fakeService) Update(_ tenant.TenantContext, publicID string, req UpdateRoleRequest) (*RoleResponse, error) {
+func (f *fakeService) Update(tc tenant.TenantContext, publicID string, req UpdateRoleRequest) (*RoleResponse, error) {
+	f.lastTC = tc
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -70,19 +75,22 @@ func (f *fakeService) Update(_ tenant.TenantContext, publicID string, req Update
 	return f.role, nil
 }
 
-func (f *fakeService) Delete(_ tenant.TenantContext, publicID string) error {
+func (f *fakeService) Delete(tc tenant.TenantContext, publicID string) error {
+	f.lastTC = tc
 	f.deletedPID = publicID
 	return f.err
 }
 
-func (f *fakeService) GetPermissionCatalog(_ tenant.TenantContext, publicID string) ([]RolePermissionGroupResponse, error) {
+func (f *fakeService) GetPermissionCatalog(tc tenant.TenantContext, publicID string) ([]RolePermissionGroupResponse, error) {
+	f.lastTC = tc
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.catalog, nil
 }
 
-func (f *fakeService) AssignPermissions(_ tenant.TenantContext, publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error) {
+func (f *fakeService) AssignPermissions(tc tenant.TenantContext, publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error) {
+	f.lastTC = tc
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -96,6 +104,35 @@ func setupHandler(svc Service) (*gin.Engine, *Handler) {
 }
 
 func TestHandler_List(t *testing.T) {
+	t.Run("passes scoped tenant context to service", func(t *testing.T) {
+		svc := &fakeService{roles: []RoleResponse{}, total: 0}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/roles", nil)
+		tenant.SetGin(c, tenant.NewScoped(42, "acme"))
+		h.List(c)
+
+		if svc.lastTC.IsRootScope || svc.lastTC.CompanyID != 42 || svc.lastTC.CompanySlug != "acme" {
+			t.Fatalf("expected scoped tenant context, got %+v", svc.lastTC)
+		}
+	})
+
+	t.Run("falls back to root tenant context", func(t *testing.T) {
+		svc := &fakeService{roles: []RoleResponse{}, total: 0}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/roles", nil)
+		h.List(c)
+
+		if !svc.lastTC.IsRootScope {
+			t.Fatalf("expected root tenant context fallback, got %+v", svc.lastTC)
+		}
+	})
+
 	t.Run("returns paginated roles list", func(t *testing.T) {
 		svc := &fakeService{
 			roles: []RoleResponse{

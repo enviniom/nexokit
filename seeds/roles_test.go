@@ -19,7 +19,7 @@ func TestSeedRoles(t *testing.T) {
 		t.Fatalf("failed to migrate roles table: %v", err)
 	}
 
-	t.Run("seeds all roles on first run", func(t *testing.T) {
+	t.Run("seeds only root role on first run", func(t *testing.T) {
 		if err := seedRoles(db); err != nil {
 			t.Fatalf("seedRoles failed: %v", err)
 		}
@@ -28,11 +28,11 @@ func TestSeedRoles(t *testing.T) {
 		if err := db.Model(&roles.Role{}).Count(&count).Error; err != nil {
 			t.Fatalf("failed to count roles: %v", err)
 		}
-		if count != 3 {
-			t.Errorf("expected 3 roles, got %d", count)
+		if count != 1 {
+			t.Errorf("expected 1 role, got %d", count)
 		}
 
-		for _, name := range []string{"root", "admin", "user"} {
+		for _, name := range []string{"root"} {
 			var role roles.Role
 			if err := db.Where("name = ?", name).First(&role).Error; err != nil {
 				t.Errorf("expected role %s to exist: %v", name, err)
@@ -62,8 +62,8 @@ func TestSeedRoles(t *testing.T) {
 		if err := db.Model(&roles.Role{}).Count(&count).Error; err != nil {
 			t.Fatalf("failed to count roles: %v", err)
 		}
-		if count != 3 {
-			t.Errorf("expected still 3 roles after re-run, got %d", count)
+		if count != 1 {
+			t.Errorf("expected still 1 role after re-run, got %d", count)
 		}
 	})
 }

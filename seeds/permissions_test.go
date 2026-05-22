@@ -73,38 +73,24 @@ func TestSeedRolePermissions(t *testing.T) {
 		t.Fatalf("seedPermissions failed: %v", err)
 	}
 
-	tests := []struct {
-		name     string
-		roleSlug string
-		want     int
-	}{
-		{name: "root gets all permissions", roleSlug: roles.RootRoleSlug, want: len(systemPermissions())},
-		{name: "admin gets admin permissions", roleSlug: roles.AdminRoleSlug, want: len(adminPermissionSlugs())},
-		{name: "user gets basic permissions", roleSlug: roles.UserRoleSlug, want: len(userPermissionSlugs())},
+	if err := seedRolePermissions(database); err != nil {
+		t.Fatalf("seedRolePermissions failed: %v", err)
+	}
+	if err := seedRolePermissions(database); err != nil {
+		t.Fatalf("seedRolePermissions failed on rerun: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := seedRolePermissions(database); err != nil {
-				t.Fatalf("seedRolePermissions failed: %v", err)
-			}
-			if err := seedRolePermissions(database); err != nil {
-				t.Fatalf("seedRolePermissions failed on rerun: %v", err)
-			}
+	var links []permissions.RolePermission
+	if err := database.Find(&links).Error; err != nil {
+		t.Fatalf("failed to load role permissions: %v", err)
+	}
+	if len(links) != 0 {
+		t.Fatalf("expected no role_permissions rows, got %d", len(links))
+	}
 
-			var role roles.Role
-			if err := database.Where("slug = ?", tt.roleSlug).First(&role).Error; err != nil {
-				t.Fatalf("failed to load role: %v", err)
-			}
-
-			var links []permissions.RolePermission
-			if err := database.Where("role_id = ?", role.ID).Find(&links).Error; err != nil {
-				t.Fatalf("failed to load role permissions: %v", err)
-			}
-			if len(links) != tt.want {
-				t.Fatalf("expected %d role permissions, got %d", tt.want, len(links))
-			}
-		})
+	var rootRole roles.Role
+	if err := database.Where("slug = ?", roles.RootRoleSlug).First(&rootRole).Error; err != nil {
+		t.Fatalf("failed to load root role: %v", err)
 	}
 }
 

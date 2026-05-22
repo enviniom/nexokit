@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// RolesSeed idempotently seeds root, admin, and user system roles.
+// RolesSeed idempotently seeds only the root system role.
 func RolesSeed() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -28,8 +28,6 @@ func RolesSeed() error {
 func seedRoles(database *gorm.DB) error {
 	roleList := []roles.Role{
 		{Name: "root", Slug: roles.RootRoleSlug, Description: "System root role", IsSystem: true},
-		{Name: "admin", Slug: roles.AdminRoleSlug, Description: "System admin role", IsSystem: true},
-		{Name: "user", Slug: roles.UserRoleSlug, Description: "System user role", IsSystem: true},
 	}
 
 	for i := range roleList {

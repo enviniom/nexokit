@@ -5,12 +5,10 @@ import (
 
 	"github.com/enviniom/nexokit/internal/config"
 	"github.com/enviniom/nexokit/internal/infra/db"
-	"github.com/enviniom/nexokit/internal/modules/permissions"
-	"github.com/enviniom/nexokit/internal/modules/roles"
 	"gorm.io/gorm"
 )
 
-// RolePermissionsSeed idempotently assigns base permissions to system roles.
+// RolePermissionsSeed seeds the permissions catalog only.
 func RolePermissionsSeed() error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -25,42 +23,11 @@ func RolePermissionsSeed() error {
 	if err := seedPermissions(database); err != nil {
 		return err
 	}
-	return seedRolePermissions(database)
+	return nil
 }
 
 func seedRolePermissions(database *gorm.DB) error {
-	assignments := map[string][]string{
-		roles.RootRoleSlug:  allSystemPermissionSlugs(),
-		roles.AdminRoleSlug: adminPermissionSlugs(),
-		roles.UserRoleSlug:  userPermissionSlugs(),
-	}
-
-	for roleSlug, permissionSlugs := range assignments {
-		var role roles.Role
-		if err := database.Where("slug = ?", roleSlug).First(&role).Error; err != nil {
-			return fmt.Errorf("failed to load role %s: %w", roleSlug, err)
-		}
-
-		for _, permissionSlug := range permissionSlugs {
-			var permission permissions.Permission
-			if err := database.Where("slug = ?", permissionSlug).First(&permission).Error; err != nil {
-				return fmt.Errorf("failed to load permission %s: %w", permissionSlug, err)
-			}
-
-			link := permissions.RolePermission{RoleID: role.ID, PermissionID: permission.ID}
-			result := database.Where("role_id = ? AND permission_id = ?", role.ID, permission.ID).First(&permissions.RolePermission{})
-			if result.Error == nil {
-				continue
-			}
-			if result.Error != gorm.ErrRecordNotFound {
-				return fmt.Errorf("failed to check role permission %s/%s: %w", roleSlug, permissionSlug, result.Error)
-			}
-			if err := database.Create(&link).Error; err != nil {
-				return fmt.Errorf("failed to assign permission %s to role %s: %w", permissionSlug, roleSlug, err)
-			}
-		}
-	}
-
+	// Root receives "*" via middleware (authctx.AttachPermissions), so no role_permissions rows are seeded.
 	return nil
 }
 
