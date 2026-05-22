@@ -529,8 +529,11 @@ func TestHandler_Delete(t *testing.T) {
 		setTenant(c)
 		h.Delete(c)
 
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected status 200, got %d", w.Code)
+		if w.Code != http.StatusNoContent {
+			t.Fatalf("expected status 204, got %d", w.Code)
+		}
+		if w.Body.Len() != 0 {
+			t.Fatalf("expected empty body, got %q", w.Body.String())
 		}
 		if svc.deletedPID != "user1" {
 			t.Errorf("expected deleted public_id 'user1', got %s", svc.deletedPID)

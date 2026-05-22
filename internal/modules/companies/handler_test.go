@@ -202,20 +202,24 @@ func TestHandler_UsesPublicIDRoutes(t *testing.T) {
 	r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
 
 	for _, tt := range []struct {
-		name   string
-		method string
-		path   string
-		body   any
+		name       string
+		method     string
+		path       string
+		body       any
+		wantStatus int
 	}{
-		{name: "get", method: http.MethodGet, path: "/api/v1/companies/01HCOMPANYPUBLICID"},
-		{name: "update", method: http.MethodPut, path: "/api/v1/companies/01HCOMPANYPUBLICID", body: UpdateCompanyRequest{Name: "Acme", Slug: "acme", Status: CompanyStatusActive}},
-		{name: "delete", method: http.MethodDelete, path: "/api/v1/companies/01HCOMPANYPUBLICID"},
+		{name: "get", method: http.MethodGet, path: "/api/v1/companies/01HCOMPANYPUBLICID", wantStatus: http.StatusOK},
+		{name: "update", method: http.MethodPut, path: "/api/v1/companies/01HCOMPANYPUBLICID", body: UpdateCompanyRequest{Name: "Acme", Slug: "acme", Status: CompanyStatusActive}, wantStatus: http.StatusOK},
+		{name: "delete", method: http.MethodDelete, path: "/api/v1/companies/01HCOMPANYPUBLICID", wantStatus: http.StatusNoContent},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, companyJSONRequest(tt.method, tt.path, tt.body))
-			if w.Code != http.StatusOK {
-				t.Fatalf("expected status 200, got %d body=%s", w.Code, w.Body.String())
+			if w.Code != tt.wantStatus {
+				t.Fatalf("expected status %d, got %d body=%s", tt.wantStatus, w.Code, w.Body.String())
+			}
+			if tt.method == http.MethodDelete && w.Body.Len() != 0 {
+				t.Fatalf("expected empty body, got %q", w.Body.String())
 			}
 			if svc.lastID != "01HCOMPANYPUBLICID" {
 				t.Fatalf("expected public id route param, got %q", svc.lastID)

@@ -82,8 +82,11 @@ func TestUsersCRUDIntegration(t *testing.T) {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodDelete, "/users/"+created.PublicID, nil)
 		r.ServeHTTP(w, req)
-		if w.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+		if w.Code != http.StatusNoContent {
+			t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+		}
+		if w.Body.Len() != 0 {
+			t.Fatalf("expected empty body, got %q", w.Body.String())
 		}
 
 		fetch := httptest.NewRecorder()

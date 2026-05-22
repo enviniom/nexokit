@@ -1,8 +1,6 @@
 package roles
 
 import (
-	"net/http"
-
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/query"
@@ -124,7 +122,7 @@ func (h *Handler) Delete(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
-	c.AbortWithStatus(http.StatusNoContent)
+	response.NoContent(c)
 }
 
 func permissionSlugsFromContext(c *gin.Context) []string {

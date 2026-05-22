@@ -99,6 +99,11 @@ func Created[T any](c *gin.Context, message string, data T) {
 	})
 }
 
+// NoContent returns a 204 No Content response with no body.
+func NoContent(c *gin.Context) {
+	c.AbortWithStatus(http.StatusNoContent)
+}
+
 // Error returns a generic error response with the given status code.
 func Error(c *gin.Context, status int, message string, errs any) {
 	c.JSON(status, ErrorResponse{

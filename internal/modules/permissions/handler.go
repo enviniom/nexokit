@@ -90,5 +90,5 @@ func (h *Handler) Delete(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
-	response.Success[any](c, messages.MsgSuccess, nil)
+	response.NoContent(c)
 }

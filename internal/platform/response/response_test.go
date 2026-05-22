@@ -67,6 +67,18 @@ func TestCreated(t *testing.T) {
 	}
 }
 
+func TestNoContent(t *testing.T) {
+	c, w := setupRecorder()
+	NoContent(c)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected status %d, got %d", http.StatusNoContent, w.Code)
+	}
+	if w.Body.Len() != 0 {
+		t.Fatalf("expected empty body, got %q", w.Body.String())
+	}
+}
+
 func TestErrorResponse(t *testing.T) {
 	c, w := setupRecorder()
 	Error(c, http.StatusBadRequest, "Something went wrong", map[string][]string{"field": {"error"}})
@@ -281,7 +293,7 @@ func TestPaginatedWithFilters(t *testing.T) {
 		wantSearch string
 	}{
 		{
-			name:       "with filters and search",
+			name: "with filters and search",
 			params: query.ListParams{
 				Pagination: query.PaginationParams{Page: 1, PerPage: 10},
 				Filters:    query.FilterParams{Status: "active"},
@@ -294,10 +306,10 @@ func TestPaginatedWithFilters(t *testing.T) {
 			wantSearch: "jhon",
 		},
 		{
-			name:       "empty filters include defaults",
-			params: query.ListParams{Pagination: query.PaginationParams{Page: 2, PerPage: 25}},
-			wantSort:   "created_at",
-			wantOrder:  "desc",
+			name:      "empty filters include defaults",
+			params:    query.ListParams{Pagination: query.PaginationParams{Page: 2, PerPage: 25}},
+			wantSort:  "created_at",
+			wantOrder: "desc",
 		},
 	}
 
