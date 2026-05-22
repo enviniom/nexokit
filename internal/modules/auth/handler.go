@@ -1,10 +1,7 @@
 package auth
 
 import (
-	"net/http"
-
 	"github.com/enviniom/nexokit/internal/modules/users"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
@@ -32,14 +29,13 @@ func (h *Handler) Login(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 
 	result, err := h.service.Login(req)
 	if err != nil {
-		h.respondError(c, err)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, result)
@@ -52,14 +48,13 @@ func (h *Handler) Refresh(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 
 	result, err := h.service.Refresh(req)
 	if err != nil {
-		h.respondError(c, err)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, result)
@@ -72,12 +67,11 @@ func (h *Handler) Logout(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 	if err := h.service.Logout(req); err != nil {
-		h.respondError(c, err)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success[any](c, messages.MsgSuccess, nil)
@@ -99,15 +93,4 @@ func (h *Handler) Me(c *gin.Context) {
 		RoleName:  current.Role,
 		CompanyID: current.CompanyID,
 	}, RoleSlug: current.RoleSlug, Permissions: current.Permissions})
-}
-
-func (h *Handler) respondError(c *gin.Context, err error) {
-	switch apperror.Status(err) {
-	case http.StatusUnauthorized:
-		response.Unauthorized(c, messages.MsgUnauthorized)
-	case http.StatusForbidden:
-		response.Forbidden(c, messages.MsgForbidden)
-	default:
-		response.InternalServerError(c, messages.MsgInternalError)
-	}
 }

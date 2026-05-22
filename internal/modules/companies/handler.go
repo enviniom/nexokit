@@ -26,13 +26,13 @@ func (h *Handler) List(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
-	response.PaginatedWithFilters(c, messages.MsgSuccess, companies, params.Pagination, params.Filters, params.Sort, params.Search, total)
+	response.PaginatedWithFilters(c, messages.MsgSuccess, companies, params, total)
 }
 
 func (h *Handler) GetByPublicID(c *gin.Context) {
 	company, err := h.service.GetByPublicID(c.Param("id"))
 	if err != nil {
-		h.respondError(c, err)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, company)
@@ -74,7 +74,7 @@ func (h *Handler) Update(c *gin.Context) {
 
 func (h *Handler) Delete(c *gin.Context) {
 	if err := h.service.Delete(c.Param("id")); err != nil {
-		h.respondError(c, err)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success[any](c, messages.MsgSuccess, nil)

@@ -168,13 +168,13 @@ func ValidationError(c *gin.Context, errs any) {
 
 // Paginated returns a 200 OK response with pagination metadata.
 func Paginated[T any](c *gin.Context, message string, data T, page, perPage int, total int64) {
-	PaginatedWithFilters(c, message, data, query.PaginationParams{Page: page, PerPage: perPage}, query.FilterParams{}, query.SortParams{}, query.SearchParams{}, total)
+	PaginatedWithFilters(c, message, data, query.ListParams{Pagination: query.PaginationParams{Page: page, PerPage: perPage}}, total)
 }
 
 // PaginatedWithFilters returns a 200 OK response with pagination and filter metadata.
-func PaginatedWithFilters[T any](c *gin.Context, message string, data T, pagination query.PaginationParams, filters query.FilterParams, sort query.SortParams, search query.SearchParams, total int64) {
-	page := pagination.Page
-	perPage := pagination.PerPage
+func PaginatedWithFilters[T any](c *gin.Context, message string, data T, params query.ListParams, total int64) {
+	page := params.Pagination.Page
+	perPage := params.Pagination.PerPage
 	totalPages := 0
 	if perPage > 0 {
 		totalPages = int((total + int64(perPage) - 1) / int64(perPage))
@@ -190,7 +190,7 @@ func PaginatedWithFilters[T any](c *gin.Context, message string, data T, paginat
 				Total:      total,
 				TotalPages: totalPages,
 			},
-			"filters": filtersMeta(filters, sort, search),
+			"filters": filtersMeta(params.Filters, params.Sort, params.Search),
 		},
 		Errors: nil,
 	})

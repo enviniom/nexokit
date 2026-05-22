@@ -9,6 +9,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/companies"
 	"github.com/enviniom/nexokit/internal/modules/permissions"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
@@ -264,7 +265,7 @@ func TestService_List(t *testing.T) {
 		}
 		svc := NewService(repo)
 
-		result, total, err := svc.List(tenant.NewRoot(), 1, 10)
+		result, total, err := svc.List(tenant.NewRoot(), query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -286,7 +287,7 @@ func TestService_List(t *testing.T) {
 		repo := &fakeRepository{roles: []Role{}, total: 0}
 		svc := NewService(repo)
 
-		result, total, err := svc.List(tenant.NewRoot(), 1, 10)
+		result, total, err := svc.List(tenant.NewRoot(), query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -302,7 +303,7 @@ func TestService_List(t *testing.T) {
 		repo := &fakeRepository{err: apperror.ErrInternal}
 		svc := NewService(repo)
 
-		_, _, err := svc.List(tenant.NewRoot(), 1, 10)
+		_, _, err := svc.List(tenant.NewRoot(), query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}})
 		if err == nil {
 			t.Error("expected error")
 		}
@@ -771,7 +772,7 @@ func TestService_TenantScopedBehavior(t *testing.T) {
 	svc := NewService(repo)
 
 	t.Run("list returns only current company roles for non-root", func(t *testing.T) {
-		items, total, err := svc.List(tenant.NewScoped(companyA, "company-a"), 1, 10)
+		items, total, err := svc.List(tenant.NewScoped(companyA, "company-a"), query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -781,7 +782,7 @@ func TestService_TenantScopedBehavior(t *testing.T) {
 	})
 
 	t.Run("list returns all roles for root scope", func(t *testing.T) {
-		items, total, err := svc.List(tenant.NewRoot(), 1, 10)
+		items, total, err := svc.List(tenant.NewRoot(), query.ListParams{Pagination: query.PaginationParams{Page: 1, PerPage: 10}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

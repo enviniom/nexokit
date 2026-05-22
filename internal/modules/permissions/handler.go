@@ -1,9 +1,6 @@
 package permissions
 
 import (
-	"net/http"
-
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/response"
@@ -24,32 +21,28 @@ func NewHandler(service Service) *Handler {
 func (h *Handler) List(c *gin.Context) {
 	groups, err := h.service.ListGrouped()
 	if err != nil {
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, groups)
 }
 
-// ListPaginated returns paginated permissions.
+// ListPaginated returns paginated permissions with filter metadata.
 func (h *Handler) ListPaginated(c *gin.Context) {
-	pagination := query.PaginationFromGin(c)
-	permissions, total, err := h.service.List(pagination.Page, pagination.PerPage)
+	params := query.ListFromGin(c)
+	permissions, total, err := h.service.List(params)
 	if err != nil {
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
-	response.Paginated(c, messages.MsgSuccess, permissions, pagination.Page, pagination.PerPage, total)
+	response.PaginatedWithFilters(c, messages.MsgSuccess, permissions, params, total)
 }
 
 // GetByPublicID returns a single permission by public ID.
 func (h *Handler) GetByPublicID(c *gin.Context) {
 	permission, err := h.service.GetByPublicID(c.Param("id"))
 	if err != nil {
-		if apperror.Status(err) == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, permission)
@@ -62,13 +55,12 @@ func (h *Handler) Create(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 	permission, err := h.service.Create(req)
 	if err != nil {
-		writePermissionError(c, err)
+		response.HandleError(c, err)
 		return
 	}
 	response.Created(c, messages.MsgSuccess, permission)
@@ -81,13 +73,12 @@ func (h *Handler) Update(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 	permission, err := h.service.Update(c.Param("id"), req)
 	if err != nil {
-		writePermissionError(c, err)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, permission)
@@ -96,23 +87,8 @@ func (h *Handler) Update(c *gin.Context) {
 // Delete deletes a non-system permission.
 func (h *Handler) Delete(c *gin.Context) {
 	if err := h.service.Delete(c.Param("id")); err != nil {
-		writePermissionError(c, err)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success[any](c, messages.MsgSuccess, nil)
-}
-
-func writePermissionError(c *gin.Context, err error) {
-	switch apperror.Status(err) {
-	case http.StatusNotFound:
-		response.NotFound(c, messages.MsgNotFound)
-	case http.StatusConflict:
-		response.Conflict(c, messages.MsgConflict)
-	case http.StatusForbidden:
-		response.Forbidden(c, messages.MsgForbidden)
-	case http.StatusBadRequest:
-		response.BadRequest(c, messages.MsgBadRequest)
-	default:
-		response.InternalServerError(c, messages.MsgInternalError)
-	}
 }

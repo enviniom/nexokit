@@ -33,7 +33,7 @@ func (h *Handler) List(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
-	response.PaginatedWithFilters(c, messages.MsgSuccess, users, params.Pagination, params.Filters, params.Sort, params.Search, total)
+	response.PaginatedWithFilters(c, messages.MsgSuccess, users, params, total)
 }
 
 // GetByPublicID returns a single user by its public ID.
@@ -54,8 +54,7 @@ func (h *Handler) Create(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 	user, err := h.service.Create(h.tenantContext(c), req)
@@ -74,8 +73,7 @@ func (h *Handler) Update(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 	user, err := h.service.Update(h.tenantContext(c), publicID, h.actorPublicID(c), req)
@@ -104,8 +102,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 	if err := h.service.ChangePassword(h.tenantContext(c), publicID, h.actorPublicID(c), req); err != nil {
@@ -137,8 +134,7 @@ func (h *Handler) ToggleStatus(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 	user, err := h.service.ToggleStatus(h.tenantContext(c), publicID, req)

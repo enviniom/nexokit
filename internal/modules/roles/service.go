@@ -11,6 +11,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/permissions"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
@@ -18,7 +19,7 @@ import (
 
 // Service defines the business logic contract for roles.
 type Service interface {
-	List(tc tenant.TenantContext, page, perPage int) ([]RoleResponse, int64, error)
+	List(tc tenant.TenantContext, params query.ListParams) ([]RoleResponse, int64, error)
 	GetByPublicID(tc tenant.TenantContext, publicID string) (*RoleResponse, error)
 	Create(tc tenant.TenantContext, req CreateRoleRequest) (*RoleResponse, error)
 	Update(tc tenant.TenantContext, publicID string, req UpdateRoleRequest) (*RoleResponse, error)
@@ -72,8 +73,8 @@ func WithCache(c cache.Cache) ServiceOption {
 }
 
 // List returns paginated roles as DTOs.
-func (s *roleService) List(tc tenant.TenantContext, page, perPage int) ([]RoleResponse, int64, error) {
-	roles, err := s.repo.List(tc, page, perPage)
+func (s *roleService) List(tc tenant.TenantContext, params query.ListParams) ([]RoleResponse, int64, error) {
+	roles, err := s.repo.List(tc, params.Pagination.Page, params.Pagination.PerPage)
 	if err != nil {
 		return nil, 0, err
 	}

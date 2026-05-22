@@ -3,7 +3,6 @@ package roles
 import (
 	"net/http"
 
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/query"
@@ -22,17 +21,17 @@ func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
 
-// List returns paginated roles.
+// List returns paginated roles with filter metadata.
 func (h *Handler) List(c *gin.Context) {
-	pagination := query.PaginationFromGin(c)
+	params := query.ListFromGin(c)
 	tc := h.tenantContext(c)
 
-	roles, total, err := h.service.List(tc, pagination.Page, pagination.PerPage)
+	roles, total, err := h.service.List(tc, params)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
-	response.Paginated(c, messages.MsgSuccess, roles, pagination.Page, pagination.PerPage, total)
+	response.PaginatedWithFilters(c, messages.MsgSuccess, roles, params, total)
 }
 
 // GetByPublicID returns a single role by its public ID.
@@ -65,8 +64,7 @@ func (h *Handler) AssignPermissions(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 	actorPermissions := permissionSlugsFromContext(c)
@@ -89,8 +87,7 @@ func (h *Handler) Create(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 	role, err := h.service.Create(h.tenantContext(c), req)
@@ -109,8 +106,7 @@ func (h *Handler) Update(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
+	if response.RespondIfInvalid(c, req.Validate()) {
 		return
 	}
 	role, err := h.service.Update(h.tenantContext(c), publicID, req)
@@ -125,20 +121,7 @@ func (h *Handler) Update(c *gin.Context) {
 func (h *Handler) Delete(c *gin.Context) {
 	publicID := c.Param("id")
 	if err := h.service.Delete(h.tenantContext(c), publicID); err != nil {
-		status := apperror.Status(err)
-		if status == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		if status == http.StatusForbidden {
-			response.Forbidden(c, messages.MsgForbidden)
-			return
-		}
-		if status == http.StatusUnprocessableEntity {
-			response.Error(c, http.StatusUnprocessableEntity, messages.MsgRoleHasAssignedUsers, nil)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	c.AbortWithStatus(http.StatusNoContent)

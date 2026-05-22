@@ -274,10 +274,7 @@ func TestRespondIfInvalid_WithErrors(t *testing.T) {
 func TestPaginatedWithFilters(t *testing.T) {
 	tests := []struct {
 		name       string
-		pagination query.PaginationParams
-		filters    query.FilterParams
-		sort       query.SortParams
-		search     query.SearchParams
+		params     query.ListParams
 		wantStatus string
 		wantSort   string
 		wantOrder  string
@@ -285,10 +282,12 @@ func TestPaginatedWithFilters(t *testing.T) {
 	}{
 		{
 			name:       "with filters and search",
-			pagination: query.PaginationParams{Page: 1, PerPage: 10},
-			filters:    query.FilterParams{Status: "active"},
-			sort:       query.SortParams{Sort: "name", Order: "asc"},
-			search:     query.SearchParams{Query: "jhon"},
+			params: query.ListParams{
+				Pagination: query.PaginationParams{Page: 1, PerPage: 10},
+				Filters:    query.FilterParams{Status: "active"},
+				Sort:       query.SortParams{Sort: "name", Order: "asc"},
+				Search:     query.SearchParams{Query: "jhon"},
+			},
 			wantStatus: "active",
 			wantSort:   "name",
 			wantOrder:  "asc",
@@ -296,10 +295,7 @@ func TestPaginatedWithFilters(t *testing.T) {
 		},
 		{
 			name:       "empty filters include defaults",
-			pagination: query.PaginationParams{Page: 2, PerPage: 25},
-			filters:    query.FilterParams{},
-			sort:       query.SortParams{},
-			search:     query.SearchParams{},
+			params: query.ListParams{Pagination: query.PaginationParams{Page: 2, PerPage: 25}},
 			wantSort:   "created_at",
 			wantOrder:  "desc",
 		},
@@ -308,7 +304,7 @@ func TestPaginatedWithFilters(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c, w := setupRecorder()
-			PaginatedWithFilters(c, "List retrieved", []string{"a"}, tt.pagination, tt.filters, tt.sort, tt.search, 50)
+			PaginatedWithFilters(c, "List retrieved", []string{"a"}, tt.params, 50)
 
 			if w.Code != http.StatusOK {
 				t.Fatalf("status = %d; want %d", w.Code, http.StatusOK)

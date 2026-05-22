@@ -11,6 +11,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
@@ -40,7 +41,7 @@ type fakeService struct {
 	lastTC     tenant.TenantContext
 }
 
-func (f *fakeService) List(tc tenant.TenantContext, page, perPage int) ([]RoleResponse, int64, error) {
+func (f *fakeService) List(tc tenant.TenantContext, params query.ListParams) ([]RoleResponse, int64, error) {
 	f.lastTC = tc
 	if f.err != nil {
 		return nil, 0, f.err
@@ -177,6 +178,9 @@ func TestHandler_List(t *testing.T) {
 		}
 		if len(resp.Data) != 2 {
 			t.Errorf("expected 2 roles, got %d", len(resp.Data))
+		}
+		if _, ok := metaMap["filters"]; !ok {
+			t.Error("expected filters in meta")
 		}
 	})
 

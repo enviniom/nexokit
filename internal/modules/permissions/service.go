@@ -12,6 +12,7 @@ import (
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
+	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
@@ -19,7 +20,7 @@ import (
 // Service defines the business logic contract for permissions.
 type Service interface {
 	ListGrouped() ([]PermissionGroupResponse, error)
-	List(page, perPage int) ([]PermissionResponse, int64, error)
+	List(params query.ListParams) ([]PermissionResponse, int64, error)
 	GetByPublicID(publicID string) (*PermissionResponse, error)
 	Create(req CreatePermissionRequest) (*PermissionResponse, error)
 	Update(publicID string, req UpdatePermissionRequest) (*PermissionResponse, error)
@@ -60,8 +61,8 @@ func (s *permissionService) ListGrouped() ([]PermissionGroupResponse, error) {
 }
 
 // List returns paginated permissions as DTOs.
-func (s *permissionService) List(page, perPage int) ([]PermissionResponse, int64, error) {
-	items, err := s.repo.List(page, perPage)
+func (s *permissionService) List(params query.ListParams) ([]PermissionResponse, int64, error) {
+	items, err := s.repo.List(params.Pagination.Page, params.Pagination.PerPage)
 	if err != nil {
 		return nil, 0, err
 	}
