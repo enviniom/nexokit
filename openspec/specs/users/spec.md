@@ -8,7 +8,7 @@ User management CRUD, password change, and active/inactive status with tenant-sc
 
 ### Requirement: User CRUD endpoints
 
-The system MUST expose `GET /api/v1/users`, `POST /api/v1/users`, `GET /api/v1/users/:id`, `PUT /api/v1/users/:id`, and `DELETE /api/v1/users/:id`. All responses MUST use the standard DTO envelope and MUST NOT include `password` or `password_hash`. For non-root users, all queries MUST filter by `company_id` from TenantContext. Root users with `IsRootScope=true` see all users; root users scoped to a specific company see only that company's users. The `company_id` field MUST be required for admin/user roles; root MAY have null `company_id`.
+The system MUST expose `GET /api/v1/users`, `POST /api/v1/users`, `GET /api/v1/users/:id`, `PUT /api/v1/users/:id`, and `DELETE /api/v1/users/:id`. Responses MUST use the standard DTO envelope except successful DELETE responses, which MUST return HTTP 204 with no body. Response DTOs MUST NOT include `password` or `password_hash`. For non-root users, all queries MUST filter by `company_id` from TenantContext. Root users with `IsRootScope=true` see all users; root users scoped to a specific company see only that company's users. The `company_id` field MUST be required for admin/user roles; root MAY have null `company_id`.
 
 #### Scenario: Create user with company_id
 
@@ -56,7 +56,8 @@ The system MUST expose `GET /api/v1/users`, `POST /api/v1/users`, `GET /api/v1/u
 
 - GIVEN an existing user within the requester's tenant scope
 - WHEN `DELETE /api/v1/users/:id` is called
-- THEN response returns HTTP 200, user is soft-deleted
+- THEN response returns HTTP 204 with an empty body
+- AND the user is soft-deleted
 
 #### Scenario: Cross-tenant update returns 404
 

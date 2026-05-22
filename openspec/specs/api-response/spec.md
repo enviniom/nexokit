@@ -1,7 +1,7 @@
 # API Response Specification
 
 ## Purpose
-Define the standard JSON envelope used by every API response, including success, error, and paginated variants.
+Define the standard JSON envelope used by API responses, including success, error, and paginated variants. Successful no-content operations are the explicit exception and return HTTP 204 without a JSON body.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ The system MUST render absent `data` as `null` (not omitted) and absent `meta` a
 
 #### Scenario: Empty success response
 
-- GIVEN no data to return
+- GIVEN no data to return but the operation still returns a success envelope
 - WHEN `response.Success(c, "Deleted", nil)` is called
 - THEN `data` is `null` in JSON
 
@@ -47,6 +47,17 @@ The system MUST render absent `data` as `null` (not omitted) and absent `meta` a
 - GIVEN a paginated request with no explicit filters
 - WHEN `PaginatedWithFilters` is called
 - THEN `meta.filters` is present with default sort, order, and empty search
+
+### Requirement: NoContent response helper
+
+The system MUST provide `NoContent(c *gin.Context)` for successful operations that return HTTP 204 and no response body. This helper MUST NOT emit the standard JSON envelope because HTTP 204 responses cannot carry content.
+
+#### Scenario: Successful no-content response
+
+- GIVEN a delete operation succeeds and has no representation to return
+- WHEN `response.NoContent(c)` is called
+- THEN the response status is HTTP 204
+- AND the response body is empty
 
 ### Requirement: Explicit response DTO names
 
@@ -128,5 +139,6 @@ The system MUST provide a `TooManyRequests(c *gin.Context, message string)` help
 ## Constraints and Edge Cases
 
 - All handlers MUST use `platform/response`; direct `gin.H` is prohibited.
-- Content-Type MUST be `application/json; charset=utf-8`.
+- Content-Type MUST be `application/json; charset=utf-8` for JSON envelope responses.
+- HTTP 204 responses produced by `NoContent` MUST have an empty body and no JSON content type requirement.
 - `errors` field MUST be a map of field names to string arrays.

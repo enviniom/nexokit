@@ -24,7 +24,7 @@ The system MUST define a `Company` model with fields: `ID uint` (primaryKey), `P
 
 ### Requirement: Company CRUD endpoints
 
-The system MUST expose `GET /api/v1/companies`, `POST /api/v1/companies`, `GET /api/v1/companies/:id`, `PUT /api/v1/companies/:id`, and `DELETE /api/v1/companies/:id`. All responses MUST use the standard DTO envelope. The `:id` parameter MUST reference the `PublicID`, never the internal `ID`.
+The system MUST expose `GET /api/v1/companies`, `POST /api/v1/companies`, `GET /api/v1/companies/:id`, `PUT /api/v1/companies/:id`, and `DELETE /api/v1/companies/:id`. Responses MUST use the standard DTO envelope except successful DELETE responses, which MUST return HTTP 204 with no body. The `:id` parameter MUST reference the `PublicID`, never the internal `ID`.
 
 #### Scenario: List companies
 
@@ -54,7 +54,8 @@ The system MUST expose `GET /api/v1/companies`, `POST /api/v1/companies`, `GET /
 
 - GIVEN an existing company
 - WHEN `DELETE /api/v1/companies/:id` is called by a root user
-- THEN the response returns HTTP 200 and the company is soft-deleted
+- THEN the response returns HTTP 204 with an empty body
+- AND the company is soft-deleted
 
 ### Requirement: Root-only company creation
 

@@ -72,7 +72,7 @@ The system MUST NOT allow deletion of a role that has users assigned to it. Befo
 
 ### Requirement: Role API
 
-The system MUST expose `GET /api/v1/roles`, `GET /api/v1/roles/:id`, `POST /api/v1/roles`, `PUT /api/v1/roles/:id`, and `DELETE /api/v1/roles/:id`. GET endpoints return all roles including custom roles. Mutation endpoints MUST enforce permission guards and system-role protection. Responses MUST use the standard DTO envelope. Each role response MUST include a `permissions` field containing an array of permission slug strings associated with that role.
+The system MUST expose `GET /api/v1/roles`, `GET /api/v1/roles/:id`, `POST /api/v1/roles`, `PUT /api/v1/roles/:id`, and `DELETE /api/v1/roles/:id`. GET endpoints return all roles including custom roles. Mutation endpoints MUST enforce permission guards and system-role protection. Responses MUST use the standard DTO envelope except successful DELETE responses, which MUST return HTTP 204 with no body. Each role response MUST include a `permissions` field containing an array of permission slug strings associated with that role.
 (Previously: Read-only role API with GET endpoints only; mutation endpoints were not exposed)
 
 #### Scenario: List roles includes custom roles

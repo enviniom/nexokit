@@ -40,7 +40,7 @@ The system MUST expose admin-only endpoints:
 | PUT | `/api/v1/permissions/:id` | Update a non-system permission |
 | DELETE | `/api/v1/permissions/:id` | Delete a non-system permission |
 
-All endpoints MUST use the standard DTO envelope. List endpoints MUST return permissions grouped by `module`, sorted by `display_order` within each module. Mutation endpoints MUST require `permissions.manage`. The system MUST NOT allow creation, update, or deletion of system permissions (`is_system: true`).
+Endpoints MUST use the standard DTO envelope except successful DELETE responses, which MUST return HTTP 204 with no body. List endpoints MUST return permissions grouped by `module`, sorted by `display_order` within each module. Mutation endpoints MUST require `permissions.manage`. The system MUST NOT allow creation, update, or deletion of system permissions (`is_system: true`).
 
 #### Scenario: List permissions grouped and sorted
 
@@ -53,6 +53,13 @@ All endpoints MUST use the standard DTO envelope. List endpoints MUST return per
 - GIVEN a user with `permissions.manage` permission
 - WHEN `POST /api/v1/permissions` is called with valid `slug`, `name`, `module`, `action`
 - THEN the response returns HTTP 201 with the created permission
+
+#### Scenario: Delete non-system permission
+
+- GIVEN a non-system permission exists and the user has `permissions.manage`
+- WHEN `DELETE /api/v1/permissions/:id` is called
+- THEN the response returns HTTP 204 with an empty body
+- AND the permission is deleted
 
 #### Scenario: Reject mutation on system permission
 
