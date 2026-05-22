@@ -18,13 +18,13 @@ import (
 
 // Service defines the business logic contract for roles.
 type Service interface {
-	List(page, perPage int) ([]RoleResponse, int64, error)
-	GetByPublicID(publicID string) (*RoleResponse, error)
-	Create(req CreateRoleRequest) (*RoleResponse, error)
-	Update(publicID string, req UpdateRoleRequest) (*RoleResponse, error)
-	Delete(publicID string) error
-	GetPermissionCatalog(publicID string) ([]RolePermissionGroupResponse, error)
-	AssignPermissions(publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error)
+	List(tc tenant.TenantContext, page, perPage int) ([]RoleResponse, int64, error)
+	GetByPublicID(tc tenant.TenantContext, publicID string) (*RoleResponse, error)
+	Create(tc tenant.TenantContext, req CreateRoleRequest) (*RoleResponse, error)
+	Update(tc tenant.TenantContext, publicID string, req UpdateRoleRequest) (*RoleResponse, error)
+	Delete(tc tenant.TenantContext, publicID string) error
+	GetPermissionCatalog(tc tenant.TenantContext, publicID string) ([]RolePermissionGroupResponse, error)
+	AssignPermissions(tc tenant.TenantContext, publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error)
 }
 
 type permissionCatalogRepository interface {
@@ -72,13 +72,13 @@ func WithCache(c cache.Cache) ServiceOption {
 }
 
 // List returns paginated roles as DTOs.
-func (s *roleService) List(page, perPage int) ([]RoleResponse, int64, error) {
-	roles, err := s.repo.List(tenant.NewRoot(), page, perPage)
+func (s *roleService) List(tc tenant.TenantContext, page, perPage int) ([]RoleResponse, int64, error) {
+	roles, err := s.repo.List(tc, page, perPage)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	total, err := s.repo.Count(tenant.NewRoot())
+	total, err := s.repo.Count(tc)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -92,8 +92,8 @@ func (s *roleService) List(page, perPage int) ([]RoleResponse, int64, error) {
 }
 
 // GetByPublicID returns a single role by public ID.
-func (s *roleService) GetByPublicID(publicID string) (*RoleResponse, error) {
-	role, err := s.repo.GetByPublicID(tenant.NewRoot(), publicID)
+func (s *roleService) GetByPublicID(tc tenant.TenantContext, publicID string) (*RoleResponse, error) {
+	role, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.ErrNotFound
@@ -105,21 +105,21 @@ func (s *roleService) GetByPublicID(publicID string) (*RoleResponse, error) {
 }
 
 // Create creates a new role after checking name uniqueness.
-func (s *roleService) Create(req CreateRoleRequest) (*RoleResponse, error) {
-	if isRootRole(req.Name, req.Slug) {
+func (s *roleService) Create(tc tenant.TenantContext, req CreateRoleRequest) (*RoleResponse, error) {
+	if isReservedIdentity(req.Name, req.Slug) {
 		return nil, apperror.ErrConflict
 	}
 
-	if _, err := s.repo.GetByName(tenant.NewRoot(), req.Name); err == nil {
-		return nil, apperror.ErrConflict
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+	if exists, err := s.repo.ExistsByName(tc, req.Name); err != nil {
 		return nil, err
+	} else if exists {
+		return nil, apperror.ErrConflict
 	}
 
-	if _, err := s.repo.GetBySlug(tenant.NewRoot(), req.Slug); err == nil {
-		return nil, apperror.ErrConflict
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+	if exists, err := s.repo.ExistsBySlug(tc, req.Slug); err != nil {
 		return nil, err
+	} else if exists {
+		return nil, apperror.ErrConflict
 	}
 
 	publicID, err := identity.Generate()
@@ -137,6 +137,11 @@ func (s *roleService) Create(req CreateRoleRequest) (*RoleResponse, error) {
 		IsSystem:    false,
 	}
 
+	if !tc.IsRootScope {
+		companyID := tc.CompanyID
+		role.CompanyID = &companyID
+	}
+
 	if err := s.repo.Create(role); err != nil {
 		if isUniqueConstraintError(err) {
 			return nil, apperror.ErrConflict
@@ -148,8 +153,8 @@ func (s *roleService) Create(req CreateRoleRequest) (*RoleResponse, error) {
 }
 
 // Update updates a role if it is not a system role and the new name is unique.
-func (s *roleService) Update(publicID string, req UpdateRoleRequest) (*RoleResponse, error) {
-	role, err := s.repo.GetByPublicID(tenant.NewRoot(), publicID)
+func (s *roleService) Update(tc tenant.TenantContext, publicID string, req UpdateRoleRequest) (*RoleResponse, error) {
+	role, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.ErrNotFound
@@ -160,28 +165,26 @@ func (s *roleService) Update(publicID string, req UpdateRoleRequest) (*RoleRespo
 	if role.IsSystem {
 		return nil, apperror.ErrForbidden
 	}
-	if isRootRole(role.Name, role.Slug) {
+	if isReservedIdentity(role.Name, role.Slug) || isReservedIdentity(req.Name, req.Slug) {
 		return nil, apperror.ErrForbidden
 	}
 
 	if role.Name != req.Name {
-		existing, err := s.repo.GetByName(tenant.NewRoot(), req.Name)
-		if err == nil {
-			if existing.PublicID != publicID {
-				return nil, apperror.ErrConflict
-			}
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		exists, err := s.repo.ExistsByName(tc, req.Name)
+		if err != nil {
 			return nil, err
+		}
+		if exists {
+			return nil, apperror.ErrConflict
 		}
 	}
 	if role.Slug != req.Slug {
-		existing, err := s.repo.GetBySlug(tenant.NewRoot(), req.Slug)
-		if err == nil {
-			if existing.PublicID != publicID {
-				return nil, apperror.ErrConflict
-			}
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		exists, err := s.repo.ExistsBySlug(tc, req.Slug)
+		if err != nil {
 			return nil, err
+		}
+		if exists {
+			return nil, apperror.ErrConflict
 		}
 	}
 
@@ -199,13 +202,20 @@ func (s *roleService) Update(publicID string, req UpdateRoleRequest) (*RoleRespo
 	return toResponse(role), nil
 }
 
-func isRootRole(name, slug string) bool {
-	return strings.EqualFold(strings.TrimSpace(name), RootRoleSlug) || strings.EqualFold(strings.TrimSpace(slug), RootRoleSlug)
+func isReservedIdentity(name, slug string) bool {
+	normalizedName := strings.TrimSpace(name)
+	normalizedSlug := strings.TrimSpace(slug)
+	for _, reserved := range ReservedSlugs {
+		if strings.EqualFold(normalizedName, reserved) || strings.EqualFold(normalizedSlug, reserved) {
+			return true
+		}
+	}
+	return false
 }
 
 // Delete deletes a role if it is not a system role.
-func (s *roleService) Delete(publicID string) error {
-	role, err := s.repo.GetByPublicID(tenant.NewRoot(), publicID)
+func (s *roleService) Delete(tc tenant.TenantContext, publicID string) error {
+	role, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.ErrNotFound
@@ -216,7 +226,7 @@ func (s *roleService) Delete(publicID string) error {
 	if role.IsSystem {
 		return apperror.ErrForbidden
 	}
-	if isRootRole(role.Name, role.Slug) {
+	if isReservedIdentity(role.Name, role.Slug) {
 		return apperror.ErrForbidden
 	}
 
@@ -230,12 +240,12 @@ func (s *roleService) Delete(publicID string) error {
 		}
 	}
 
-	return s.repo.Delete(tenant.NewRoot(), publicID)
+	return s.repo.Delete(tc, publicID)
 }
 
 // GetPermissionCatalog returns the full permission catalog annotated with role grants.
-func (s *roleService) GetPermissionCatalog(publicID string) ([]RolePermissionGroupResponse, error) {
-	role, err := s.repo.GetByPublicID(tenant.NewRoot(), publicID)
+func (s *roleService) GetPermissionCatalog(tc tenant.TenantContext, publicID string) ([]RolePermissionGroupResponse, error) {
+	role, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.ErrNotFound
@@ -253,11 +263,11 @@ func (s *roleService) GetPermissionCatalog(publicID string) ([]RolePermissionGro
 }
 
 // AssignPermissions replaces role permissions by slug, protects system roles, and invalidates member caches.
-func (s *roleService) AssignPermissions(publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error) {
+func (s *roleService) AssignPermissions(tc tenant.TenantContext, publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error) {
 	if !hasPermission(actorPermissions, "roles.assign_permissions") {
 		return nil, apperror.ErrForbidden
 	}
-	role, err := s.repo.GetByPublicID(tenant.NewRoot(), publicID)
+	role, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, apperror.ErrNotFound
@@ -304,6 +314,7 @@ func toResponse(r *Role) *RoleResponse {
 	sort.Strings(permissionSlugs)
 	return &RoleResponse{
 		PublicID:    r.PublicID,
+		CompanyID:   r.CompanyID,
 		Name:        r.Name,
 		Slug:        r.Slug,
 		Description: r.Description,

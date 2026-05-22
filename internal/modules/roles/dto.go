@@ -10,6 +10,7 @@ import (
 // RoleResponse is the DTO for role read operations.
 type RoleResponse struct {
 	PublicID    string    `json:"public_id"`
+	CompanyID   *uint     `json:"company_id,omitempty"`
 	Name        string    `json:"name"`
 	Slug        string    `json:"slug"`
 	Description string    `json:"description"`

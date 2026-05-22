@@ -45,22 +45,22 @@ Chain strategy: feature-branch-chain
 
 ## Phase 3: Service (Business Logic + Tenant Isolation)
 
-- [ ] 3.1 Update `internal/modules/roles/service.go` interface — add `tenant.TenantContext` to `List`, `GetByPublicID`, `Create`, `Update`, `Delete` signatures.
-- [ ] 3.2 Replace `isRootRole(name, slug)` with `isReservedIdentity(name, slug)` checking against all reserved slugs (`root`, `admin`, `user`).
-- [ ] 3.3 Update `List(tc, page, perPage)` — pass tenant context to repository; map `CompanyID` in response DTOs.
-- [ ] 3.4 Update `GetByPublicID(tc, publicID)` — pass tenant context; return `ErrNotFound` if role exists but belongs to different tenant.
-- [ ] 3.5 Update `Create(tc, req)` — set `role.CompanyID` from `tc.CompanyID` when not root scope; use `ExistsByName`/`ExistsBySlug` for scoped uniqueness; reject reserved slugs via `isReservedIdentity`.
-- [ ] 3.6 Update `Update(tc, publicID, req)` — pass tenant context to lookup; prevent cross-tenant update; forbid reserved slug/name changes; use scoped uniqueness checks.
-- [ ] 3.7 Update `Delete(tc, publicID)` — pass tenant context; prevent cross-tenant delete; forbid reserved role deletion.
-- [ ] 3.8 Update `GetPermissionCatalog` and `AssignPermissions` — add tenant context to role lookup; verify tenant ownership before permission operations.
+- [x] 3.1 Update `internal/modules/roles/service.go` interface — add `tenant.TenantContext` to `List`, `GetByPublicID`, `Create`, `Update`, `Delete` signatures.
+- [x] 3.2 Replace `isRootRole(name, slug)` with `isReservedIdentity(name, slug)` checking against all reserved slugs (`root`, `admin`, `user`).
+- [x] 3.3 Update `List(tc, page, perPage)` — pass tenant context to repository; map `CompanyID` in response DTOs.
+- [x] 3.4 Update `GetByPublicID(tc, publicID)` — pass tenant context; return `ErrNotFound` if role exists but belongs to different tenant.
+- [x] 3.5 Update `Create(tc, req)` — set `role.CompanyID` from `tc.CompanyID` when not root scope; use `ExistsByName`/`ExistsBySlug` for scoped uniqueness; reject reserved slugs via `isReservedIdentity`.
+- [x] 3.6 Update `Update(tc, publicID, req)` — pass tenant context to lookup; prevent cross-tenant update; forbid reserved slug/name changes; use scoped uniqueness checks.
+- [x] 3.7 Update `Delete(tc, publicID)` — pass tenant context; prevent cross-tenant delete; forbid reserved role deletion.
+- [x] 3.8 Update `GetPermissionCatalog` and `AssignPermissions` — add tenant context to role lookup; verify tenant ownership before permission operations.
 
 ## Phase 4: Handler + DTO (HTTP Wiring)
 
-- [ ] 4.1 Modify `internal/modules/roles/handler.go` — add `tenantContext(c *gin.Context) tenant.TenantContext` method mirroring users handler pattern (`tenant.FromGin` fallback to `tenant.NewRoot()`).
-- [ ] 4.2 Update `List` handler — extract tenant context, pass to service; use `response.HandleError` pattern.
-- [ ] 4.3 Update `GetByPublicID`, `Create`, `Update`, `Delete` handlers — extract and pass tenant context to service calls.
-- [ ] 4.4 Update `GetPermissionCatalog` and `AssignPermissions` handlers — pass tenant context to service.
-- [ ] 4.5 Modify `internal/modules/roles/dto.go` — add `CompanyID *uint json:"company_id,omitempty"` to `RoleResponse`.
+- [x] 4.1 Modify `internal/modules/roles/handler.go` — add `tenantContext(c *gin.Context) tenant.TenantContext` method mirroring users handler pattern (`tenant.FromGin` fallback to `tenant.NewRoot()`).
+- [x] 4.2 Update `List` handler — extract tenant context, pass to service; use `response.HandleError` pattern.
+- [x] 4.3 Update `GetByPublicID`, `Create`, `Update`, `Delete` handlers — extract and pass tenant context to service calls.
+- [x] 4.4 Update `GetPermissionCatalog` and `AssignPermissions` handlers — pass tenant context to service.
+- [x] 4.5 Modify `internal/modules/roles/dto.go` — add `CompanyID *uint json:"company_id,omitempty"` to `RoleResponse`.
 
 ## Phase 5: Seeds (Data Changes)
 

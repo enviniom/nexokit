@@ -12,6 +12,7 @@ import (
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,28 +39,28 @@ type fakeService struct {
 	assigned   *RolePermissionAssignmentResponse
 }
 
-func (f *fakeService) List(page, perPage int) ([]RoleResponse, int64, error) {
+func (f *fakeService) List(_ tenant.TenantContext, page, perPage int) ([]RoleResponse, int64, error) {
 	if f.err != nil {
 		return nil, 0, f.err
 	}
 	return f.roles, f.total, nil
 }
 
-func (f *fakeService) GetByPublicID(publicID string) (*RoleResponse, error) {
+func (f *fakeService) GetByPublicID(_ tenant.TenantContext, publicID string) (*RoleResponse, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.role, nil
 }
 
-func (f *fakeService) Create(req CreateRoleRequest) (*RoleResponse, error) {
+func (f *fakeService) Create(_ tenant.TenantContext, req CreateRoleRequest) (*RoleResponse, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.created, nil
 }
 
-func (f *fakeService) Update(publicID string, req UpdateRoleRequest) (*RoleResponse, error) {
+func (f *fakeService) Update(_ tenant.TenantContext, publicID string, req UpdateRoleRequest) (*RoleResponse, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -69,19 +70,19 @@ func (f *fakeService) Update(publicID string, req UpdateRoleRequest) (*RoleRespo
 	return f.role, nil
 }
 
-func (f *fakeService) Delete(publicID string) error {
+func (f *fakeService) Delete(_ tenant.TenantContext, publicID string) error {
 	f.deletedPID = publicID
 	return f.err
 }
 
-func (f *fakeService) GetPermissionCatalog(publicID string) ([]RolePermissionGroupResponse, error) {
+func (f *fakeService) GetPermissionCatalog(_ tenant.TenantContext, publicID string) ([]RolePermissionGroupResponse, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.catalog, nil
 }
 
-func (f *fakeService) AssignPermissions(publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error) {
+func (f *fakeService) AssignPermissions(_ tenant.TenantContext, publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error) {
 	if f.err != nil {
 		return nil, f.err
 	}

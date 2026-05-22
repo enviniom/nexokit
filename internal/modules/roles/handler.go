@@ -8,6 +8,7 @@ import (
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,10 +25,11 @@ func NewHandler(service Service) *Handler {
 // List returns paginated roles.
 func (h *Handler) List(c *gin.Context) {
 	pagination := query.PaginationFromGin(c)
+	tc := h.tenantContext(c)
 
-	roles, total, err := h.service.List(pagination.Page, pagination.PerPage)
+	roles, total, err := h.service.List(tc, pagination.Page, pagination.PerPage)
 	if err != nil {
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Paginated(c, messages.MsgSuccess, roles, pagination.Page, pagination.PerPage, total)
@@ -36,13 +38,9 @@ func (h *Handler) List(c *gin.Context) {
 // GetByPublicID returns a single role by its public ID.
 func (h *Handler) GetByPublicID(c *gin.Context) {
 	publicID := c.Param("id")
-	role, err := h.service.GetByPublicID(publicID)
+	role, err := h.service.GetByPublicID(h.tenantContext(c), publicID)
 	if err != nil {
-		if apperror.Status(err) == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, role)
@@ -51,14 +49,9 @@ func (h *Handler) GetByPublicID(c *gin.Context) {
 // GetPermissionCatalog returns the full permission catalog annotated for a role.
 func (h *Handler) GetPermissionCatalog(c *gin.Context) {
 	publicID := c.Param("id")
-	catalog, err := h.service.GetPermissionCatalog(publicID)
+	catalog, err := h.service.GetPermissionCatalog(h.tenantContext(c), publicID)
 	if err != nil {
-		status := apperror.Status(err)
-		if status == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, catalog)
@@ -81,22 +74,9 @@ func (h *Handler) AssignPermissions(c *gin.Context) {
 		response.Forbidden(c, messages.MsgForbidden)
 		return
 	}
-	result, err := h.service.AssignPermissions(publicID, req, actorPermissions)
+	result, err := h.service.AssignPermissions(h.tenantContext(c), publicID, req, actorPermissions)
 	if err != nil {
-		status := apperror.Status(err)
-		if status == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		if status == http.StatusForbidden {
-			response.Forbidden(c, messages.MsgForbidden)
-			return
-		}
-		if status == http.StatusBadRequest {
-			response.BadRequest(c, messages.MsgBadRequest)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, result)
@@ -113,14 +93,9 @@ func (h *Handler) Create(c *gin.Context) {
 		response.ValidationError(c, errs)
 		return
 	}
-	role, err := h.service.Create(req)
+	role, err := h.service.Create(h.tenantContext(c), req)
 	if err != nil {
-		status := apperror.Status(err)
-		if status == http.StatusConflict {
-			response.Conflict(c, messages.MsgConflict)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Created(c, messages.MsgSuccess, role)
@@ -138,22 +113,9 @@ func (h *Handler) Update(c *gin.Context) {
 		response.ValidationError(c, errs)
 		return
 	}
-	role, err := h.service.Update(publicID, req)
+	role, err := h.service.Update(h.tenantContext(c), publicID, req)
 	if err != nil {
-		status := apperror.Status(err)
-		if status == http.StatusNotFound {
-			response.NotFound(c, messages.MsgNotFound)
-			return
-		}
-		if status == http.StatusConflict {
-			response.Conflict(c, messages.MsgConflict)
-			return
-		}
-		if status == http.StatusForbidden {
-			response.Forbidden(c, messages.MsgForbidden)
-			return
-		}
-		response.InternalServerError(c, messages.MsgInternalError)
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, role)
@@ -162,7 +124,7 @@ func (h *Handler) Update(c *gin.Context) {
 // Delete deletes a role.
 func (h *Handler) Delete(c *gin.Context) {
 	publicID := c.Param("id")
-	if err := h.service.Delete(publicID); err != nil {
+	if err := h.service.Delete(h.tenantContext(c), publicID); err != nil {
 		status := apperror.Status(err)
 		if status == http.StatusNotFound {
 			response.NotFound(c, messages.MsgNotFound)
@@ -197,4 +159,11 @@ func containsPermission(items []string, slug string) bool {
 		}
 	}
 	return false
+}
+
+func (h *Handler) tenantContext(c *gin.Context) tenant.TenantContext {
+	if tc, ok := tenant.FromGin(c); ok {
+		return tc
+	}
+	return tenant.NewRoot()
 }
