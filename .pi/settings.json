@@ -1,0 +1,15 @@
+{
+	"subagents": {
+		"agentOverrides": {
+			"sdd-tasks": {
+				"model": "openai-codex/gpt-5.3-codex"
+			},
+			"sdd-apply": {
+				"model": "openai-codex/gpt-5.3-codex"
+			},
+			"sdd-archive": {
+				"model": "openai-codex/gpt-5.2"
+			}
+		}
+	}
+}
