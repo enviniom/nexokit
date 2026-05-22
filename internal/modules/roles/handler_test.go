@@ -280,8 +280,8 @@ func TestHandler_Create(t *testing.T) {
 		}
 	})
 
-	t.Run("returns conflict when creating reserved root role", func(t *testing.T) {
-		svc := &fakeService{err: apperror.ErrConflict}
+	t.Run("returns validation error when creating reserved role identity", func(t *testing.T) {
+		svc := &fakeService{err: apperror.ErrValidation}
 		_, h := setupHandler(svc)
 
 		w := httptest.NewRecorder()
@@ -289,8 +289,8 @@ func TestHandler_Create(t *testing.T) {
 		c.Request = jsonRequest(http.MethodPost, "/roles", CreateRoleRequest{Name: "root", Slug: "root"})
 		h.Create(c)
 
-		if w.Code != http.StatusConflict {
-			t.Fatalf("expected status 409, got %d", w.Code)
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status 422, got %d", w.Code)
 		}
 	})
 
@@ -368,8 +368,8 @@ func TestHandler_Update(t *testing.T) {
 		}
 	})
 
-	t.Run("returns forbidden when editing root role", func(t *testing.T) {
-		svc := &fakeService{err: apperror.ErrForbidden}
+	t.Run("returns validation error when editing reserved role identity", func(t *testing.T) {
+		svc := &fakeService{err: apperror.ErrValidation}
 		_, h := setupHandler(svc)
 
 		w := httptest.NewRecorder()
@@ -378,8 +378,8 @@ func TestHandler_Update(t *testing.T) {
 		c.Request = jsonRequest(http.MethodPut, "/roles/role-root", UpdateRoleRequest{Name: "renamed-root", Slug: "renamed-root"})
 		h.Update(c)
 
-		if w.Code != http.StatusForbidden {
-			t.Fatalf("expected status 403, got %d", w.Code)
+		if w.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("expected status 422, got %d", w.Code)
 		}
 	})
 

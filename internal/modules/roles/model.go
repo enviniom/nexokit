@@ -1,6 +1,7 @@
 package roles
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies"
 	"github.com/enviniom/nexokit/internal/modules/permissions"
 	"github.com/enviniom/nexokit/internal/shared"
 )
@@ -22,6 +23,7 @@ type Role struct {
 	Name        string `gorm:"not null"`
 	Slug        string `gorm:"not null"`
 	CompanyID   *uint
+	Company     *companies.Company `gorm:"foreignKey:CompanyID"`
 	Description string
 	IsSystem    bool                     `gorm:"not null;default:false"`
 	Permissions []permissions.Permission `gorm:"many2many:role_permissions;joinForeignKey:RoleID;joinReferences:PermissionID"`

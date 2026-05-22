@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/enviniom/nexokit/internal/modules/companies"
 	"github.com/enviniom/nexokit/internal/modules/permissions"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
@@ -390,7 +391,7 @@ func TestService_Create(t *testing.T) {
 		}
 	})
 
-	t.Run("returns conflict when creating reserved root role", func(t *testing.T) {
+	t.Run("returns validation when creating reserved role identity", func(t *testing.T) {
 		repo := &fakeRepository{roles: []Role{}}
 		svc := NewService(repo)
 
@@ -398,12 +399,14 @@ func TestService_Create(t *testing.T) {
 			{Name: "root", Slug: "custom-role"},
 			{Name: "Root", Slug: "custom-role"},
 			{Name: "custom", Slug: "root"},
+			{Name: "admin", Slug: "custom-role"},
+			{Name: "custom", Slug: "user"},
 		}
 
 		for _, req := range tests {
 			_, err := svc.Create(tenant.NewRoot(), req)
-			if !errors.Is(err, apperror.ErrConflict) {
-				t.Fatalf("expected ErrConflict for %+v, got %v", req, err)
+			if !errors.Is(err, apperror.ErrValidation) {
+				t.Fatalf("expected ErrValidation for %+v, got %v", req, err)
 			}
 		}
 	})
@@ -475,20 +478,35 @@ func TestService_Update(t *testing.T) {
 		}
 	})
 
-	t.Run("returns forbidden when updating root role even if not system", func(t *testing.T) {
-		tests := []Role{
-			{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "root", Slug: "custom-role", IsSystem: false},
-			{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "custom-role", Slug: RootRoleSlug, IsSystem: false},
+	t.Run("returns validation when updating reserved role identity", func(t *testing.T) {
+		tests := []struct {
+			role Role
+			req  UpdateRoleRequest
+		}{
+			{role: Role{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "root", Slug: "custom-role", IsSystem: false}, req: UpdateRoleRequest{Name: "renamed-root", Slug: "renamed-root"}},
+			{role: Role{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "custom-role", Slug: RootRoleSlug, IsSystem: false}, req: UpdateRoleRequest{Name: "renamed-root", Slug: "renamed-root"}},
+			{role: Role{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "manager", Slug: "manager", IsSystem: false}, req: UpdateRoleRequest{Name: "admin", Slug: "manager"}},
+			{role: Role{BaseModel: shared.BaseModel{PublicID: "role1"}, Name: "manager", Slug: "manager", IsSystem: false}, req: UpdateRoleRequest{Name: "manager", Slug: "user"}},
 		}
 
-		for _, role := range tests {
-			repo := &fakeRepository{roles: []Role{role}}
+		for _, tt := range tests {
+			repo := &fakeRepository{roles: []Role{tt.role}}
 			svc := NewService(repo)
-			req := UpdateRoleRequest{Name: "renamed-root", Slug: "renamed-root"}
-			_, err := svc.Update(tenant.NewRoot(), "role1", req)
-			if !errors.Is(err, apperror.ErrForbidden) {
-				t.Fatalf("expected ErrForbidden for role %+v, got %v", role, err)
+			_, err := svc.Update(tenant.NewRoot(), "role1", tt.req)
+			if !errors.Is(err, apperror.ErrValidation) {
+				t.Fatalf("expected ErrValidation for role %+v request %+v, got %v", tt.role, tt.req, err)
 			}
+		}
+	})
+
+	t.Run("returns validation for requested reserved identity before lookup", func(t *testing.T) {
+		repo := &fakeRepository{err: apperror.ErrInternal}
+		svc := NewService(repo)
+
+		req := UpdateRoleRequest{Name: "admin", Slug: "admin"}
+		_, err := svc.Update(tenant.NewRoot(), "missing-role", req)
+		if !errors.Is(err, apperror.ErrValidation) {
+			t.Fatalf("expected ErrValidation before repository lookup, got %v", err)
 		}
 	})
 
@@ -804,8 +822,11 @@ func TestService_CreateSetsCompanyIDByScope(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if res.CompanyID == nil || *res.CompanyID != companyID {
-			t.Fatalf("expected company id %d, got %+v", companyID, res.CompanyID)
+		if len(repo.roles) != 1 || repo.roles[0].CompanyID == nil || *repo.roles[0].CompanyID != companyID {
+			t.Fatalf("expected persisted company id %d, got roles %+v", companyID, repo.roles)
+		}
+		if res.CompanyID != nil {
+			t.Fatalf("expected nil response company id without preloaded company, got %+v", res.CompanyID)
 		}
 	})
 
@@ -816,6 +837,42 @@ func TestService_CreateSetsCompanyIDByScope(t *testing.T) {
 		}
 		if res.CompanyID != nil {
 			t.Fatalf("expected nil company id for root scope, got %+v", res.CompanyID)
+		}
+	})
+}
+
+func TestRoleResponseUsesCompanyPublicID(t *testing.T) {
+	companyID := uint(77)
+	companyPublicID := "company_public_77"
+	repo := &fakeRepository{roles: []Role{
+		{
+			BaseModel: shared.BaseModel{PublicID: "role-company"},
+			Name:      "editor",
+			Slug:      "editor",
+			CompanyID: &companyID,
+			Company:   &companies.Company{BaseModel: shared.BaseModel{ID: companyID, PublicID: companyPublicID}, Slug: "acme"},
+		},
+		{BaseModel: shared.BaseModel{PublicID: "role-global"}, Name: "auditor", Slug: "auditor"},
+	}}
+	svc := NewService(repo)
+
+	t.Run("scoped role returns company public id", func(t *testing.T) {
+		res, err := svc.GetByPublicID(tenant.NewScoped(companyID, "acme"), "role-company")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res.CompanyID == nil || *res.CompanyID != companyPublicID {
+			t.Fatalf("expected company public id %q, got %+v", companyPublicID, res.CompanyID)
+		}
+	})
+
+	t.Run("global role omits company id", func(t *testing.T) {
+		res, err := svc.GetByPublicID(tenant.NewRoot(), "role-global")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res.CompanyID != nil {
+			t.Fatalf("expected nil company id for global role, got %+v", res.CompanyID)
 		}
 	})
 }

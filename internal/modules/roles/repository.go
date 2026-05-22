@@ -35,7 +35,7 @@ func (r *GormRepository) List(tc tenant.TenantContext, page, perPage int) ([]Rol
 	var roles []Role
 	offset := (page - 1) * perPage
 	db := tenant.ApplyTenantScope(r.db, tc)
-	if err := db.Preload("Permissions").Limit(perPage).Offset(offset).Order("created_at DESC").Find(&roles).Error; err != nil {
+	if err := db.Preload("Company").Preload("Permissions").Limit(perPage).Offset(offset).Order("created_at DESC").Find(&roles).Error; err != nil {
 		return nil, err
 	}
 	return roles, nil
@@ -54,7 +54,7 @@ func (r *GormRepository) Count(tc tenant.TenantContext) (int64, error) {
 // GetByPublicID returns a role by its public ID.
 func (r *GormRepository) GetByPublicID(tc tenant.TenantContext, publicID string) (*Role, error) {
 	var role Role
-	db := tenant.ApplyTenantScope(r.db.Preload("Permissions"), tc)
+	db := tenant.ApplyTenantScope(r.db.Preload("Company").Preload("Permissions"), tc)
 	if err := db.Where("public_id = ?", publicID).First(&role).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, err
@@ -67,7 +67,7 @@ func (r *GormRepository) GetByPublicID(tc tenant.TenantContext, publicID string)
 // GetByName returns a role by its name.
 func (r *GormRepository) GetByName(tc tenant.TenantContext, name string) (*Role, error) {
 	var role Role
-	db := tenant.ApplyTenantScope(r.db.Preload("Permissions"), tc)
+	db := tenant.ApplyTenantScope(r.db.Preload("Company").Preload("Permissions"), tc)
 	if err := db.Where("name = ?", name).First(&role).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, err
@@ -80,7 +80,7 @@ func (r *GormRepository) GetByName(tc tenant.TenantContext, name string) (*Role,
 // GetBySlug returns a role by its slug.
 func (r *GormRepository) GetBySlug(tc tenant.TenantContext, slug string) (*Role, error) {
 	var role Role
-	db := tenant.ApplyTenantScope(r.db.Preload("Permissions"), tc)
+	db := tenant.ApplyTenantScope(r.db.Preload("Company").Preload("Permissions"), tc)
 	if err := db.Where("slug = ?", slug).First(&role).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return nil, err

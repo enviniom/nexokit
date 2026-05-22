@@ -107,7 +107,7 @@ func (s *roleService) GetByPublicID(tc tenant.TenantContext, publicID string) (*
 // Create creates a new role after checking name uniqueness.
 func (s *roleService) Create(tc tenant.TenantContext, req CreateRoleRequest) (*RoleResponse, error) {
 	if isReservedIdentity(req.Name, req.Slug) {
-		return nil, apperror.ErrConflict
+		return nil, apperror.ErrValidation
 	}
 
 	if exists, err := s.repo.ExistsByName(tc, req.Name); err != nil {
@@ -149,11 +149,19 @@ func (s *roleService) Create(tc tenant.TenantContext, req CreateRoleRequest) (*R
 		return nil, err
 	}
 
-	return toResponse(role), nil
+	created, err := s.repo.GetByPublicID(tc, role.PublicID)
+	if err != nil {
+		return nil, err
+	}
+	return toResponse(created), nil
 }
 
 // Update updates a role if it is not a system role and the new name is unique.
 func (s *roleService) Update(tc tenant.TenantContext, publicID string, req UpdateRoleRequest) (*RoleResponse, error) {
+	if isReservedIdentity(req.Name, req.Slug) {
+		return nil, apperror.ErrValidation
+	}
+
 	role, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -166,7 +174,7 @@ func (s *roleService) Update(tc tenant.TenantContext, publicID string, req Updat
 		return nil, apperror.ErrForbidden
 	}
 	if isReservedIdentity(role.Name, role.Slug) || isReservedIdentity(req.Name, req.Slug) {
-		return nil, apperror.ErrForbidden
+		return nil, apperror.ErrValidation
 	}
 
 	if role.Name != req.Name {
@@ -314,7 +322,7 @@ func toResponse(r *Role) *RoleResponse {
 	sort.Strings(permissionSlugs)
 	return &RoleResponse{
 		PublicID:    r.PublicID,
-		CompanyID:   r.CompanyID,
+		CompanyID:   companyPublicID(r),
 		Name:        r.Name,
 		Slug:        r.Slug,
 		Description: r.Description,
@@ -325,6 +333,14 @@ func toResponse(r *Role) *RoleResponse {
 		CreatedBy:   r.CreatedBy,
 		UpdatedBy:   r.UpdatedBy,
 	}
+}
+
+func companyPublicID(r *Role) *string {
+	if r.Company == nil || r.Company.PublicID == "" {
+		return nil
+	}
+	publicID := r.Company.PublicID
+	return &publicID
 }
 
 func grantedSlugSet(items []permissions.Permission) map[string]bool {
