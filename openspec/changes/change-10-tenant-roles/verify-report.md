@@ -1,42 +1,65 @@
 # Verification Report: change-10-tenant-roles
 
-Status: **PASS after verification blocker fix pass**
+Status: **PASS**
 
-## Summary
+## Executive Summary
 
-The previous verification run failed on spec/TDD/workload blockers even though tests and build were green. This follow-up fix pass addressed the blockers in the approved scope and reran validation.
+Re-verification after blocker-fix commit `48166a0` passed. The repo was clean before updating this report, focused and full Go validation passed, and the implementation now satisfies the previously-blocking contracts: reserved `root`/`admin`/`user` identity validation occurs before repository/database lookup, role responses expose tenant company context as a public string ID, seeds create only global root with no `role_permissions` rows, and strict-TDD evidence/workload boundary documentation is present.
 
-## Blocker Resolution
+## Spec Coverage
 
-1. **Reserved identity HTTP contract** — fixed.
-   - `Create` now returns `apperror.ErrValidation` for reserved `root`, `admin`, or `user` name/slug.
-   - `Update` now returns `apperror.ErrValidation` when either the existing role identity or requested identity is reserved.
-   - Handler tests now assert HTTP 422 for reserved identity create/update paths.
+| Area | Status | Evidence |
+| --- | --- | --- |
+| Company-scoped role model | PASS | `roles.Role` has nullable `CompanyID`; migration adds FK/indexes; repository scopes queries through `tenant.ApplyTenantScope`. |
+| Tenant-isolated role queries | PASS | Service/repository list/get/count/name/slug/delete paths accept `tenant.TenantContext`; tests cover scoped list, root list, and cross-tenant not-found behavior. |
+| Reserved identity validation | PASS | `Create` and `Update` call `isReservedIdentity` before repository lookup; validation is case-insensitive over name and slug; handler maps `ErrValidation` to HTTP 422. |
+| Root/system role protection | PASS | Service forbids `IsSystem` mutation/deletion and preserves explicit reserved-root protection. |
+| Role DTO company context | PASS | `RoleResponse.CompanyID` is `*string`; repositories preload `Company`; mapping emits `Company.PublicID` and omits global/non-preloaded company data. |
+| Seed only root globally | PASS | `seeds/roles.go` seeds only root; `seeds/role_permissions.go` is no-op; seed tests assert one root role and no role permission rows. |
 
-2. **Role DTO `company_id` contract** — fixed with the smallest safe mapping.
-   - `RoleResponse.CompanyID` is now `*string`.
-   - Roles preload `Company` in repository read paths.
-   - DTO mapping emits `Company.PublicID` when available and omits `company_id` for global roles or non-preloaded company data.
-   - The role model now declares the `Company` relationship through `CompanyID`.
+## Task Completion Status
 
-3. **Seed helper cleanup** — fixed.
-   - Removed obsolete `allSystemPermissionSlugs`, `adminPermissionSlugs`, and `userPermissionSlugs` helper code.
-   - Removed tests that targeted the obsolete admin permission helper.
+All tasks in `openspec/changes/change-10-tenant-roles/tasks.md` are checked complete. Code inspection and validation support the completion claims for Phases 1-6.
 
-4. **Strict TDD evidence** — fixed.
-   - Added `openspec/changes/change-10-tenant-roles/apply-progress.md` with reconstructed evidence for prior slices and live RED/GREEN/TRIANGULATE/REFACTOR evidence for this fix pass.
+## Strict TDD Compliance
 
-5. **Review workload boundary** — documented.
-   - Added chained work-unit commit boundary and local-branch `size:exception` note in `apply-progress.md`.
+Strict TDD mode is active via `openspec/config.yaml` (`apply.tdd: true`). No project-local `.pi/gentle-ai/support/strict-tdd-verify.md` override was present.
 
-## Validation Commands
+| Check | Status | Notes |
+| --- | --- | --- |
+| `TDD Cycle Evidence` table present | PASS | `apply-progress.md` includes a table with RED/GREEN/TRIANGULATE/REFACTOR columns. |
+| Evidence credibility | PASS with note | Earlier PR slices are reconstructed rather than live RED logs; the blocker-fix cycle records live RED/GREEN evidence and aligns with commit `48166a0`. No history rewrite was required. |
+| Test files cross-referenced | PASS | Reported tests exist in `internal/modules/roles/service_test.go`, `internal/modules/roles/handler_test.go`, `seeds/roles_test.go`, and `seeds/permissions_test.go`. |
+| Relevant tests green | PASS | Focused uncached test and full suite passed. |
+| Assertion quality | PASS | Changed tests assert behavior and side effects (tenant scoping, public company ID mapping, 422 validation, seed row counts); no tautologies, ghost loops, type-only assertions, smoke-only tests, or CSS/implementation-detail assertions found. |
 
-- `go test ./internal/modules/roles` — failed during the test-first RED step before implementation, as expected.
-- `go test ./internal/modules/roles ./seeds` — PASS.
-- `go test ./...` — PASS.
+## Review Workload / PR Boundary Findings
+
+Status: **PASS with delivery warning**.
+
+`tasks.md` forecasted 550-650 changed lines, high 400-line review-budget risk, `auto-chain`, and `feature-branch-chain`. The implementation was delivered as reviewable work-unit commits on one local branch:
+
+1. `c8c8e86 feat(roles): add tenant-scoped role foundation`
+2. `ad677ce feat(roles): wire tenant context through service and handlers`
+3. `079b49c feat(roles): update seeds and tenant role tests`
+4. `48166a0 fix(roles): align tenant role verification contracts`
+
+`apply-progress.md` records a local-branch `size:exception` and recommends presenting reviewer-facing delivery as chained/reviewable slices. No product scope creep beyond the assigned tenant-role change was found, but `.pi/settings.json`, `.atl/*`, and `.gitignore` runtime/config cleanup are present in the local history and should remain separate from product review when possible.
+
+## Test / Validation Commands
+
+- `git status --short && git rev-parse --short HEAD` — PASS; no status output before this report update, `48166a0`.
+- `git diff --check` — PASS.
+- `go test ./internal/modules/roles ./seeds` — PASS (cached).
+- `go test ./...` — PASS (cached).
 - `go build ./...` — PASS.
+- `git status --short && go test -count=1 ./internal/modules/roles ./seeds` — PASS; no status output before this report update, focused tests uncached.
 
-## Remaining Notes
+## Blockers
 
-- The `size:exception` is limited to the current local branch shape. Reviewer-facing delivery should still present the product commits as chained/reviewable slices and keep the Pi runtime config commit separate from the tenant-role product change.
-- Pi-lens created local `.pi-lens/` runtime cache files during analysis; they are not part of this change and were not modified intentionally.
+None.
+
+## Residual Risks / Notes
+
+- Earlier strict-TDD RED evidence for the first three implementation slices is reconstructed, not raw terminal output. This is acceptable for this re-verification because the blocker-fix cycle has live evidence and current tests remain green, but future phases should preserve exact RED/GREEN logs as work is performed.
+- Reviewer-facing delivery should honor the forecasted chain/commit boundaries and keep Pi/runtime config changes out of the tenant-role product diff if possible.
