@@ -2,9 +2,9 @@
 
 ## Review status
 
-Status: ready for maintainer review before deciding whether to keep the current diff.
+Status: approved and committed as `82666f1 refactor(api): normalize handler responses`.
 
-This packet was reconstructed because implementation happened before the intended artifact/task checkpoint. Review this alongside the working-tree diff.
+This packet was reconstructed because implementation happened before the intended artifact/task checkpoint. The maintainer reviewed the code, accepted the work unit, and authorized commit.
 
 ## What changed in the working tree
 
@@ -44,9 +44,9 @@ Fresh review result:
 
 ## Maintainer review checklist
 
-- [ ] Confirm additive `meta.filters` on roles/permissions list responses is acceptable.
-- [ ] Confirm `query.ListParams` in services is acceptable even though only pagination is currently applied to repository queries.
-- [ ] Confirm `PaginatedWithFilters` should receive `query.ListParams` directly.
-- [ ] Confirm `response.RespondIfInvalid` is the standard validation pattern for handlers.
-- [ ] Confirm permissions handler tests are enough for this change.
-- [ ] Confirm `.atl/*` files stay out of the commit.
+- [x] Confirm additive `meta.filters` on roles/permissions list responses is acceptable.
+- [x] Confirm `query.ListParams` in services is acceptable even though only pagination is currently applied to repository queries.
+- [x] Confirm `PaginatedWithFilters` should receive `query.ListParams` directly.
+- [x] Confirm `response.RespondIfInvalid` is the standard validation pattern for handlers.
+- [x] Confirm permissions handler tests are enough for this change.
+- [x] Confirm `.atl/*` files stay out of the commit.
