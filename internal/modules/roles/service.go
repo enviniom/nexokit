@@ -12,6 +12,7 @@ import (
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 	"github.com/enviniom/nexokit/internal/platform/query"
+	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
@@ -26,6 +27,7 @@ type Service interface {
 	Delete(tc tenant.TenantContext, publicID string) error
 	GetPermissionCatalog(tc tenant.TenantContext, publicID string) ([]RolePermissionGroupResponse, error)
 	AssignPermissions(tc tenant.TenantContext, publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error)
+	ListSelect(tc tenant.TenantContext) ([]response.SelectResponse, error)
 }
 
 type permissionCatalogRepository interface {
@@ -454,4 +456,28 @@ func (s *roleService) invalidateRoleMemberCaches(roleID uint) error {
 		}
 	}
 	return nil
+}
+
+// ListSelect returns all assignable roles mapped to flat SelectResponse DTOs.
+func (s *roleService) ListSelect(tc tenant.TenantContext) ([]response.SelectResponse, error) {
+	roles, err := s.repo.ListSelect(tc)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]response.SelectResponse, len(roles))
+	for i, r := range roles {
+		meta := make(map[string]any)
+		meta["slug"] = r.Slug
+		if r.CompanyID != nil {
+			meta["company_id"] = r.Company.PublicID
+		}
+		result[i] = response.SelectResponse{
+			ID:   r.PublicID,
+			Name: r.Name,
+			Meta: meta,
+		}
+	}
+
+	return result, nil
 }

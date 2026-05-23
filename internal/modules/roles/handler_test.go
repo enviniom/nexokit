@@ -98,6 +98,21 @@ func (f *fakeService) AssignPermissions(tc tenant.TenantContext, publicID string
 	return f.assigned, nil
 }
 
+func (f *fakeService) ListSelect(tc tenant.TenantContext) ([]response.SelectResponse, error) {
+	f.lastTC = tc
+	if f.err != nil {
+		return nil, f.err
+	}
+	var selectRes []response.SelectResponse
+	for _, r := range f.roles {
+		selectRes = append(selectRes, response.SelectResponse{
+			ID:   r.PublicID,
+			Name: r.Name,
+		})
+	}
+	return selectRes, nil
+}
+
 func setupHandler(svc Service) (*gin.Engine, *Handler) {
 	gin.SetMode(gin.TestMode)
 	h := NewHandler(svc)
@@ -583,6 +598,55 @@ func TestHandler_AssignPermissions(t *testing.T) {
 
 		if w.Code != http.StatusForbidden {
 			t.Fatalf("expected status 403, got %d", w.Code)
+		}
+	})
+}
+
+func TestHandler_ListSelect(t *testing.T) {
+	t.Run("returns select options successfully", func(t *testing.T) {
+		svc := &fakeService{
+			roles: []RoleResponse{
+				{PublicID: "role1", Name: "admin", Slug: "admin"},
+				{PublicID: "role2", Name: "user", Slug: "user"},
+			},
+		}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/roles/select", nil)
+		h.ListSelect(c)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", w.Code)
+		}
+
+		var resp response.APIResponse[[]response.SelectResponse]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if !resp.Success {
+			t.Error("expected success response")
+		}
+		if len(resp.Data) != 2 {
+			t.Errorf("expected 2 select options, got %d", len(resp.Data))
+		}
+		if resp.Data[0].ID != "role1" || resp.Data[0].Name != "admin" {
+			t.Errorf("expected first option to be admin, got %+v", resp.Data[0])
+		}
+	})
+
+	t.Run("returns error on service failure", func(t *testing.T) {
+		svc := &fakeService{err: errors.New("boom")}
+		_, h := setupHandler(svc)
+
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/roles/select", nil)
+		h.ListSelect(c)
+
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("expected status 500, got %d", w.Code)
 		}
 	})
 }

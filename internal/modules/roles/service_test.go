@@ -56,6 +56,19 @@ func (f *fakeRepository) List(tc tenant.TenantContext, page, perPage int) ([]Rol
 	return items, nil
 }
 
+func (f *fakeRepository) ListSelect(tc tenant.TenantContext) ([]Role, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	var selectRes []Role
+	for _, r := range f.roles {
+		if roleMatchesTenantScope(r, tc) && r.Slug != RootRoleSlug {
+			selectRes = append(selectRes, r)
+		}
+	}
+	return selectRes, nil
+}
+
 func (f *fakeRepository) Count(tc tenant.TenantContext) (int64, error) {
 	if f.err != nil {
 		return 0, f.err
@@ -919,4 +932,48 @@ func stringSlicesEqual(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func TestService_ListSelect(t *testing.T) {
+	companyA := uint(10)
+	companyB := uint(20)
+
+	repo := &fakeRepository{roles: []Role{
+		{BaseModel: shared.BaseModel{PublicID: "global-root"}, Name: "root", Slug: "root", IsSystem: true},
+		{BaseModel: shared.BaseModel{PublicID: "a-role"}, Name: "manager-a", Slug: "manager", CompanyID: &companyA, Company: &companies.Company{BaseModel: shared.BaseModel{PublicID: "comp-a"}}},
+		{BaseModel: shared.BaseModel{PublicID: "b-role"}, Name: "manager-b", Slug: "manager", CompanyID: &companyB, Company: &companies.Company{BaseModel: shared.BaseModel{PublicID: "comp-b"}}},
+		{BaseModel: shared.BaseModel{PublicID: "global-admin"}, Name: "admin", Slug: "admin", IsSystem: true},
+	}}
+	svc := NewService(repo)
+
+	t.Run("excludes root slug and filters by tenant scope", func(t *testing.T) {
+		res, err := svc.ListSelect(tenant.NewScoped(companyA, "company-a"))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(res) != 1 {
+			t.Fatalf("expected exactly 1 role, got %d: %+v", len(res), res)
+		}
+		if res[0].ID != "a-role" {
+			t.Errorf("expected public_id 'a-role', got %s", res[0].ID)
+		}
+		if res[0].Meta["company_id"] != "comp-a" {
+			t.Errorf("expected company_id 'comp-a' in meta, got %v", res[0].Meta["company_id"])
+		}
+	})
+
+	t.Run("excludes root slug but returns other roles in root scope", func(t *testing.T) {
+		res, err := svc.ListSelect(tenant.NewRoot())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(res) != 3 {
+			t.Fatalf("expected 3 roles in root scope, got %d: %+v", len(res), res)
+		}
+		for _, r := range res {
+			if r.Meta["slug"] == "root" {
+				t.Fatalf("expected root slug to be excluded from select listing")
+			}
+		}
+	})
 }

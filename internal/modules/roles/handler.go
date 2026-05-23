@@ -142,6 +142,16 @@ func containsPermission(items []string, slug string) bool {
 	return false
 }
 
+// ListSelect returns all assignable roles.
+func (h *Handler) ListSelect(c *gin.Context) {
+	roles, err := h.service.ListSelect(h.tenantContext(c))
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.Success(c, messages.MsgSuccess, roles)
+}
+
 func (h *Handler) tenantContext(c *gin.Context) tenant.TenantContext {
 	if tc, ok := tenant.FromGin(c); ok {
 		return tc
