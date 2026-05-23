@@ -18,6 +18,7 @@ type Repository interface {
 	ExistsByName(tc tenant.TenantContext, name string) (bool, error)
 	ExistsBySlug(tc tenant.TenantContext, slug string) (bool, error)
 	ReplacePermissions(roleID uint, permissionIDs []uint) error
+	ListSelect(tc tenant.TenantContext) ([]Role, error)
 }
 
 // GormRepository is the GORM implementation of Repository.
@@ -139,4 +140,32 @@ func (r *GormRepository) ReplacePermissions(roleID uint, permissionIDs []uint) e
 		}
 		return nil
 	})
+}
+
+// FindAssignableByPublicID looks up an assignable role within a tenant context.
+func (r *GormRepository) FindAssignableByPublicID(tc tenant.TenantContext, publicID string) (*AssignmentRoleSummary, error) {
+	var role Role
+	db := tenant.ApplyTenantScope(r.db, tc)
+	if err := db.Where("public_id = ?", publicID).First(&role).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, gorm.ErrRecordNotFound
+		}
+		return nil, err
+	}
+	return &AssignmentRoleSummary{
+		InternalID: role.ID,
+		PublicID:   role.PublicID,
+		Slug:       role.Slug,
+		CompanyID:  role.CompanyID,
+	}, nil
+}
+
+// ListSelect returns all assignable roles in a tenant context, excluding root role.
+func (r *GormRepository) ListSelect(tc tenant.TenantContext) ([]Role, error) {
+	var roles []Role
+	db := tenant.ApplyTenantScope(r.db, tc)
+	if err := db.Preload("Company").Where("slug <> ?", RootRoleSlug).Order("name ASC").Find(&roles).Error; err != nil {
+		return nil, err
+	}
+	return roles, nil
 }
