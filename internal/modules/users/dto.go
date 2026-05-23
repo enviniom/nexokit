@@ -48,7 +48,6 @@ func (r CreateUserRequest) Validate() response.ValidationErrors {
 type UpdateUserRequest struct {
 	Name      string `json:"name"`
 	Email     string `json:"email"`
-	RoleID    uint   `json:"role_id"`
 	CompanyID *uint  `json:"company_id,omitempty"`
 }
 
@@ -57,9 +56,18 @@ func (r UpdateUserRequest) Validate() response.ValidationErrors {
 	errs := make(response.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	validator.Field(errs, "email", r.Email).Required().Apply(validator.ValidEmail())
-	if r.RoleID == 0 {
-		errs.Add("role_id", messages.MsgRequired)
-	}
+	return errs
+}
+
+// ChangeUserRoleRequest is the DTO for changing a user's role.
+type ChangeUserRoleRequest struct {
+	RoleID string `json:"role_id"`
+}
+
+// Validate performs field-level validation for ChangeUserRoleRequest.
+func (r ChangeUserRoleRequest) Validate() response.ValidationErrors {
+	errs := make(response.ValidationErrors)
+	validator.Field(errs, "role_id", r.RoleID).Required()
 	return errs
 }
 

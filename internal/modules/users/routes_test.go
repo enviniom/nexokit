@@ -75,6 +75,9 @@ func (routeFakeService) ChangePassword(tc tenant.TenantContext, publicID string,
 func (routeFakeService) ToggleStatus(tc tenant.TenantContext, publicID string, req UpdateStatusRequest) (*UserResponse, error) {
 	return nil, nil
 }
+func (routeFakeService) ChangeRole(tc tenant.TenantContext, targetPublicID string, actorPublicID string, req ChangeUserRoleRequest) (*UserResponse, error) {
+	return nil, nil
+}
 
 func TestRegisterAppliesUserPermissionGuards(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -88,7 +91,8 @@ func TestRegisterAppliesUserPermissionGuards(t *testing.T) {
 		{name: "list users", method: http.MethodGet, path: "/users", expected: []string{"users.index"}},
 		{name: "create user", method: http.MethodPost, path: "/users", expected: []string{"users.create"}},
 		{name: "view user", method: http.MethodGet, path: "/users/user1", expected: []string{"users.view"}},
-		{name: "update user", method: http.MethodPut, path: "/users/user1", expected: []string{"users.update", "users.change_role"}},
+		{name: "update user", method: http.MethodPut, path: "/users/user1", expected: []string{"users.update"}},
+		{name: "change role", method: http.MethodPatch, path: "/users/user1/role", expected: []string{"users.change_role"}},
 		{name: "delete user", method: http.MethodDelete, path: "/users/user1", expected: []string{"users.delete"}},
 		{name: "change password", method: http.MethodPatch, path: "/users/user1/password", expected: []string{"users.update"}},
 		{name: "toggle status", method: http.MethodPatch, path: "/users/user1/status", expected: []string{"users.update"}},

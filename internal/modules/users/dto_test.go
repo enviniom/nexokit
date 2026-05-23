@@ -119,39 +119,32 @@ func TestUpdateUserRequest_Validate(t *testing.T) {
 	}{
 		{
 			name: "valid request with company",
-			req:  UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 2, CompanyID: uintPtr(1)},
+			req:  UpdateUserRequest{Name: "Alice", Email: "alice@example.com", CompanyID: uintPtr(1)},
 		},
 		{
 			name: "any role can structurally omit company",
-			req:  UpdateUserRequest{Name: "Root", Email: "root@example.com", RoleID: RootRoleID},
+			req:  UpdateUserRequest{Name: "Root", Email: "root@example.com"},
 		},
 		{
 			name:    "missing name",
-			req:     UpdateUserRequest{Email: "alice@example.com", RoleID: 2},
+			req:     UpdateUserRequest{Email: "alice@example.com"},
 			wantErr: true,
 			field:   "name",
 			msg:     messages.MsgRequired,
 		},
 		{
 			name:    "missing email",
-			req:     UpdateUserRequest{Name: "Alice", RoleID: 2},
+			req:     UpdateUserRequest{Name: "Alice"},
 			wantErr: true,
 			field:   "email",
 			msg:     messages.MsgRequired,
 		},
 		{
 			name:    "invalid email",
-			req:     UpdateUserRequest{Name: "Alice", Email: "bad", RoleID: 2},
+			req:     UpdateUserRequest{Name: "Alice", Email: "bad"},
 			wantErr: true,
 			field:   "email",
 			msg:     messages.MsgValidEmail,
-		},
-		{
-			name:    "missing role_id",
-			req:     UpdateUserRequest{Name: "Alice", Email: "alice@example.com"},
-			wantErr: true,
-			field:   "role_id",
-			msg:     messages.MsgRequired,
 		},
 	}
 
