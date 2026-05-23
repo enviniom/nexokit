@@ -34,6 +34,14 @@ func TestSeedPermissions(t *testing.T) {
 			t.Fatalf("unexpected permission fields: %+v", permission)
 		}
 
+		var selectPermission permissions.Permission
+		if err := database.Where("slug = ?", "roles.select").First(&selectPermission).Error; err != nil {
+			t.Fatalf("expected roles.select permission: %v", err)
+		}
+		if selectPermission.Module != "roles" || selectPermission.Action != permissions.ActionSelect || !selectPermission.IsSystem || selectPermission.DisplayOrder != 70 {
+			t.Fatalf("unexpected permission fields: %+v", selectPermission)
+		}
+
 		var readCount int64
 		if err := database.Model(&permissions.Permission{}).Where("action = ? OR slug LIKE ?", "read", "%.read").Count(&readCount).Error; err != nil {
 			t.Fatalf("failed to count read permissions: %v", err)

@@ -12,6 +12,7 @@ const (
 	ActionManage            = "manage"
 	ActionChangeRole        = "change_role"
 	ActionAssignPermissions = "assign_permissions"
+	ActionSelect            = "select"
 )
 
 // Permission represents an RBAC permission with UI-friendly metadata.

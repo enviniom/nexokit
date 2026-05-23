@@ -66,6 +66,7 @@ func systemPermissions() []permissions.Permission {
 		permission("roles", permissions.ActionUpdate, "Update roles", "Allows updating roles", 40),
 		permission("roles", permissions.ActionDelete, "Delete roles", "Allows deleting roles", 50),
 		permission("roles", permissions.ActionAssignPermissions, "Assign role permissions", "Allows assigning permissions to roles", 60),
+		permission("roles", permissions.ActionSelect, "Select roles", "Allows listing roles for dropdowns", 70),
 
 		permission("companies", permissions.ActionIndex, "List companies", "Allows listing companies", 10),
 		permission("companies", permissions.ActionView, "View companies", "Allows viewing company details", 20),
