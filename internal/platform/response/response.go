@@ -10,6 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// SelectResponse is the standard DTO for uniform select options.
+type SelectResponse struct {
+	ID   string         `json:"id"`
+	Name string         `json:"name"`
+	Meta map[string]any `json:"meta,omitempty"`
+}
+
 // APIResponse is the standard envelope for all API responses.
 type APIResponse[T any] struct {
 	Success bool   `json:"success"`
