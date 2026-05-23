@@ -4,15 +4,15 @@ import "github.com/enviniom/nexokit/internal/shared"
 
 const (
 	ActionIndex             = "index"
-	ActionView              = "view"
 	ActionList              = "list"
+	ActionSelect            = "select"
+	ActionView              = "view"
 	ActionCreate            = "create"
 	ActionUpdate            = "update"
 	ActionDelete            = "delete"
 	ActionManage            = "manage"
 	ActionChangeRole        = "change_role"
 	ActionAssignPermissions = "assign_permissions"
-	ActionSelect            = "select"
 )
 
 // Permission represents an RBAC permission with UI-friendly metadata.
