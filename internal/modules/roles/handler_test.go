@@ -491,7 +491,7 @@ func TestHandler_Delete(t *testing.T) {
 
 func TestHandler_GetPermissionCatalog(t *testing.T) {
 	t.Run("returns grouped catalog with granted flags", func(t *testing.T) {
-		svc := &fakeService{catalog: []RolePermissionGroupResponse{{Module: "users", Permissions: []RolePermissionResponse{{Slug: "users.index", Granted: true}, {Slug: "users.view", Granted: false}}}}}
+		svc := &fakeService{catalog: []RolePermissionGroupResponse{{Module: "users", Permissions: []RolePermissionResponse{{Slug: "users.list", Granted: true}, {Slug: "users.view", Granted: false}}}}}
 		_, h := setupHandler(svc)
 
 		w := httptest.NewRecorder()
@@ -531,13 +531,13 @@ func TestHandler_GetPermissionCatalog(t *testing.T) {
 
 func TestHandler_AssignPermissions(t *testing.T) {
 	t.Run("returns updated grouped catalog", func(t *testing.T) {
-		svc := &fakeService{assigned: &RolePermissionAssignmentResponse{RoleID: "role1", Permissions: []string{"users.index"}, Catalog: []RolePermissionGroupResponse{{Module: "users", Permissions: []RolePermissionResponse{{Slug: "users.index", Granted: true}}}}}}
+		svc := &fakeService{assigned: &RolePermissionAssignmentResponse{RoleID: "role1", Permissions: []string{"users.list"}, Catalog: []RolePermissionGroupResponse{{Module: "users", Permissions: []RolePermissionResponse{{Slug: "users.list", Granted: true}}}}}}
 		_, h := setupHandler(svc)
 
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "role1"}}
-		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"users.index"}})
+		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"users.list"}})
 		authctx.SetGin(c, &authctx.User{PublicID: "actor", Role: "admin", RoleSlug: "admin", Permissions: []string{"roles.assign_permissions"}})
 		h.AssignPermissions(c)
 
@@ -548,7 +548,7 @@ func TestHandler_AssignPermissions(t *testing.T) {
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if len(resp.Data.Permissions) != 1 || resp.Data.Permissions[0] != "users.index" {
+		if len(resp.Data.Permissions) != 1 || resp.Data.Permissions[0] != "users.list" {
 			t.Fatalf("expected exact permissions response, got %+v", resp.Data.Permissions)
 		}
 	})
@@ -576,7 +576,7 @@ func TestHandler_AssignPermissions(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "role1"}}
-		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"users.index"}})
+		c.Request = jsonRequest(http.MethodPut, "/roles/role1/permissions", AssignRolePermissionsRequest{Permissions: []string{"users.list"}})
 		authctx.SetGin(c, &authctx.User{PublicID: "actor", Role: "user", RoleSlug: "user", Permissions: []string{"users.view"}})
 		h.AssignPermissions(c)
 

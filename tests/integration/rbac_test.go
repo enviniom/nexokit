@@ -23,7 +23,7 @@ func TestRBACIntegration(t *testing.T) {
 		expected   int
 		assertNext bool
 	}{
-		{name: "user with permission accesses resource", user: &authctx.User{PublicID: "u1", Permissions: []string{"users.index"}, IsActive: true}, expected: http.StatusOK},
+		{name: "user with permission accesses resource", user: &authctx.User{PublicID: "u1", Permissions: []string{"users.list"}, IsActive: true}, expected: http.StatusOK},
 		{name: "user without permission gets 403", user: &authctx.User{PublicID: "u2", Permissions: []string{"users.view"}, IsActive: true}, expected: http.StatusForbidden},
 		{name: "unauthenticated gets 401", user: nil, expected: http.StatusUnauthorized},
 		{name: "root has all permissions", user: &authctx.User{PublicID: "root", IsRoot: true, Permissions: []string{"*"}, IsActive: true}, expected: http.StatusOK},
@@ -38,7 +38,7 @@ func TestRBACIntegration(t *testing.T) {
 				}
 				c.Next()
 			})
-			r.GET("/protected", middleware.RequirePermission("users.index"), func(c *gin.Context) { c.Status(http.StatusOK) })
+			r.GET("/protected", middleware.RequirePermission("users.list"), func(c *gin.Context) { c.Status(http.StatusOK) })
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/protected", nil)
 			r.ServeHTTP(w, req)

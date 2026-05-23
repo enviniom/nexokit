@@ -3,7 +3,6 @@ package permissions
 import "github.com/enviniom/nexokit/internal/shared"
 
 const (
-	ActionIndex             = "index"
 	ActionList              = "list"
 	ActionSelect            = "select"
 	ActionView              = "view"

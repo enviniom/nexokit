@@ -88,7 +88,7 @@ func TestRegisterAppliesUserPermissionGuards(t *testing.T) {
 		path     string
 		expected []string
 	}{
-		{name: "list users", method: http.MethodGet, path: "/users", expected: []string{"users.index"}},
+		{name: "list users", method: http.MethodGet, path: "/users", expected: []string{"users.list"}},
 		{name: "create user", method: http.MethodPost, path: "/users", expected: []string{"users.create"}},
 		{name: "view user", method: http.MethodGet, path: "/users/user1", expected: []string{"users.view"}},
 		{name: "update user", method: http.MethodPut, path: "/users/user1", expected: []string{"users.update"}},

@@ -17,7 +17,7 @@ func TestRegisterAppliesRolePermissionGuards(t *testing.T) {
 		path     string
 		expected string
 	}{
-		{name: "list roles", method: http.MethodGet, path: "/roles", expected: "roles.index"},
+		{name: "list roles", method: http.MethodGet, path: "/roles", expected: "roles.list"},
 		{name: "view role", method: http.MethodGet, path: "/roles/role1", expected: "roles.view"},
 		{name: "create role", method: http.MethodPost, path: "/roles", expected: "roles.create"},
 		{name: "update role", method: http.MethodPut, path: "/roles/role1", expected: "roles.update"},

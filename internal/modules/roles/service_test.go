@@ -669,10 +669,10 @@ func TestService_Delete(t *testing.T) {
 
 func TestService_GetPermissionCatalog(t *testing.T) {
 	t.Run("returns grouped catalog with granted flags", func(t *testing.T) {
-		repo := &fakeRepository{roles: []Role{{BaseModel: shared.BaseModel{ID: 7, PublicID: "role-admin"}, Name: "admin", Permissions: []permissions.Permission{{Slug: "users.index"}}}}}
+		repo := &fakeRepository{roles: []Role{{BaseModel: shared.BaseModel{ID: 7, PublicID: "role-admin"}, Name: "admin", Permissions: []permissions.Permission{{Slug: "users.list"}}}}}
 		catalog := fakePermissionCatalogRepository{permissions: []permissions.Permission{
-			{BaseModel: shared.BaseModel{PublicID: "p1"}, Module: "roles", Slug: "roles.index", Action: permissions.ActionIndex, DisplayOrder: 10},
-			{BaseModel: shared.BaseModel{PublicID: "p2"}, Module: "users", Slug: "users.index", Action: permissions.ActionIndex, DisplayOrder: 10},
+			{BaseModel: shared.BaseModel{PublicID: "p1"}, Module: "roles", Slug: "roles.list", Action: permissions.ActionList, DisplayOrder: 10},
+			{BaseModel: shared.BaseModel{PublicID: "p2"}, Module: "users", Slug: "users.list", Action: permissions.ActionList, DisplayOrder: 10},
 			{BaseModel: shared.BaseModel{PublicID: "p3"}, Module: "users", Slug: "users.view", Action: permissions.ActionView, DisplayOrder: 20},
 		}}
 		svc := NewService(repo, WithPermissionCatalog(catalog))
@@ -685,7 +685,7 @@ func TestService_GetPermissionCatalog(t *testing.T) {
 			t.Fatalf("expected roles and users groups, got %+v", groups)
 		}
 		if !groups[1].Permissions[0].Granted || groups[1].Permissions[1].Granted {
-			t.Fatalf("expected granted flag only for users.index, got %+v", groups[1].Permissions)
+			t.Fatalf("expected granted flag only for users.list, got %+v", groups[1].Permissions)
 		}
 	})
 
@@ -711,9 +711,9 @@ func TestService_AssignPermissions(t *testing.T) {
 	}{
 		{
 			name:       "replaces role permissions exactly and invalidates member cache",
-			role:       Role{BaseModel: shared.BaseModel{ID: 7, PublicID: "role-admin"}, Name: "admin", Permissions: []permissions.Permission{{BaseModel: shared.BaseModel{ID: 1}, Slug: "users.index"}}},
-			catalog:    []permissions.Permission{{BaseModel: shared.BaseModel{ID: 2}, Slug: "users.view", Module: "users"}, {BaseModel: shared.BaseModel{ID: 3}, Slug: "roles.index", Module: "roles"}},
-			req:        AssignRolePermissionsRequest{Permissions: []string{"users.view", "roles.index"}},
+			role:       Role{BaseModel: shared.BaseModel{ID: 7, PublicID: "role-admin"}, Name: "admin", Permissions: []permissions.Permission{{BaseModel: shared.BaseModel{ID: 1}, Slug: "users.list"}}},
+			catalog:    []permissions.Permission{{BaseModel: shared.BaseModel{ID: 2}, Slug: "users.view", Module: "users"}, {BaseModel: shared.BaseModel{ID: 3}, Slug: "roles.list", Module: "roles"}},
+			req:        AssignRolePermissionsRequest{Permissions: []string{"users.view", "roles.list"}},
 			actorPerms: []string{"roles.assign_permissions"},
 			wantIDs:    []uint{2, 3},
 			wantDelete: []string{"rbac:permissions:user-one", "rbac:permissions:user-two"},
@@ -736,8 +736,8 @@ func TestService_AssignPermissions(t *testing.T) {
 		},
 		{
 			name:       "protects system role system permissions",
-			role:       Role{BaseModel: shared.BaseModel{ID: 7, PublicID: "role-root"}, Name: "root", IsSystem: true, Permissions: []permissions.Permission{{BaseModel: shared.BaseModel{ID: 1}, Slug: "users.index", IsSystem: true}}},
-			catalog:    []permissions.Permission{{BaseModel: shared.BaseModel{ID: 1}, Slug: "users.index", Module: "users", IsSystem: true}, {BaseModel: shared.BaseModel{ID: 2}, Slug: "users.view", Module: "users"}},
+			role:       Role{BaseModel: shared.BaseModel{ID: 7, PublicID: "role-root"}, Name: "root", IsSystem: true, Permissions: []permissions.Permission{{BaseModel: shared.BaseModel{ID: 1}, Slug: "users.list", IsSystem: true}}},
+			catalog:    []permissions.Permission{{BaseModel: shared.BaseModel{ID: 1}, Slug: "users.list", Module: "users", IsSystem: true}, {BaseModel: shared.BaseModel{ID: 2}, Slug: "users.view", Module: "users"}},
 			req:        AssignRolePermissionsRequest{Permissions: []string{"users.view"}},
 			actorPerms: []string{"roles.assign_permissions"},
 			wantErr:    apperror.ErrForbidden,

@@ -62,6 +62,10 @@ func (f *fakePermissionService) Resolve(publicID string) ([]string, error) {
 	return nil, f.err
 }
 
+func (f *fakePermissionService) SyncPermissions(slugs []string) error {
+	return f.err
+}
+
 func setupPermissionHandler(svc Service) *Handler {
 	gin.SetMode(gin.TestMode)
 	return NewHandler(svc)
@@ -81,7 +85,7 @@ func TestPermissionHandler_ListPaginated(t *testing.T) {
 	t.Run("returns paginated permissions with filters metadata", func(t *testing.T) {
 		svc := &fakePermissionService{
 			permissions: []PermissionResponse{
-				{PublicID: "p1", Slug: "users.index", Module: "users", Action: ActionIndex},
+				{PublicID: "p1", Slug: "users.list", Module: "users", Action: ActionList},
 				{PublicID: "p2", Slug: "users.create", Module: "users", Action: ActionCreate},
 			},
 			total: 2,
@@ -137,7 +141,7 @@ func TestPermissionHandler_ListPaginated(t *testing.T) {
 func TestPermissionHandler_GetByPublicID(t *testing.T) {
 	t.Run("returns permission when found", func(t *testing.T) {
 		svc := &fakePermissionService{
-			single: &PermissionResponse{PublicID: "p1", Slug: "users.index", Module: "users", Action: ActionIndex},
+			single: &PermissionResponse{PublicID: "p1", Slug: "users.list", Module: "users", Action: ActionList},
 		}
 		h := setupPermissionHandler(svc)
 
@@ -199,7 +203,7 @@ func TestPermissionHandler_Create(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request = jsonPermissionRequest(http.MethodPost, "/permissions", CreatePermissionRequest{
-			Slug: "users.index", Name: "Index users", Module: "users", Action: ActionIndex,
+			Slug: "users.list", Name: "List users", Module: "users", Action: ActionList,
 		})
 		h.Create(c)
 
@@ -215,7 +219,7 @@ func TestPermissionHandler_Create(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request = jsonPermissionRequest(http.MethodPost, "/permissions", CreatePermissionRequest{
-			Slug: "users.index", Name: "Index users", Module: "users", Action: ActionIndex,
+			Slug: "users.list", Name: "List users", Module: "users", Action: ActionList,
 		})
 		h.Create(c)
 

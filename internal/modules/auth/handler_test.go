@@ -133,7 +133,7 @@ func TestHandler_RefreshLogoutAndMe(t *testing.T) {
 		h := NewHandler(fakeAuthService{})
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		authctx.SetGin(c, &authctx.User{PublicID: "user1", Email: "user@example.com", Name: "Alice", Role: "admin", RoleSlug: "admin", RoleID: 3, IsActive: true, Permissions: []string{"users.index", "auth.view"}})
+		authctx.SetGin(c, &authctx.User{PublicID: "user1", Email: "user@example.com", Name: "Alice", Role: "admin", RoleSlug: "admin", RoleID: 3, IsActive: true, Permissions: []string{"users.list", "auth.view"}})
 
 		h.Me(c)
 
