@@ -5,6 +5,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/messages"
+	"github.com/enviniom/nexokit/internal/platform/permissions"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
 )
@@ -52,6 +53,8 @@ func AttachPermissions(resolver PermissionResolver) gin.HandlerFunc {
 
 // RequirePermission allows requests whose authenticated user has the required permission.
 func RequirePermission(slug string) gin.HandlerFunc {
+	permissions.Register(slug)
+
 	return func(c *gin.Context) {
 		user, ok := authctx.FromGin(c)
 		if !ok || user == nil {

@@ -104,6 +104,10 @@ func Bootstrap(ctx context.Context) (*App, error) {
 
 	router := server.NewRouter(cfg, log, ginWriter, healthDeps, container.RegisterModules)
 
+	if err := container.SyncPermissions(); err != nil {
+		return nil, fmt.Errorf("failed to sync permissions: %w", err)
+	}
+
 	srv := server.New(cfg, router)
 
 	app := &App{

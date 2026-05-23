@@ -12,6 +12,7 @@ import (
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
+	platformPerms "github.com/enviniom/nexokit/internal/platform/permissions"
 	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
@@ -26,6 +27,7 @@ type Service interface {
 	Update(publicID string, req UpdatePermissionRequest) (*PermissionResponse, error)
 	Delete(publicID string) error
 	Resolve(publicID string) ([]string, error)
+	SyncPermissions(slugs []string) error
 }
 
 // permissionService is the concrete implementation of Service.
@@ -132,27 +134,8 @@ func (s *permissionService) Update(publicID string, req UpdatePermissionRequest)
 		}
 		return nil, err
 	}
-	if permission.IsSystem {
-		return nil, apperror.ErrForbidden
-	}
-	if err := validatePermissionParts(req.Module, req.Action, req.Slug); err != nil {
-		return nil, err
-	}
-	if permission.Slug != req.Slug {
-		existing, err := s.repo.GetBySlug(req.Slug)
-		if err == nil {
-			if existing.PublicID != publicID {
-				return nil, apperror.ErrConflict
-			}
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-	}
 
-	permission.Slug = req.Slug
 	permission.Name = req.Name
-	permission.Module = req.Module
-	permission.Action = req.Action
 	permission.Description = req.Description
 	permission.DisplayOrder = req.DisplayOrder
 
@@ -273,4 +256,42 @@ func toResponse(p *Permission) *PermissionResponse {
 		CreatedBy:    p.CreatedBy,
 		UpdatedBy:    p.UpdatedBy,
 	}
+}
+
+// SyncPermissions dynamically syncs registered permission slugs to the database.
+func (s *permissionService) SyncPermissions(slugs []string) error {
+	for _, slug := range slugs {
+		parts := strings.SplitN(slug, ".", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		module := parts[0]
+		action := parts[1]
+
+		_, err := s.repo.GetBySlug(slug)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				publicID, err := identity.Generate()
+				if err != nil {
+					return err
+				}
+				newPerm := &Permission{
+					BaseModel:    shared.BaseModel{PublicID: publicID},
+					Slug:         slug,
+					Name:         platformPerms.HumanizeName(module, action),
+					Module:       module,
+					Action:       action,
+					Description:  platformPerms.HumanizeDescription(module, action),
+					IsSystem:     true,
+					DisplayOrder: platformPerms.DefaultDisplayOrder(action),
+				}
+				if err := s.repo.Create(newPerm); err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		}
+	}
+	return nil
 }

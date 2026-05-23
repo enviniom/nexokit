@@ -51,10 +51,7 @@ func (r CreatePermissionRequest) Validate() response.ValidationErrors {
 
 // UpdatePermissionRequest is the DTO for updating a non-system permission.
 type UpdatePermissionRequest struct {
-	Slug         string `json:"slug"`
 	Name         string `json:"name"`
-	Module       string `json:"module"`
-	Action       string `json:"action"`
 	Description  string `json:"description"`
 	DisplayOrder int    `json:"display_order"`
 }
@@ -62,9 +59,6 @@ type UpdatePermissionRequest struct {
 // Validate performs field-level validation for UpdatePermissionRequest.
 func (r UpdatePermissionRequest) Validate() response.ValidationErrors {
 	errs := make(response.ValidationErrors)
-	validator.Field(errs, "slug", r.Slug).Required()
 	validator.Field(errs, "name", r.Name).Required()
-	validator.Field(errs, "module", r.Module).Required()
-	validator.Field(errs, "action", r.Action).Required()
 	return errs
 }

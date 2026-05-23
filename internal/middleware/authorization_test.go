@@ -32,7 +32,7 @@ func TestAttachPermissions(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("loads permissions on cache miss and stores them in auth context", func(t *testing.T) {
-		resolver := &fakePermissionResolver{permissions: []string{"users.index", "roles.view"}}
+		resolver := &fakePermissionResolver{permissions: []string{"users.list", "roles.view"}}
 		r := gin.New()
 		r.Use(func(c *gin.Context) {
 			authctx.SetGin(c, &authctx.User{PublicID: "user1", Role: "admin", RoleSlug: "admin", IsActive: true})
@@ -63,7 +63,7 @@ func TestAttachPermissions(t *testing.T) {
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
-		if len(resp.Data.Permissions) != 2 || resp.Data.Permissions[0] != "users.index" || resp.Data.Permissions[1] != "roles.view" {
+		if len(resp.Data.Permissions) != 2 || resp.Data.Permissions[0] != "users.list" || resp.Data.Permissions[1] != "roles.view" {
 			t.Fatalf("unexpected permissions: %#v", resp.Data.Permissions)
 		}
 	})

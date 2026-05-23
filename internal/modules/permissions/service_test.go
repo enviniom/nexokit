@@ -204,8 +204,8 @@ func TestValidatePermissionParts(t *testing.T) {
 func TestService_ListGroupedSortsByModuleAndDisplayOrder(t *testing.T) {
 	repo := &fakeRepository{permissions: []Permission{
 		{BaseModel: shared.BaseModel{PublicID: "p3"}, Module: "users", Slug: "users.delete", Action: ActionDelete, DisplayOrder: 50},
-		{BaseModel: shared.BaseModel{PublicID: "p1"}, Module: "roles", Slug: "roles.index", Action: ActionIndex, DisplayOrder: 10},
-		{BaseModel: shared.BaseModel{PublicID: "p2"}, Module: "users", Slug: "users.index", Action: ActionIndex, DisplayOrder: 10},
+		{BaseModel: shared.BaseModel{PublicID: "p1"}, Module: "roles", Slug: "roles.list", Action: ActionList, DisplayOrder: 10},
+		{BaseModel: shared.BaseModel{PublicID: "p2"}, Module: "users", Slug: "users.list", Action: ActionList, DisplayOrder: 10},
 	}}
 	svc := NewService(repo)
 
@@ -219,43 +219,47 @@ func TestService_ListGroupedSortsByModuleAndDisplayOrder(t *testing.T) {
 	if groups[0].Module != "roles" || groups[1].Module != "users" {
 		t.Fatalf("expected groups sorted by module, got %+v", groups)
 	}
-	if got := groups[1].Permissions[0].Slug; got != "users.index" {
-		t.Fatalf("expected users.index first by display_order, got %s", got)
+	if got := groups[1].Permissions[0].Slug; got != "users.list" {
+		t.Fatalf("expected users.list first by display_order, got %s", got)
 	}
 }
 
 func TestService_SystemCRUDProtection(t *testing.T) {
-	tests := []struct {
-		name string
-		run  func(Service) error
-	}{
-		{
-			name: "update system permission forbidden",
-			run: func(svc Service) error {
-				_, err := svc.Update("system", UpdatePermissionRequest{Slug: "users.index", Name: "List users", Module: "users", Action: ActionIndex})
-				return err
-			},
-		},
-		{
-			name: "delete system permission forbidden",
-			run:  func(svc Service) error { return svc.Delete("system") },
-		},
-	}
+	t.Run("update allows editing Name and Description but rejects structural alterations", func(t *testing.T) {
+		repo := &fakeRepository{permissions: []Permission{
+			{BaseModel: shared.BaseModel{PublicID: "p1"}, Slug: "users.list", Name: "Old Name", Module: "users", Action: ActionList, IsSystem: true},
+		}}
+		svc := NewService(repo)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := &fakeRepository{permissions: []Permission{{BaseModel: shared.BaseModel{PublicID: "system"}, Slug: "users.index", Module: "users", Action: ActionIndex, IsSystem: true}}}
-			err := tt.run(NewService(repo))
-			if !errors.Is(err, apperror.ErrForbidden) {
-				t.Fatalf("expected forbidden, got %v", err)
-			}
+		// 1. Success updating Name, Description, and DisplayOrder
+		updated, err := svc.Update("p1", UpdatePermissionRequest{
+			Name:         "New Name",
+			Description:  "New Description",
+			DisplayOrder: 99,
 		})
-	}
+		if err != nil {
+			t.Fatalf("failed to update descriptives: %v", err)
+		}
+		if updated.Name != "New Name" || updated.Description != "New Description" || updated.DisplayOrder != 99 {
+			t.Fatalf("unexpected updated fields: %+v", updated)
+		}
+	})
+
+	t.Run("delete system permission returns forbidden", func(t *testing.T) {
+		repo := &fakeRepository{permissions: []Permission{
+			{BaseModel: shared.BaseModel{PublicID: "system"}, Slug: "users.list", Module: "users", Action: ActionList, IsSystem: true},
+		}}
+		svc := NewService(repo)
+		err := svc.Delete("system")
+		if !errors.Is(err, apperror.ErrForbidden) {
+			t.Fatalf("expected forbidden, got %v", err)
+		}
+	})
 }
 
 func TestService_ResolvePermissions(t *testing.T) {
 	t.Run("returns cached permissions without repository lookup", func(t *testing.T) {
-		cached, _ := json.Marshal([]string{"users.index", "roles.index"})
+		cached, _ := json.Marshal([]string{"users.list", "roles.list"})
 		repo := &fakeRepository{err: errors.New("repository should not be called")}
 		svc := NewService(repo, WithCache(&resolverCache{values: map[string][]byte{"rbac:permissions:user-one": cached}}))
 
@@ -263,7 +267,7 @@ func TestService_ResolvePermissions(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if len(got) != 2 || got[0] != "users.index" || got[1] != "roles.index" {
+		if len(got) != 2 || got[0] != "users.list" || got[1] != "roles.list" {
 			t.Fatalf("expected cached slugs, got %v", got)
 		}
 	})
@@ -289,6 +293,38 @@ func TestService_ResolvePermissions(t *testing.T) {
 		}
 		if len(stored) != 2 || stored[0] != "users.view" || stored[1] != "auth.view" {
 			t.Fatalf("expected cached repository slugs, got %v", stored)
+		}
+	})
+}
+
+func TestService_SyncPermissions(t *testing.T) {
+	t.Run("creates new permissions and leaves existing customized fields untouched", func(t *testing.T) {
+		repo := &fakeRepository{permissions: []Permission{
+			{BaseModel: shared.BaseModel{PublicID: "p1"}, Slug: "users.list", Name: "Custom Name", Module: "users", Action: ActionList, Description: "Custom Desc", IsSystem: true},
+		}}
+		svc := NewService(repo)
+
+		slugs := []string{"users.list", "roles.list"}
+		if err := svc.SyncPermissions(slugs); err != nil {
+			t.Fatalf("SyncPermissions failed: %v", err)
+		}
+
+		// 1. Verify roles.list was created with defaults
+		rolesPerm, err := repo.GetBySlug("roles.list")
+		if err != nil {
+			t.Fatalf("expected roles.list to be created: %v", err)
+		}
+		if rolesPerm.Name != "List roles" || rolesPerm.Description != "Allows listing roles" || !rolesPerm.IsSystem {
+			t.Fatalf("roles.list got unexpected fields: %+v", rolesPerm)
+		}
+
+		// 2. Verify users.list was untouched on custom Name/Description
+		usersPerm, err := repo.GetBySlug("users.list")
+		if err != nil {
+			t.Fatalf("expected users.list to exist: %v", err)
+		}
+		if usersPerm.Name != "Custom Name" || usersPerm.Description != "Custom Desc" {
+			t.Fatalf("users.list custom Name/Description was overwritten: %+v", usersPerm)
 		}
 	})
 }

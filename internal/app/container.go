@@ -3,6 +3,8 @@ package app
 import (
 	"time"
 
+	"log/slog"
+
 	"github.com/enviniom/nexokit/internal/config"
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/middleware"
@@ -13,11 +15,11 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/users"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/password"
+	platformPerms "github.com/enviniom/nexokit/internal/platform/permissions"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/platform/token"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"log/slog"
 )
 
 // Container holds the dependency graph for all application modules.
@@ -27,6 +29,7 @@ type Container struct {
 	companiesHandler   *companies.Handler
 	companiesRepo      *companies.GormRepository
 	permissionsHandler *permissions.Handler
+	permissionsService permissions.Service
 	authHandler        *auth.Handler
 	authMW             gin.HandlerFunc
 	authzMW            gin.HandlerFunc
@@ -67,7 +70,19 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	loginRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "login", cfg.RateLimit.LoginRPM, window)
 	refreshRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "refresh", cfg.RateLimit.RefreshRPM, window)
 
-	return &Container{rolesHandler: rolesHandler, usersHandler: usersHandler, companiesHandler: companiesHandler, companiesRepo: companiesRepo, permissionsHandler: permissionsHandler, authHandler: authHandler, authMW: authMW, authzMW: authzMW, loginRateLimitMW: loginRateLimitMW, refreshRateLimitMW: refreshRateLimitMW}
+	return &Container{
+		rolesHandler:       rolesHandler,
+		usersHandler:       usersHandler,
+		companiesHandler:   companiesHandler,
+		companiesRepo:      companiesRepo,
+		permissionsHandler: permissionsHandler,
+		permissionsService: permissionsService,
+		authHandler:        authHandler,
+		authMW:             authMW,
+		authzMW:            authzMW,
+		loginRateLimitMW:   loginRateLimitMW,
+		refreshRateLimitMW: refreshRateLimitMW,
+	}
 }
 
 // RegisterModules mounts all business module routes onto the v1 router group.
@@ -115,4 +130,10 @@ func (l userLookup) GetAuthUser(publicID string) (*authctx.User, error) {
 		IsRoot:    user.IsRoot(),
 		IsActive:  user.IsActive,
 	}, nil
+}
+
+// SyncPermissions delegates synchronization of registered permissions to permissionsService.
+func (c *Container) SyncPermissions() error {
+	slugs := platformPerms.ListRegistered()
+	return c.permissionsService.SyncPermissions(slugs)
 }
