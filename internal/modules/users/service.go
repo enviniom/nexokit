@@ -1,9 +1,12 @@
 package users
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"strings"
 
+	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
@@ -33,6 +36,7 @@ type Service interface {
 	Delete(tc tenant.TenantContext, publicID string) error
 	ChangePassword(tc tenant.TenantContext, publicID string, actorPublicID string, req ChangePasswordRequest) error
 	ToggleStatus(tc tenant.TenantContext, publicID string, req UpdateStatusRequest) (*UserResponse, error)
+	ChangeRole(tc tenant.TenantContext, targetPublicID string, actorPublicID string, req ChangeUserRoleRequest) (*UserResponse, error)
 }
 
 // userService is the concrete implementation of Service.
@@ -41,11 +45,34 @@ type userService struct {
 	hasher           PasswordHasher
 	resolver         RoleResolver
 	cachedRootRoleID uint
+	roleReader       roles.AssignmentRoleReader
+	cache            cache.Cache
+}
+
+// ServiceOption configures optional user service collaborators.
+type ServiceOption func(*userService)
+
+// WithRoleReader configures the role reader collaborator.
+func WithRoleReader(r roles.AssignmentRoleReader) ServiceOption {
+	return func(s *userService) {
+		s.roleReader = r
+	}
+}
+
+// WithCache configures the cache collaborator.
+func WithCache(c cache.Cache) ServiceOption {
+	return func(s *userService) {
+		s.cache = c
+	}
 }
 
 // NewService creates a new users service.
-func NewService(repo Repository, hasher PasswordHasher, resolver RoleResolver) Service {
-	return &userService{repo: repo, hasher: hasher, resolver: resolver}
+func NewService(repo Repository, hasher PasswordHasher, resolver RoleResolver, opts ...ServiceOption) Service {
+	s := &userService{repo: repo, hasher: hasher, resolver: resolver}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 func (s *userService) rootRoleID() (uint, error) {
@@ -58,6 +85,9 @@ func (s *userService) rootRoleID() (uint, error) {
 	role, err := s.resolver.GetBySlug(roles.RootRoleSlug)
 	if err != nil {
 		return 0, err
+	}
+	if role == nil {
+		return 0, errors.New("root role not found")
 	}
 	s.cachedRootRoleID = role.ID
 	return role.ID, nil
@@ -179,11 +209,6 @@ func (s *userService) Update(tc tenant.TenantContext, publicID string, actorPubl
 
 	isRoot := user.RoleID == rootRoleID
 
-	// Rule: cannot promote a non-root user to root role.
-	if !isRoot && req.RoleID == rootRoleID {
-		return nil, apperror.ErrForbidden
-	}
-
 	if isRoot {
 		// Rule: root can only be edited by itself.
 		// When auth context is unavailable (empty actor), reject for safety.
@@ -195,9 +220,20 @@ func (s *userService) Update(tc tenant.TenantContext, publicID string, actorPubl
 		user.Email = req.Email
 		// RoleID and CompanyID are intentionally ignored for root.
 	} else {
-		if req.CompanyID == nil {
-			return nil, apperror.ErrBadRequest
+		// Rule: non-root users in a tenant must not be moved out of their company
+		if !tc.IsRootScope {
+			if req.CompanyID != nil && *req.CompanyID != tc.CompanyID {
+				return nil, apperror.ErrForbidden
+			}
+			companyID := tc.CompanyID
+			req.CompanyID = &companyID
+		} else {
+			// In root scope, we must ensure CompanyID is not nil for a non-root user.
+			if req.CompanyID == nil {
+				return nil, apperror.ErrBadRequest
+			}
 		}
+
 		if user.Email != req.Email {
 			existing, err := s.repo.GetByEmail(req.Email)
 			if err == nil {
@@ -211,7 +247,6 @@ func (s *userService) Update(tc tenant.TenantContext, publicID string, actorPubl
 
 		user.Name = req.Name
 		user.Email = req.Email
-		user.RoleID = req.RoleID
 		user.CompanyID = req.CompanyID
 	}
 
@@ -301,6 +336,66 @@ func (s *userService) ToggleStatus(tc tenant.TenantContext, publicID string, req
 	}
 
 	updated, err := s.repo.GetByPublicID(tc, user.PublicID)
+	if err != nil {
+		return nil, err
+	}
+
+	return toResponse(updated), nil
+}
+
+// ChangeRole changes a user's role.
+func (s *userService) ChangeRole(tc tenant.TenantContext, targetPublicID string, actorPublicID string, req ChangeUserRoleRequest) (*UserResponse, error) {
+	if actorPublicID == "" || actorPublicID == targetPublicID {
+		return nil, apperror.ErrForbidden
+	}
+
+	targetUser, err := s.repo.GetByPublicID(tc, targetPublicID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrNotFound
+		}
+		return nil, err
+	}
+
+	rootRoleID, err := s.rootRoleID()
+	if err != nil {
+		return nil, err
+	}
+
+	if targetUser.RoleID == rootRoleID {
+		return nil, apperror.ErrForbidden
+	}
+
+	if s.roleReader == nil {
+		return nil, errors.New("role reader dependency is not configured")
+	}
+
+	targetRole, err := s.roleReader.FindAssignableByPublicID(tc, req.RoleID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperror.ErrNotFound
+		}
+		return nil, err
+	}
+
+	if targetRole.Slug == roles.RootRoleSlug {
+		return nil, apperror.ErrForbidden
+	}
+
+	if targetUser.CompanyID != nil && targetRole.CompanyID != nil && *targetUser.CompanyID != *targetRole.CompanyID {
+		return nil, apperror.ErrForbidden
+	}
+
+	targetUser.RoleID = targetRole.InternalID
+	if err := s.repo.Update(targetUser); err != nil {
+		return nil, err
+	}
+
+	if s.cache != nil {
+		_ = s.cache.Delete(context.Background(), fmt.Sprintf("rbac:permissions:%s", targetUser.PublicID))
+	}
+
+	updated, err := s.repo.GetByPublicID(tc, targetUser.PublicID)
 	if err != nil {
 		return nil, err
 	}

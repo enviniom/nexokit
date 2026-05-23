@@ -112,6 +112,25 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	response.Success[any](c, messages.MsgSuccess, nil)
 }
 
+// ChangeRole handles PATCH /users/:id/role.
+func (h *Handler) ChangeRole(c *gin.Context) {
+	publicID := c.Param("id")
+	var req ChangeUserRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
+	}
+	if response.RespondIfInvalid(c, req.Validate()) {
+		return
+	}
+	user, err := h.service.ChangeRole(h.tenantContext(c), publicID, h.actorPublicID(c), req)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.Success(c, messages.MsgSuccess, user)
+}
+
 func (h *Handler) actorPublicID(c *gin.Context) string {
 	if h.actorProvider == nil {
 		return ""

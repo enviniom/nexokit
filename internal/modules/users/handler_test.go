@@ -103,6 +103,14 @@ func (f *fakeService) ToggleStatus(tc tenant.TenantContext, publicID string, req
 	return f.toggled, nil
 }
 
+func (f *fakeService) ChangeRole(tc tenant.TenantContext, targetPublicID string, actorPublicID string, req ChangeUserRoleRequest) (*UserResponse, error) {
+	f.tenant = tc
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.user, nil
+}
+
 func setTenant(c *gin.Context) {
 	tenant.SetGin(c, tenant.NewScoped(7, "acme"))
 }
@@ -386,7 +394,7 @@ func TestHandler_Create(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "root1"}}
 		authctx.SetGin(c, &authctx.User{PublicID: "root1", IsActive: true})
-		c.Request = jsonRequest(http.MethodPut, "/users/root1", UpdateUserRequest{Name: "Root", Email: "root@example.com", RoleID: RootRoleID})
+		c.Request = jsonRequest(http.MethodPut, "/users/root1", UpdateUserRequest{Name: "Root", Email: "root@example.com"})
 		setTenant(c)
 		h.Update(c)
 
@@ -409,7 +417,7 @@ func TestHandler_Update(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
-		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", RoleID: 2, CompanyID: uintPtr(7)})
+		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", CompanyID: uintPtr(7)})
 		setTenant(c)
 		h.Update(c)
 
@@ -433,7 +441,7 @@ func TestHandler_Update(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "missing"}}
-		c.Request = jsonRequest(http.MethodPut, "/users/missing", UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 2, CompanyID: uintPtr(7)})
+		c.Request = jsonRequest(http.MethodPut, "/users/missing", UpdateUserRequest{Name: "Alice", Email: "alice@example.com", CompanyID: uintPtr(7)})
 		setTenant(c)
 		h.Update(c)
 
@@ -449,7 +457,7 @@ func TestHandler_Update(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
-		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 2, CompanyID: uintPtr(7)})
+		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "Alice", Email: "bob@example.com", CompanyID: uintPtr(7)})
 		setTenant(c)
 		h.Update(c)
 
@@ -465,7 +473,7 @@ func TestHandler_Update(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Params = gin.Params{{Key: "id", Value: "user1"}}
-		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "", Email: "bad", RoleID: 0})
+		c.Request = jsonRequest(http.MethodPut, "/users/user1", UpdateUserRequest{Name: "", Email: "bad"})
 		setTenant(c)
 		h.Update(c)
 
@@ -489,9 +497,6 @@ func TestHandler_Update(t *testing.T) {
 		}
 		if _, ok := errsMap["email"]; !ok {
 			t.Error("expected validation error for email")
-		}
-		if _, ok := errsMap["role_id"]; !ok {
-			t.Error("expected validation error for role_id")
 		}
 	})
 }

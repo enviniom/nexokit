@@ -1,8 +1,10 @@
 package users
 
 import (
+	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
@@ -536,7 +538,7 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", RoleID: 2, CompanyID: uintPtr(1)}
+		req := UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", CompanyID: uintPtr(1)}
 		result, err := svc.Update(tenant.NewRoot(), "user1", "", req)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -556,7 +558,7 @@ func TestService_Update(t *testing.T) {
 		repo := &fakeRepository{userByPublicID: map[string]*User{}}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		_, err := svc.Update(tenant.NewRoot(), "missing", "", UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 2, CompanyID: uintPtr(1)})
+		_, err := svc.Update(tenant.NewRoot(), "missing", "", UpdateUserRequest{Name: "Alice", Email: "alice@example.com", CompanyID: uintPtr(1)})
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -580,7 +582,7 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 2, CompanyID: uintPtr(1)}
+		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", CompanyID: uintPtr(1)}
 		_, err := svc.Update(tenant.NewRoot(), "user1", "", req)
 		if err == nil {
 			t.Fatal("expected error")
@@ -602,7 +604,7 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 2, CompanyID: uintPtr(1)}
+		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", CompanyID: uintPtr(1)}
 		_, err := svc.Update(tenant.NewRoot(), "user1", "", req)
 		if err == nil {
 			t.Fatal("expected error")
@@ -625,7 +627,7 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 999}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", RoleID: 2, CompanyID: uintPtr(1)}
+		req := UpdateUserRequest{Name: "Alice", Email: "bob@example.com", CompanyID: uintPtr(1)}
 		_, err := svc.Update(tenant.NewRoot(), "user1", "", req)
 		if err == nil {
 			t.Fatal("expected error")
@@ -635,25 +637,26 @@ func TestService_Update(t *testing.T) {
 		}
 	})
 
-	t.Run("returns forbidden when promoting non-root to root", func(t *testing.T) {
+	t.Run("asserts RoleID cannot be changed via general update", func(t *testing.T) {
+		companyID := uint(1)
 		repo := &fakeRepository{
 			users: []User{
-				{BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", RoleID: 2},
+				{BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", RoleID: 2, CompanyID: &companyID},
 			},
 			userByPublicID: map[string]*User{
-				"user1": {BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", RoleID: 2},
+				"user1": {BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", RoleID: 2, CompanyID: &companyID},
 			},
 			userByEmail: map[string]*User{},
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 1}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Alice", Email: "alice@example.com", RoleID: 1}
-		_, err := svc.Update(tenant.NewRoot(), "user1", "", req)
-		if err == nil {
-			t.Fatal("expected error")
+		req := UpdateUserRequest{Name: "Alice", Email: "alice@example.com", CompanyID: &companyID}
+		result, err := svc.Update(tenant.NewRoot(), "user1", "", req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
-		if !errors.Is(err, apperror.ErrForbidden) {
-			t.Errorf("expected ErrForbidden, got %v", err)
+		if result.RoleID != 2 {
+			t.Errorf("expected RoleID to remain 2, got %d", result.RoleID)
 		}
 	})
 
@@ -669,7 +672,7 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 1}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Root Updated", Email: "root-new@example.com", RoleID: 1}
+		req := UpdateUserRequest{Name: "Root Updated", Email: "root-new@example.com"}
 		_, err := svc.Update(tenant.NewRoot(), "root1", "", req)
 		if err == nil {
 			t.Fatal("expected error")
@@ -691,7 +694,7 @@ func TestService_Update(t *testing.T) {
 		}
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 1}, Name: "root"}})
 
-		req := UpdateUserRequest{Name: "Root Updated", Email: "root-new@example.com", RoleID: 1}
+		req := UpdateUserRequest{Name: "Root Updated", Email: "root-new@example.com"}
 		_, err := svc.Update(tenant.NewRoot(), "root1", "other", req)
 		if err == nil {
 			t.Fatal("expected error")
@@ -714,7 +717,7 @@ func TestService_Update(t *testing.T) {
 		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: 1}, Name: "root"}})
 
 		companyID := uint(42)
-		req := UpdateUserRequest{Name: "Root Updated", Email: "root-new@example.com", RoleID: 2, CompanyID: &companyID}
+		req := UpdateUserRequest{Name: "Root Updated", Email: "root-new@example.com", CompanyID: &companyID}
 		result, err := svc.Update(tenant.NewRoot(), "root1", "root1", req)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -750,7 +753,7 @@ func TestService_TenantScopedWrites(t *testing.T) {
 	scope := tenant.NewScoped(companyOne, "acme")
 
 	t.Run("updates user within tenant scope", func(t *testing.T) {
-		result, err := svc.Update(scope, "user1", "", UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", RoleID: 2, CompanyID: &companyOne})
+		result, err := svc.Update(scope, "user1", "", UpdateUserRequest{Name: "Alice Updated", Email: "alice-new@example.com", CompanyID: &companyOne})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -760,7 +763,7 @@ func TestService_TenantScopedWrites(t *testing.T) {
 	})
 
 	t.Run("cross tenant update returns not found", func(t *testing.T) {
-		_, err := svc.Update(scope, "user2", "", UpdateUserRequest{Name: "Bob Updated", Email: "bob-new@example.com", RoleID: 2, CompanyID: &companyTwo})
+		_, err := svc.Update(scope, "user2", "", UpdateUserRequest{Name: "Bob Updated", Email: "bob-new@example.com", CompanyID: &companyTwo})
 		if !errors.Is(err, apperror.ErrNotFound) {
 			t.Fatalf("expected ErrNotFound for cross-tenant update, got %v", err)
 		}
@@ -926,3 +929,141 @@ func TestService_ToggleStatus(t *testing.T) {
 		}
 	})
 }
+
+type fakeRoleReader struct {
+	summary *roles.AssignmentRoleSummary
+	err     error
+}
+
+func (f *fakeRoleReader) FindAssignableByPublicID(tc tenant.TenantContext, publicID string) (*roles.AssignmentRoleSummary, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.summary, nil
+}
+
+type fakeCache struct {
+	deleted []string
+}
+
+func (f *fakeCache) Get(ctx context.Context, key string) ([]byte, error) { return nil, nil }
+func (f *fakeCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error { return nil }
+func (f *fakeCache) Delete(ctx context.Context, key string) error {
+	f.deleted = append(f.deleted, key)
+	return nil
+}
+func (f *fakeCache) Exists(ctx context.Context, key string) (bool, error) { return false, nil }
+func (f *fakeCache) Close() error { return nil }
+
+func TestService_ChangeRole(t *testing.T) {
+	t.Run("successfully assigns role and invalidates cache", func(t *testing.T) {
+		companyOne := uint(1)
+		repo := &fakeRepository{
+			users: []User{
+				{BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", RoleID: 2, CompanyID: &companyOne},
+			},
+			userByPublicID: map[string]*User{
+				"user1": {BaseModel: shared.BaseModel{PublicID: "user1"}, Name: "Alice", Email: "alice@example.com", RoleID: 2, CompanyID: &companyOne},
+			},
+		}
+		roleReader := &fakeRoleReader{
+			summary: &roles.AssignmentRoleSummary{InternalID: 3, PublicID: "role3", Slug: "editor", CompanyID: &companyOne},
+		}
+		cacheMock := &fakeCache{}
+		svc := NewService(repo, &fakeHasher{hash: "hashed"}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}}, WithRoleReader(roleReader), WithCache(cacheMock))
+
+		req := ChangeUserRoleRequest{RoleID: "role3"}
+		result, err := svc.ChangeRole(tenant.NewScoped(companyOne, "acme"), "user1", "admin1", req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if result.RoleID != 3 {
+			t.Errorf("expected new role ID to be 3, got %d", result.RoleID)
+		}
+		if len(cacheMock.deleted) != 1 || cacheMock.deleted[0] != "rbac:permissions:user1" {
+			t.Errorf("expected permission cache to be invalidated for target user, got %v", cacheMock.deleted)
+		}
+	})
+
+	t.Run("rejects empty actor public ID", func(t *testing.T) {
+		svc := NewService(&fakeRepository{}, &fakeHasher{}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}})
+		_, err := svc.ChangeRole(tenant.NewRoot(), "user1", "", ChangeUserRoleRequest{RoleID: "role3"})
+		if !errors.Is(err, apperror.ErrForbidden) {
+			t.Errorf("expected ErrForbidden for empty actor, got %v", err)
+		}
+	})
+
+	t.Run("rejects self role change", func(t *testing.T) {
+		svc := NewService(&fakeRepository{}, &fakeHasher{}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}})
+		_, err := svc.ChangeRole(tenant.NewRoot(), "user1", "user1", ChangeUserRoleRequest{RoleID: "role3"})
+		if !errors.Is(err, apperror.ErrForbidden) {
+			t.Errorf("expected ErrForbidden for self role change, got %v", err)
+		}
+	})
+
+	t.Run("returns not found if target user missing or out of tenant scope", func(t *testing.T) {
+		companyOne := uint(1)
+		companyTwo := uint(2)
+		repo := &fakeRepository{
+			userByPublicID: map[string]*User{
+				"user1": {BaseModel: shared.BaseModel{PublicID: "user1"}, CompanyID: &companyTwo},
+			},
+		}
+		svc := NewService(repo, &fakeHasher{}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}})
+		_, err := svc.ChangeRole(tenant.NewScoped(companyOne, "acme"), "user1", "admin1", ChangeUserRoleRequest{RoleID: "role3"})
+		if !errors.Is(err, apperror.ErrNotFound) {
+			t.Errorf("expected ErrNotFound for cross-tenant target user, got %v", err)
+		}
+	})
+
+	t.Run("returns not found if role is missing or out of tenant scope", func(t *testing.T) {
+		companyOne := uint(1)
+		repo := &fakeRepository{
+			userByPublicID: map[string]*User{
+				"user1": {BaseModel: shared.BaseModel{PublicID: "user1"}, CompanyID: &companyOne},
+			},
+		}
+		roleReader := &fakeRoleReader{err: gorm.ErrRecordNotFound}
+		svc := NewService(repo, &fakeHasher{}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}}, WithRoleReader(roleReader))
+		_, err := svc.ChangeRole(tenant.NewScoped(companyOne, "acme"), "user1", "admin1", ChangeUserRoleRequest{RoleID: "role3"})
+		if !errors.Is(err, apperror.ErrNotFound) {
+			t.Errorf("expected ErrNotFound for missing role, got %v", err)
+		}
+	})
+
+	t.Run("rejects root role assignment", func(t *testing.T) {
+		companyOne := uint(1)
+		repo := &fakeRepository{
+			userByPublicID: map[string]*User{
+				"user1": {BaseModel: shared.BaseModel{PublicID: "user1"}, CompanyID: &companyOne},
+			},
+		}
+		roleReader := &fakeRoleReader{
+			summary: &roles.AssignmentRoleSummary{InternalID: 1, PublicID: "root-role-id", Slug: roles.RootRoleSlug},
+		}
+		svc := NewService(repo, &fakeHasher{}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}}, WithRoleReader(roleReader))
+		_, err := svc.ChangeRole(tenant.NewRoot(), "user1", "admin1", ChangeUserRoleRequest{RoleID: "root-role-id"})
+		if !errors.Is(err, apperror.ErrForbidden) {
+			t.Errorf("expected ErrForbidden when assigning root role, got %v", err)
+		}
+	})
+
+	t.Run("rejects role/user company mismatch", func(t *testing.T) {
+		companyOne := uint(1)
+		companyTwo := uint(2)
+		repo := &fakeRepository{
+			userByPublicID: map[string]*User{
+				"user1": {BaseModel: shared.BaseModel{PublicID: "user1"}, CompanyID: &companyOne},
+			},
+		}
+		roleReader := &fakeRoleReader{
+			summary: &roles.AssignmentRoleSummary{InternalID: 3, PublicID: "role3", Slug: "editor", CompanyID: &companyTwo},
+		}
+		svc := NewService(repo, &fakeHasher{}, &fakeRoleResolver{role: &roles.Role{BaseModel: shared.BaseModel{ID: RootRoleID}, Name: "root"}}, WithRoleReader(roleReader))
+		_, err := svc.ChangeRole(tenant.NewRoot(), "user1", "admin1", ChangeUserRoleRequest{RoleID: "role3"})
+		if !errors.Is(err, apperror.ErrForbidden) {
+			t.Errorf("expected ErrForbidden when target user company and role company mismatch, got %v", err)
+		}
+	})
+}
+
