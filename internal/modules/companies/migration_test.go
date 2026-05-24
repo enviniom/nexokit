@@ -7,9 +7,9 @@ import (
 )
 
 func TestCompaniesMigrationDefinesCompanyTableAndUserCompanyReference(t *testing.T) {
-	content, err := os.ReadFile("../../../migrations/20260519000000_companies.sql")
+	content, err := os.ReadFile("../../../migrations/20260101000000_init.sql")
 	if err != nil {
-		t.Fatalf("expected companies migration to exist: %v", err)
+		t.Fatalf("expected consolidated migration to exist: %v", err)
 	}
 	sql := strings.ToLower(string(content))
 
@@ -18,7 +18,7 @@ func TestCompaniesMigrationDefinesCompanyTableAndUserCompanyReference(t *testing
 		"public_id char(26) not null unique",
 		"slug varchar(120) not null unique",
 		"status varchar(20) not null",
-		"foreign key (company_id) references companies(id)",
+		"references companies(id)",
 		"create index if not exists idx_users_company_id",
 		"drop table if exists companies",
 	} {
