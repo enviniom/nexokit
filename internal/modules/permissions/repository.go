@@ -13,6 +13,7 @@ type Repository interface {
 	Create(permission *Permission) error
 	Update(permission *Permission) error
 	Delete(publicID string) error
+	AutoAssignToAdmins(permissionID uint) error
 }
 
 // GormRepository is the GORM implementation of Repository.
@@ -97,4 +98,13 @@ func (r *GormRepository) Update(permission *Permission) error {
 // Delete soft-deletes a permission by public ID.
 func (r *GormRepository) Delete(publicID string) error {
 	return r.db.Where("public_id = ?", publicID).Delete(&Permission{}).Error
+}
+
+// AutoAssignToAdmins automatically assigns a permission to all existing 'admin' roles.
+func (r *GormRepository) AutoAssignToAdmins(permissionID uint) error {
+	return r.db.Exec(`
+		INSERT INTO role_permissions (role_id, permission_id)
+		SELECT id, ? FROM roles WHERE slug = 'admin'
+		ON CONFLICT DO NOTHING
+	`, permissionID).Error
 }

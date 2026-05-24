@@ -10,6 +10,7 @@ import (
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/modules/auth"
 	"github.com/enviniom/nexokit/internal/modules/companies"
+	"github.com/enviniom/nexokit/internal/modules/onboarding"
 	"github.com/enviniom/nexokit/internal/modules/permissions"
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/modules/users"
@@ -31,6 +32,7 @@ type Container struct {
 	permissionsHandler *permissions.Handler
 	permissionsService permissions.Service
 	authHandler        *auth.Handler
+	onboardingHandler  *onboarding.Handler
 	authMW             gin.HandlerFunc
 	authzMW            gin.HandlerFunc
 	loginRateLimitMW   gin.HandlerFunc
@@ -70,6 +72,9 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	loginRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "login", cfg.RateLimit.LoginRPM, window)
 	refreshRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "refresh", cfg.RateLimit.RefreshRPM, window)
 
+	onboardingService := onboarding.NewService(db, passwordManager)
+	onboardingHandler := onboarding.NewHandler(onboardingService)
+
 	return &Container{
 		rolesHandler:       rolesHandler,
 		usersHandler:       usersHandler,
@@ -78,6 +83,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 		permissionsHandler: permissionsHandler,
 		permissionsService: permissionsService,
 		authHandler:        authHandler,
+		onboardingHandler:  onboardingHandler,
 		authMW:             authMW,
 		authzMW:            authzMW,
 		loginRateLimitMW:   loginRateLimitMW,
@@ -95,6 +101,7 @@ func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
 	// them globally while non-root requests remain scoped to their company.
 	roles.Register(globalProtected, c.rolesHandler, middleware.RequirePermission)
 	permissions.Register(globalProtected, c.permissionsHandler, middleware.RequirePermission)
+	onboarding.Register(globalProtected, c.onboardingHandler, middleware.RequireRole)
 
 	tenantProtected := v1.Group("")
 	tenantProtected.Use(c.authMW, middleware.RequireTenantScope(c.companiesRepo), c.authzMW)

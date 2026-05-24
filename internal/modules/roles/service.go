@@ -285,6 +285,9 @@ func (s *roleService) AssignPermissions(tc tenant.TenantContext, publicID string
 		}
 		return nil, err
 	}
+	if role.Slug == AdminRoleSlug {
+		return nil, apperror.ErrForbidden
+	}
 	if s.permissionCatalog == nil {
 		return nil, fmt.Errorf("permission catalog repository is not configured")
 	}

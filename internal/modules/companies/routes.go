@@ -11,7 +11,6 @@ func Register(v1 *gin.RouterGroup, handler *Handler, requirePermission func(stri
 	{
 		companies.GET("", requirePermission(platformPerms.Format(platformPerms.ModuleCompanies, platformPerms.ActionList)), handler.List)
 		companies.GET("/:id", requirePermission(platformPerms.Format(platformPerms.ModuleCompanies, platformPerms.ActionView)), handler.GetByPublicID)
-		companies.POST("", requireRole("root"), handler.Create)
 		companies.PUT("/:id", requireRole("root"), handler.Update)
 		companies.DELETE("/:id", requireRole("root"), handler.Delete)
 	}

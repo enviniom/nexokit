@@ -288,6 +288,9 @@ func (s *permissionService) SyncPermissions(slugs []string) error {
 				if err := s.repo.Create(newPerm); err != nil {
 					return err
 				}
+				if err := s.repo.AutoAssignToAdmins(newPerm.ID); err != nil {
+					return err
+				}
 			} else {
 				return err
 			}

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
@@ -84,58 +83,20 @@ func setupCompanyRouter(user *authctx.User, svc Service) *gin.Engine {
 }
 
 func TestHandler_Create(t *testing.T) {
-	t.Run("root creates company", func(t *testing.T) {
-		svc := &fakeCompanyService{company: &CompanyResponse{PublicID: "01HCOMPANY", Name: "Acme", Slug: "acme", Status: CompanyStatusActive, CreatedAt: time.Now(), UpdatedAt: time.Now()}}
-		r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
-
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, companyJSONRequest(http.MethodPost, "/api/v1/companies", CreateCompanyRequest{Name: "Acme", Slug: "acme"}))
-
-		if w.Code != http.StatusCreated {
-			t.Fatalf("expected status 201, got %d body=%s", w.Code, w.Body.String())
-		}
-		var resp response.APIResponse[CompanyResponse]
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("decode response: %v", err)
-		}
-		if !resp.Success || resp.Data.PublicID != "01HCOMPANY" {
-			t.Fatalf("expected created company public id, got %#v", resp)
-		}
-	})
-
-	t.Run("admin and user receive forbidden", func(t *testing.T) {
-		for _, role := range []string{"admin", "user"} {
+	t.Run("direct company creation is blocked for all users (returns 404)", func(t *testing.T) {
+		for _, role := range []string{"root", "admin", "user"} {
 			t.Run(role, func(t *testing.T) {
 				svc := &fakeCompanyService{company: &CompanyResponse{PublicID: "01HCOMPANY", Name: "Acme", Slug: "acme"}}
-				r := setupCompanyRouter(&authctx.User{RoleSlug: role, Permissions: []string{"companies.create"}}, svc)
+				isRoot := role == "root"
+				r := setupCompanyRouter(&authctx.User{RoleSlug: role, IsRoot: isRoot}, svc)
 
 				w := httptest.NewRecorder()
 				r.ServeHTTP(w, companyJSONRequest(http.MethodPost, "/api/v1/companies", CreateCompanyRequest{Name: "Acme", Slug: "acme"}))
 
-				if w.Code != http.StatusForbidden {
-					t.Fatalf("expected status 403 for %s, got %d", role, w.Code)
+				if w.Code != http.StatusNotFound {
+					t.Fatalf("expected status 404, got %d", w.Code)
 				}
 			})
-		}
-	})
-
-	t.Run("duplicate slug returns validation error", func(t *testing.T) {
-		svc := &fakeCompanyService{err: ErrDuplicateSlug}
-		r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
-
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, companyJSONRequest(http.MethodPost, "/api/v1/companies", CreateCompanyRequest{Name: "Acme", Slug: "acme"}))
-
-		if w.Code != http.StatusUnprocessableEntity {
-			t.Fatalf("expected status 422, got %d body=%s", w.Code, w.Body.String())
-		}
-		var resp response.APIResponse[any]
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("decode response: %v", err)
-		}
-		errs, ok := resp.Errors.(map[string]any)
-		if !ok || errs["slug"] == nil {
-			t.Fatalf("expected slug validation error, got %#v", resp.Errors)
 		}
 	})
 }

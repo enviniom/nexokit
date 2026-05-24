@@ -19,6 +19,7 @@ type fakeRepository struct {
 	createErr   error
 	updateErr   error
 	userSlugs   map[string][]string
+	assignedPermissionID uint
 }
 
 func (f *fakeRepository) List(page, perPage int) ([]Permission, error) {
@@ -96,6 +97,11 @@ func (f *fakeRepository) ListSlugsByUserPublicID(publicID string) ([]string, err
 		return nil, f.err
 	}
 	return append([]string(nil), f.userSlugs[publicID]...), nil
+}
+
+func (f *fakeRepository) AutoAssignToAdmins(permissionID uint) error {
+	f.assignedPermissionID = permissionID
+	return nil
 }
 
 type resolverCache struct {
@@ -325,6 +331,27 @@ func TestService_SyncPermissions(t *testing.T) {
 		}
 		if usersPerm.Name != "Custom Name" || usersPerm.Description != "Custom Desc" {
 			t.Fatalf("users.list custom Name/Description was overwritten: %+v", usersPerm)
+		}
+	})
+
+	t.Run("auto assigns newly created permissions to admin roles", func(t *testing.T) {
+		repo := &fakeRepository{permissions: []Permission{}}
+		svc := NewService(repo)
+
+		slugs := []string{"users.list"}
+		if err := svc.SyncPermissions(slugs); err != nil {
+			t.Fatalf("SyncPermissions failed: %v", err)
+		}
+
+		createdPerm, err := repo.GetBySlug("users.list")
+		if err != nil {
+			t.Fatalf("expected users.list to be created: %v", err)
+		}
+
+		// Since our mock database or fake repository adds it, we ensure it called AutoAssignToAdmins
+		// Our fakeRepository sets f.assignedPermissionID when AutoAssignToAdmins is called.
+		if repo.assignedPermissionID != createdPerm.ID {
+			t.Errorf("expected auto assignment of permission ID %d to admins, got %d", createdPerm.ID, repo.assignedPermissionID)
 		}
 	})
 }

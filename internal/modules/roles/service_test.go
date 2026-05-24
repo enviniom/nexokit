@@ -742,6 +742,14 @@ func TestService_AssignPermissions(t *testing.T) {
 			actorPerms: []string{"roles.assign_permissions"},
 			wantErr:    apperror.ErrForbidden,
 		},
+		{
+			name:       "protects admin role from revoking existing permissions",
+			role:       Role{BaseModel: shared.BaseModel{ID: 8, PublicID: "role-admin"}, Name: "admin", Slug: "admin", Permissions: []permissions.Permission{{BaseModel: shared.BaseModel{ID: 1}, Slug: "users.list"}}},
+			catalog:    []permissions.Permission{{BaseModel: shared.BaseModel{ID: 1}, Slug: "users.list", Module: "users"}, {BaseModel: shared.BaseModel{ID: 2}, Slug: "users.view", Module: "users"}},
+			req:        AssignRolePermissionsRequest{Permissions: []string{"users.view"}},
+			actorPerms: []string{"roles.assign_permissions"},
+			wantErr:    apperror.ErrForbidden,
+		},
 	}
 
 	for _, tt := range tests {
