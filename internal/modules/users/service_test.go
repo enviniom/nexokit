@@ -947,13 +947,15 @@ type fakeCache struct {
 }
 
 func (f *fakeCache) Get(ctx context.Context, key string) ([]byte, error) { return nil, nil }
-func (f *fakeCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error { return nil }
+func (f *fakeCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	return nil
+}
 func (f *fakeCache) Delete(ctx context.Context, key string) error {
 	f.deleted = append(f.deleted, key)
 	return nil
 }
 func (f *fakeCache) Exists(ctx context.Context, key string) (bool, error) { return false, nil }
-func (f *fakeCache) Close() error { return nil }
+func (f *fakeCache) Close() error                                         { return nil }
 
 func TestService_ChangeRole(t *testing.T) {
 	t.Run("successfully assigns role and invalidates cache", func(t *testing.T) {
@@ -1066,4 +1068,3 @@ func TestService_ChangeRole(t *testing.T) {
 		}
 	})
 }
-
