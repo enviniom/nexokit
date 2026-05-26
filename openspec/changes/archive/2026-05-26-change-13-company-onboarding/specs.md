@@ -25,9 +25,9 @@
 - THEN the system MUST automatically assign the new permissions to all existing tenant `admin` roles in the database.
 
 ### Admin Role Permission Protections
-- The system MUST NOT allow anyone (including `root`) to remove/revoke permissions from a tenant `admin` role.
+- The system MUST NOT allow anyone (including `root`) to directly change permission assignments for a tenant `admin` role.
 - WHEN a request is made to assign permissions to an `admin` role
-- THEN the system MUST verify that all currently assigned permissions are included in the new payload. If any assigned permission is missing, the request MUST fail with status `403 Forbidden`.
+- THEN the request MUST fail with status `403 Forbidden` and the role's permissions MUST remain unchanged.
 
 ---
 
@@ -76,9 +76,9 @@
 - **WHEN** they call `POST /api/v1/companies`
 - **THEN** the system MUST return status `404 Not Found` (since the route is completely removed).
 
-### Scenario 7: Revoking Admin Permissions is Forbidden
+### Scenario 7: Changing Admin Permissions is Forbidden
 - **GIVEN** an existing tenant `admin` role with permissions `["users.view", "users.create"]`
-- **WHEN** a request is made to assign permissions `["users.view"]` to this role (omitting `users.create`)
+- **WHEN** a request is made to assign permissions to this role
 - **THEN** the system MUST return status `403 Forbidden`
 - **AND** the role's permissions MUST remain unchanged.
 

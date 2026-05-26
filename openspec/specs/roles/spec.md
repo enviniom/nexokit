@@ -107,7 +107,7 @@ The system MUST expose `GET /api/v1/roles/:id/permissions`. It MUST return the f
 
 ### Requirement: Role permission assignment endpoint
 
-The system MUST expose `PUT /api/v1/roles/:id/permissions`. It MUST accept a request body containing an array of permission slugs and replace the role's assignments with exactly those slugs. It MUST require `roles.assign_permissions` permission. The system MUST NOT allow removal of system permissions (`is_system: true`) from system roles (`is_system: true`). After successful assignment, it MUST invalidate the permission cache for all members of that role.
+The system MUST expose `PUT /api/v1/roles/:id/permissions`. It MUST accept a request body containing an array of permission slugs and replace the role's assignments with exactly those slugs. It MUST require `roles.assign_permissions` permission. The system MUST NOT allow direct permission assignment changes for roles with slug `admin`; tenant admin roles receive permissions through onboarding and automatic permission synchronization. The system MUST NOT allow removal of system permissions (`is_system: true`) from system roles (`is_system: true`). After successful assignment, it MUST invalidate the permission cache for all members of that role.
 
 #### Scenario: Replace role permissions
 
@@ -116,6 +116,13 @@ The system MUST expose `PUT /api/v1/roles/:id/permissions`. It MUST accept a req
 - THEN the role's assignments are replaced with exactly those slugs
 - AND the response returns HTTP 200 with the updated grouped catalog
 - AND the permission cache for all members of that role is invalidated
+
+#### Scenario: Admin role permission assignment is forbidden
+
+- GIVEN a tenant `admin` role with assigned permissions
+- WHEN `PUT /api/v1/roles/:id/permissions` is called for that role
+- THEN the response returns HTTP 403
+- AND the role's permissions remain unchanged
 
 #### Scenario: System role system permission protection
 

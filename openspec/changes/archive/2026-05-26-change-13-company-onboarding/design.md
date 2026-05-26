@@ -32,8 +32,8 @@ SELECT id, ? FROM roles WHERE slug = 'admin'
 ON CONFLICT DO NOTHING;
 ```
 
-### 5. Admin Role Protection (No Revocation)
-The `admin` role is protected. If anyone tries to modify an `admin` role's permissions via `AssignPermissions`, the service will verify that all currently assigned permissions of the `admin` role are present in the request. If any permission is omitted (revoked), the transaction is aborted and a `403 Forbidden` error is returned.
+### 5. Admin Role Protection (No Direct Assignment Changes)
+The `admin` role is protected. The landed implementation rejects direct permission assignment changes for roles with slug `admin` via `AssignPermissions`, returning `403 Forbidden` before replacement. Tenant admin permissions are managed by onboarding and automatic permission synchronization instead of ad-hoc assignment payloads.
 
 ---
 
@@ -163,14 +163,10 @@ func (r *GormRepository) AutoAssignToAdmins(permissionID uint) error {
 func (s *roleService) AssignPermissions(tc tenant.TenantContext, publicID string, req AssignRolePermissionsRequest, actorPermissions []string) (*RolePermissionAssignmentResponse, error) {
 	// ... validations and loading role ...
 	
-	if role.Slug == roles.AdminRoleSlug {
-		for _, perm := range role.Permissions {
-			if !selected[perm.Slug] {
-				return nil, apperror.ErrForbidden // Revoking admin permissions is strictly forbidden
-			}
-		}
+	if role.Slug == AdminRoleSlug {
+		return nil, apperror.ErrForbidden // Admin permissions are managed by onboarding and sync.
 	}
 	
-	// ... save and commit replacement ...
+	// ... save and commit replacement for non-admin roles ...
 }
 ```

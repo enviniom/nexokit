@@ -73,6 +73,23 @@ Endpoints MUST use the standard DTO envelope except successful DELETE responses,
 - WHEN a mutation endpoint is called
 - THEN the response returns HTTP 403
 
+### Requirement: Automatic admin permission synchronization
+
+When new system permissions are synchronized at startup, the system MUST automatically assign each newly created permission to all existing roles with slug `admin`. The assignment MUST be idempotent and MUST NOT duplicate existing `role_permissions` rows.
+
+#### Scenario: Newly synced permission assigned to tenant admins
+
+- GIVEN an existing tenant `admin` role
+- AND a permission slug exists in code but not yet in the database
+- WHEN permission synchronization creates that permission
+- THEN the permission is assigned to the tenant `admin` role
+
+#### Scenario: Existing permission is not reassigned
+
+- GIVEN a permission slug already exists in the database
+- WHEN permission synchronization runs again
+- THEN no duplicate permission assignment is created
+
 ### Requirement: Permission seeds
 
 The system MUST seed base permissions on startup or via seed command using explicit actions:

@@ -6,7 +6,7 @@ Create a highly robust tenant onboarding process. When a new company is register
 To ensure maximum security, scalability, and ease of maintenance in a multi-tenant SaaS environment, we will enforce three core platform rules:
 1. **Root-Only Onboarding Protection**: Company onboarding is restricted strictly to the global system operator (`root` role). By protecting the onboarding endpoint purely through the `RequireRole("root")` middleware instead of a permission slug, we completely prevent tenant administrators from gaining access to this capability.
 2. **Automatic Permission Synchronization for Admins**: Whenever a new system permission is registered in code and synced at startup, the system will automatically assign it to all existing tenant `admin` roles in the database. This guarantees that administrators automatically gain access to new system features.
-3. **Admin Permission Lock**: The system will protect the `admin` role from having any of its permissions revoked. Any attempt to update the permissions of an `admin` role that omits currently assigned permissions will be blocked at the service layer.
+3. **Admin Permission Lock**: The system will protect the `admin` role from direct permission assignment changes. Tenant admin permissions are granted through onboarding and automatic sync, and any direct assignment request for an `admin` role is blocked at the service layer.
 
 ---
 
@@ -63,7 +63,7 @@ To ensure maximum security, scalability, and ease of maintenance in a multi-tena
 ### 3. Roles Protection (Admin Permission Lock)
 
 #### [MODIFY] [service.go](file:///home/enviniom/Proyectos/Go/nexokit/internal/modules/roles/service.go)
-- Modify `AssignPermissions` method: if the target role's slug is `admin`, verify that all currently assigned permissions are present in the incoming payload. If any assigned permission is missing (revoked), reject the request with a `Forbidden` error.
+- Modify `AssignPermissions` method: if the target role's slug is `admin`, reject the direct permission assignment request with a `Forbidden` error. Admin role permissions are managed by onboarding and automatic permission sync.
 
 ---
 
