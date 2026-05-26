@@ -14,47 +14,65 @@ NexoKit is a modular Go starter framework for building SaaS APIs.
 
 ## Quick Start
 
-1. Copy the example environment file:
-   ```bash
-   cp .env.example .env
-   ```
+Follow these steps to set up the application with a local PostgreSQL instance:
 
-2. Start PostgreSQL:
-   ```bash
-   docker compose up -d
-   ```
+### 1. Environment Configuration
+Copy the example environment template to create your active `.env` file:
+```bash
+cp .env.example .env
+```
+*(Optionally open `.env` and verify your Postgres credentials match your running local container or docker-compose setup).*
 
-3. Run migrations:
-   ```bash
-   make migrate-up
-   ```
+### 2. Launch Local Database
+Start the pre-configured PostgreSQL container in the background:
+```bash
+docker compose up -d
+```
 
-4. Run the API:
-   ```bash
-   make run
-   ```
+### 3. Initialize Schema & Database Seeders
+Apply database migrations to structure the schema and seed the initial system permissions:
+```bash
+# Run GORM schema migrations
+make migrate-up
 
-5. Check health:
-   ```bash
-   curl http://localhost:8080/health
-   ```
+# Seed base system permissions required for RBAC
+make seed
+```
+
+### 4. Create Initial Global Root User
+Provision your initial super-administrator user (`root`). This account will read the values configured under `ROOT_USER_NAME`, `ROOT_USER_EMAIL`, and `ROOT_USER_PASSWORD` inside your `.env`:
+```bash
+make create-root
+```
+
+### 5. Fire Up the Server 🚀
+Start the API server in active development mode:
+```bash
+make dev
+```
+The server will boot on port `8080` (or the one defined under `APP_PORT` in your `.env`).
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `make build` | Build the API binary |
-| `make run` | Run the API in development mode |
+| `make build` | Build the API and CLI binaries |
+| `make dev` | Run the API server in development mode |
 | `make test` | Run all tests |
-| `make migrate-up` | Apply pending migrations |
-| `make migrate-down` | Revert last migration |
-| `make migrate-create` | Create a new migration |
-| `make migrate-status` | Show migration status |
-| `make fmt` | Format all Go files |
-| `make vet` | Run go vet |
-| `make install-hooks` | Install Git pre-commit hook |
-| `make uninstall-hooks` | Remove Git pre-commit hook |
-| `make check-env` | Check `.env` / `.env.example` parity |
+| `make test-unit` | Run fast unit tests only |
+| `make test-integration` | Run database integration tests |
+| `make migrate-up` | Apply pending database migrations |
+| `make migrate-down` | Revert the last applied database migration |
+| `make migrate-create` | Create a new SQL migration template |
+| `make migrate-status` | Display the status of database migrations |
+| `make migrate-reset` | Rollback all database migrations |
+| `make seed` | Load system permission catalog seeds into DB |
+| `make create-root` | Provision the initial global root user from .env credentials |
+| `make fmt` | Format all Go source files |
+| `make vet` | Run go vet analysis |
+| `make install-hooks` | Install local Git pre-commit hooks |
+| `make uninstall-hooks` | Remove Git pre-commit hooks |
+| `make check-env` | Check `.env` and `.env.example` key alignment |
 
 ## Pre-commit Hooks
 
