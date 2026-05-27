@@ -72,7 +72,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	loginRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "login", cfg.RateLimit.LoginRPM, window)
 	refreshRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "refresh", cfg.RateLimit.RefreshRPM, window)
 
-	onboardingService := onboarding.NewService(db, passwordManager)
+	onboardingService := onboarding.NewService(db, passwordManager, onboarding.WithPlatformDomain(cfg.App.PlatformDomain))
 	onboardingHandler := onboarding.NewHandler(onboardingService)
 
 	return &Container{

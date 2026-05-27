@@ -24,10 +24,11 @@ type Config struct {
 
 // AppConfig holds application-level settings.
 type AppConfig struct {
-	Name string
-	Env  string
-	URL  string
-	Port int
+	Name           string
+	Env            string
+	URL            string
+	Port           int
+	PlatformDomain string
 }
 
 // DBConfig holds database connection settings.
@@ -201,10 +202,11 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		App: AppConfig{
-			Name: getString("APP_NAME", "nexokit"),
-			Env:  getString("APP_ENV", "development"),
-			URL:  getString("APP_URL", "http://localhost:8080"),
-			Port: port,
+			Name:           getString("APP_NAME", "nexokit"),
+			Env:            getString("APP_ENV", "development"),
+			URL:            getString("APP_URL", "http://localhost:8080"),
+			Port:           port,
+			PlatformDomain: getString("APP_PLATFORM_DOMAIN", ""),
 		},
 		DB: DBConfig{
 			Host:            getString("DB_HOST", "localhost"),

@@ -40,5 +40,9 @@ Thumbs.db
 # Go workspace
 go.work
 go.work.sum
-# Local Pi runtime state
+
+# Local Pi/runtime state
 .atl/
+.pi/
+.pi-lens/
+context.md

@@ -132,7 +132,8 @@ func TestHandler_Onboard_ConflictErrors(t *testing.T) {
 	}{
 		{name: "duplicate company slug", serviceError: ErrDuplicateCompanySlug, errorField: "slug"},
 		{name: "duplicate company domain", serviceError: ErrDuplicateCompanyDomain, errorField: "domain"},
-		{name: "duplicate company subdomain", serviceError: ErrDuplicateCompanySubdomain, errorField: "subdomain"},
+		{name: "duplicate technical domain", serviceError: ErrDuplicateTechnicalDomain, errorField: "generate_technical_domain"},
+		{name: "missing platform domain", serviceError: ErrMissingPlatformDomain, errorField: "generate_technical_domain"},
 		{name: "duplicate admin email", serviceError: ErrDuplicateAdminEmail, errorField: "admin_email"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

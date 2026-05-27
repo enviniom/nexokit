@@ -8,7 +8,7 @@ Company model, migration, and management endpoints. New company creation is hand
 
 ### Requirement: Company model and migration
 
-The system MUST define a `Company` model with fields: `ID uint` (primaryKey), `PublicID string` (char(26), uniqueIndex), `Name string` (not null), `Slug string` (uniqueIndex, not null), `Domain *string` (nullable), `Subdomain *string` (nullable), `Status string` (not null), `CreatedAt time.Time`, `UpdatedAt time.Time`, `DeletedAt gorm.DeletedAt` (index), `CreatedBy *uint` (index), `UpdatedBy *uint` (index). A Goose migration MUST create the `companies` table.
+The system MUST define a `Company` model with fields: `ID uint` (primaryKey), `PublicID string` (char(26), uniqueIndex), `Name string` (not null), `Slug string` (uniqueIndex, not null), `Status string` (not null), `CreatedAt time.Time`, `UpdatedAt time.Time`, `DeletedAt gorm.DeletedAt` (index), `CreatedBy *uint` (index), `UpdatedBy *uint` (index). The model MUST have a `Domains` relationship to `[]CompanyDomain`. The system MUST NOT include `Domain` or `Subdomain` fields on the `Company` model — tenant hostname ownership is managed exclusively through the `company_domains` table. A Goose migration MUST create the `companies` table.
 
 #### Scenario: Migration creates companies table
 
@@ -41,8 +41,9 @@ The system MUST expose `GET /api/v1/companies`, `GET /api/v1/companies/:id`, `PU
 #### Scenario: Update company
 
 - GIVEN an existing company
-- WHEN `PUT /api/v1/companies/:id` is called with updated `name` or `domain`
+- WHEN `PUT /api/v1/companies/:id` is called with updated `name` or `status`
 - THEN the response returns HTTP 200 with the updated company
+- AND domain ownership MUST remain unchanged (domains are managed through dedicated endpoints)
 
 #### Scenario: Delete company
 

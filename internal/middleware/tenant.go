@@ -3,6 +3,7 @@ package middleware
 import (
 	"errors"
 	"net"
+	"net/http"
 	"strings"
 	"time"
 
@@ -24,15 +25,23 @@ var ErrTenantNotFound = errors.New("tenant not found")
 
 const msgCompanyScopeRequired = "X-Company-ID header is required for this tenant-scoped request"
 
+// HostResolution describes the tenant and domain metadata resolved from a public host.
+type HostResolution = tenant.HostResolution
+
 // CompanyResolver resolves external company identifiers to internal tenant refs.
 type CompanyResolver interface {
 	FindByPublicIDOrSlug(value string) (tenant.CompanyRef, error)
-	FindByHost(host string) (tenant.CompanyRef, error)
+	ResolveHost(host string) (tenant.HostResolution, error)
 }
 
 type cachedTenant struct {
 	company tenant.CompanyRef
 	expires time.Time
+}
+
+type cachedHostResolution struct {
+	resolution tenant.HostResolution
+	expires    time.Time
 }
 
 // RequireTenantScope resolves tenant context for tenant-owned private routes.
@@ -93,57 +102,84 @@ func privateTenant(resolver CompanyResolver, allowRootGlobal bool) gin.HandlerFu
 
 // PublicTenant resolves tenant context for unauthenticated public routes.
 func PublicTenant(resolver CompanyResolver, appEnv string) gin.HandlerFunc {
-	cache := map[string]cachedTenant{}
+	hostCache := map[string]cachedHostResolution{}
+	tenantCache := map[string]cachedTenant{}
 
 	return func(c *gin.Context) {
-		company, ok := resolvePublicCompany(c, resolver, appEnv, cache)
-		if !ok {
-			response.NotFound(c, messages.MsgNotFound)
-			c.Abort()
+		resolution, ok := resolvePublicHost(c, resolver, hostCache)
+		if ok {
+			if redirectToPrimary(c, resolution) {
+				return
+			}
+			tenant.SetGin(c, tenant.NewScoped(resolution.Company.ID, resolution.Company.Slug))
+			c.Next()
 			return
 		}
 
-		tenant.SetGin(c, tenant.NewScoped(company.ID, company.Slug))
-		c.Next()
+		if appEnv == "development" {
+			requestedTenant := strings.TrimSpace(c.GetHeader(tenantHeader))
+			if requestedTenant != "" {
+				if company, ok := cachedLookup(tenantCache, "slug:"+requestedTenant); ok {
+					tenant.SetGin(c, tenant.NewScoped(company.ID, company.Slug))
+					c.Next()
+					return
+				}
+				if company, err := resolveByIDOrSlug(resolver, requestedTenant); err == nil {
+					cacheStore(tenantCache, "slug:"+requestedTenant, company)
+					tenant.SetGin(c, tenant.NewScoped(company.ID, company.Slug))
+					c.Next()
+					return
+				}
+			}
+		}
+
+		response.NotFound(c, messages.MsgNotFound)
+		c.Abort()
 	}
 }
 
-func resolvePublicCompany(c *gin.Context, resolver CompanyResolver, appEnv string, cache map[string]cachedTenant) (tenant.CompanyRef, bool) {
+func resolvePublicHost(c *gin.Context, resolver CompanyResolver, cache map[string]cachedHostResolution) (tenant.HostResolution, bool) {
 	host := normalizeHost(c.Request.Host)
-	if host != "" {
-		if company, ok := cachedLookup(cache, "host:"+host); ok {
-			return company, true
-		}
-		if company, err := resolver.FindByHost(host); err == nil {
-			cacheStore(cache, "host:"+host, company)
-			return company, true
-		}
-
-		if slug := firstSubdomain(host); slug != "" {
-			if company, ok := cachedLookup(cache, "slug:"+slug); ok {
-				return company, true
-			}
-			if company, err := resolveByIDOrSlug(resolver, slug); err == nil {
-				cacheStore(cache, "slug:"+slug, company)
-				return company, true
-			}
-		}
+	if host == "" || resolver == nil {
+		return tenant.HostResolution{}, false
 	}
-
-	if appEnv == "development" {
-		requestedTenant := strings.TrimSpace(c.GetHeader(tenantHeader))
-		if requestedTenant != "" {
-			if company, ok := cachedLookup(cache, "slug:"+requestedTenant); ok {
-				return company, true
-			}
-			if company, err := resolveByIDOrSlug(resolver, requestedTenant); err == nil {
-				cacheStore(cache, "slug:"+requestedTenant, company)
-				return company, true
-			}
-		}
+	if resolution, ok := cachedHostLookup(cache, "host:"+host); ok {
+		return resolution, true
 	}
+	resolution, err := resolver.ResolveHost(host)
+	if err != nil || resolution.Company.ID == 0 {
+		return tenant.HostResolution{}, false
+	}
+	cacheHostStore(cache, "host:"+host, resolution)
+	return resolution, true
+}
 
-	return tenant.CompanyRef{}, false
+func redirectToPrimary(c *gin.Context, resolution tenant.HostResolution) bool {
+	if !resolution.RedirectToPrimary || resolution.PrimaryDomain == nil {
+		return false
+	}
+	primary := normalizeHost(*resolution.PrimaryDomain)
+	matched := normalizeHost(resolution.MatchedDomain)
+	if primary == "" || primary == matched {
+		return false
+	}
+	location := requestScheme(c) + "://" + primary + c.Request.URL.RequestURI()
+	c.Redirect(http.StatusPermanentRedirect, location)
+	c.Abort()
+	return true
+}
+
+func requestScheme(c *gin.Context) string {
+	if proto := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")); proto != "" {
+		return strings.ToLower(strings.Split(proto, ",")[0])
+	}
+	if c.Request.TLS != nil {
+		return "https"
+	}
+	if c.Request.URL != nil && c.Request.URL.Scheme != "" {
+		return c.Request.URL.Scheme
+	}
+	return "http"
 }
 
 func resolveByIDOrSlug(resolver CompanyResolver, value string) (tenant.CompanyRef, error) {
@@ -170,14 +206,6 @@ func normalizeHost(host string) string {
 	return strings.ToLower(strings.TrimSpace(host))
 }
 
-func firstSubdomain(host string) string {
-	parts := strings.Split(host, ".")
-	if len(parts) < 3 || parts[0] == "" || parts[0] == "www" {
-		return ""
-	}
-	return parts[0]
-}
-
 func cachedLookup(cache map[string]cachedTenant, key string) (tenant.CompanyRef, bool) {
 	entry, ok := cache[key]
 	if !ok || time.Now().After(entry.expires) {
@@ -188,4 +216,16 @@ func cachedLookup(cache map[string]cachedTenant, key string) (tenant.CompanyRef,
 
 func cacheStore(cache map[string]cachedTenant, key string, company tenant.CompanyRef) {
 	cache[key] = cachedTenant{company: company, expires: time.Now().Add(cacheTTL)}
+}
+
+func cachedHostLookup(cache map[string]cachedHostResolution, key string) (tenant.HostResolution, bool) {
+	entry, ok := cache[key]
+	if !ok || time.Now().After(entry.expires) {
+		return tenant.HostResolution{}, false
+	}
+	return entry.resolution, true
+}
+
+func cacheHostStore(cache map[string]cachedHostResolution, key string, resolution tenant.HostResolution) {
+	cache[key] = cachedHostResolution{resolution: resolution, expires: time.Now().Add(cacheTTL)}
 }

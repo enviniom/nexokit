@@ -16,10 +16,11 @@ import (
 )
 
 var (
-	ErrDuplicateCompanySlug      = errors.New("company slug already exists")
-	ErrDuplicateCompanyDomain    = errors.New("company domain already exists")
-	ErrDuplicateCompanySubdomain = errors.New("company subdomain already exists")
-	ErrDuplicateAdminEmail       = errors.New("admin email already exists")
+	ErrDuplicateCompanySlug     = errors.New("company slug already exists")
+	ErrDuplicateCompanyDomain   = errors.New("company domain already exists")
+	ErrDuplicateTechnicalDomain = errors.New("company technical domain already exists")
+	ErrMissingPlatformDomain    = errors.New("platform domain is required to generate technical domain")
+	ErrDuplicateAdminEmail      = errors.New("admin email already exists")
 )
 
 // Service defines company onboarding business operations.
@@ -28,13 +29,28 @@ type Service interface {
 }
 
 type service struct {
-	db     *gorm.DB
-	hasher users.PasswordHasher
+	db             *gorm.DB
+	hasher         users.PasswordHasher
+	platformDomain string
+}
+
+// Option configures onboarding service behavior.
+type Option func(*service)
+
+// WithPlatformDomain configures the base domain used for generated technical company domains.
+func WithPlatformDomain(domain string) Option {
+	return func(s *service) {
+		s.platformDomain = normalizeDomain(domain)
+	}
 }
 
 // NewService creates a new onboarding service instance.
-func NewService(db *gorm.DB, hasher users.PasswordHasher) Service {
-	return &service{db: db, hasher: hasher}
+func NewService(db *gorm.DB, hasher users.PasswordHasher, opts ...Option) Service {
+	svc := &service{db: db, hasher: hasher}
+	for _, opt := range opts {
+		opt(svc)
+	}
+	return svc
 }
 
 // Onboard runs the complete transactional onboarding flow for a tenant.
@@ -45,8 +61,7 @@ func (s *service) Onboard(ctx context.Context, req OnboardCompanyRequest) (*Onbo
 
 	var res OnboardCompanyResponse
 
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		// 1. Validate company slug system-wide uniqueness
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		normalizedSlug := strings.ToLower(strings.TrimSpace(req.Slug))
 		var count int64
 		if err := tx.Model(&companies.Company{}).Where("slug = ?", normalizedSlug).Count(&count).Error; err != nil {
@@ -56,33 +71,28 @@ func (s *service) Onboard(ctx context.Context, req OnboardCompanyRequest) (*Onbo
 			return ErrDuplicateCompanySlug
 		}
 
-		// 2. Validate domain uniqueness system-wide if provided
-		var normalizedDomain *string
-		if req.Domain != nil && *req.Domain != "" {
-			d := strings.ToLower(strings.TrimSpace(*req.Domain))
-			normalizedDomain = &d
-			if err := tx.Model(&companies.Company{}).Where("domain = ?", *normalizedDomain).Count(&count).Error; err != nil {
+		var normalizedDomain string
+		if req.Domain != nil && strings.TrimSpace(*req.Domain) != "" {
+			normalizedDomain = normalizeDomain(*req.Domain)
+			if err := ensureDomainAvailable(tx, normalizedDomain, ErrDuplicateCompanyDomain); err != nil {
 				return err
-			}
-			if count > 0 {
-				return ErrDuplicateCompanyDomain
 			}
 		}
 
-		// 3. Validate subdomain uniqueness system-wide if provided
-		var normalizedSubdomain *string
-		if req.Subdomain != nil && *req.Subdomain != "" {
-			sd := strings.ToLower(strings.TrimSpace(*req.Subdomain))
-			normalizedSubdomain = &sd
-			if err := tx.Model(&companies.Company{}).Where("subdomain = ?", *normalizedSubdomain).Count(&count).Error; err != nil {
-				return err
+		var technicalDomain string
+		if req.GenerateTechnicalDomain {
+			if s.platformDomain == "" {
+				return ErrMissingPlatformDomain
 			}
-			if count > 0 {
-				return ErrDuplicateCompanySubdomain
+			technicalDomain = normalizedSlug + "." + s.platformDomain
+			if normalizedDomain != "" && normalizedDomain == technicalDomain {
+				return ErrDuplicateTechnicalDomain
+			}
+			if err := ensureDomainAvailable(tx, technicalDomain, ErrDuplicateTechnicalDomain); err != nil {
+				return err
 			}
 		}
 
-		// 4. Validate admin email uniqueness system-wide
 		normalizedEmail := strings.ToLower(strings.TrimSpace(req.AdminEmail))
 		if err := tx.Model(&users.User{}).Where("email = ?", normalizedEmail).Count(&count).Error; err != nil {
 			return err
@@ -91,7 +101,6 @@ func (s *service) Onboard(ctx context.Context, req OnboardCompanyRequest) (*Onbo
 			return ErrDuplicateAdminEmail
 		}
 
-		// 5. Create Company
 		companyPubID, err := identity.Generate()
 		if err != nil {
 			return err
@@ -100,15 +109,23 @@ func (s *service) Onboard(ctx context.Context, req OnboardCompanyRequest) (*Onbo
 			BaseModel: shared.BaseModel{PublicID: companyPubID},
 			Name:      req.Name,
 			Slug:      normalizedSlug,
-			Domain:    normalizedDomain,
-			Subdomain: normalizedSubdomain,
 			Status:    companies.CompanyStatusActive,
 		}
 		if err := tx.Create(company).Error; err != nil {
 			return err
 		}
 
-		// 6. Create Tenant "admin" Role
+		if normalizedDomain != "" {
+			if err := createCompanyDomain(tx, company.ID, normalizedDomain, companies.CompanyDomainKindPrimary); err != nil {
+				return err
+			}
+		}
+		if technicalDomain != "" {
+			if err := createCompanyDomain(tx, company.ID, technicalDomain, companies.CompanyDomainKindTechnical); err != nil {
+				return err
+			}
+		}
+
 		adminRolePubID, err := identity.Generate()
 		if err != nil {
 			return err
@@ -125,7 +142,6 @@ func (s *service) Onboard(ctx context.Context, req OnboardCompanyRequest) (*Onbo
 			return err
 		}
 
-		// 7. Create Tenant "user" Role
 		userRolePubID, err := identity.Generate()
 		if err != nil {
 			return err
@@ -142,13 +158,11 @@ func (s *service) Onboard(ctx context.Context, req OnboardCompanyRequest) (*Onbo
 			return err
 		}
 
-		// 8. Load All Registered System Permissions
 		var systemPermissions []permissions.Permission
 		if err := tx.Find(&systemPermissions).Error; err != nil {
 			return err
 		}
 
-		// 9. Assign All System Permissions to Tenant "admin" Role
 		for _, perm := range systemPermissions {
 			if err := tx.Table("role_permissions").Create(map[string]any{
 				"role_id":       adminRole.ID,
@@ -158,7 +172,6 @@ func (s *service) Onboard(ctx context.Context, req OnboardCompanyRequest) (*Onbo
 			}
 		}
 
-		// 10. Assign Base Permissions subset (users.view, roles.view) to Tenant "user" Role
 		for _, perm := range systemPermissions {
 			if perm.Slug == "users.view" || perm.Slug == "roles.view" {
 				if err := tx.Table("role_permissions").Create(map[string]any{
@@ -170,13 +183,11 @@ func (s *service) Onboard(ctx context.Context, req OnboardCompanyRequest) (*Onbo
 			}
 		}
 
-		// 11. Hash Administrator Password
 		passwordHash, err := s.hasher.HashPassword(req.AdminPassword)
 		if err != nil {
 			return err
 		}
 
-		// 12. Create Initial Administrator User
 		adminUserPubID, err := identity.Generate()
 		if err != nil {
 			return err
@@ -194,7 +205,6 @@ func (s *service) Onboard(ctx context.Context, req OnboardCompanyRequest) (*Onbo
 			return err
 		}
 
-		// Save response values
 		res.CompanyPublicID = company.PublicID
 		res.CompanySlug = company.Slug
 		res.AdminPublicID = adminUser.PublicID
@@ -208,4 +218,34 @@ func (s *service) Onboard(ctx context.Context, req OnboardCompanyRequest) (*Onbo
 	}
 
 	return &res, nil
+}
+
+func ensureDomainAvailable(tx *gorm.DB, domain string, duplicateErr error) error {
+	var count int64
+	if err := tx.Model(&companies.CompanyDomain{}).Where("domain = ?", domain).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return duplicateErr
+	}
+	return nil
+}
+
+func createCompanyDomain(tx *gorm.DB, companyID uint, domain, kind string) error {
+	publicID, err := identity.Generate()
+	if err != nil {
+		return err
+	}
+	return tx.Create(&companies.CompanyDomain{
+		BaseModel:         shared.BaseModel{PublicID: publicID},
+		CompanyID:         companyID,
+		Domain:            domain,
+		Kind:              kind,
+		Status:            companies.CompanyDomainStatusActive,
+		RedirectToPrimary: false,
+	}).Error
+}
+
+func normalizeDomain(domain string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(domain)), ".")
 }

@@ -37,6 +37,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	// AutoMigrate all models to set up the schema
 	err = db.AutoMigrate(
 		&companies.Company{},
+		&companies.CompanyDomain{},
 		&roles.Role{},
 		&permissions.Permission{},
 		&users.User{},
@@ -121,6 +122,200 @@ func TestService_Onboard_Success(t *testing.T) {
 
 	if adminUser.PasswordHash != "hashed_SuperSecurePassword123" {
 		t.Errorf("expected password to be hashed correctly")
+	}
+}
+
+func TestService_Onboard_CreatesPrimaryDomain(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewService(db, fakePasswordHasher{})
+	domain := " DreamMakers.COM.CO "
+
+	_, err := svc.Onboard(context.Background(), OnboardCompanyRequest{
+		Name:          "Dream Makers",
+		Slug:          "dreammakers",
+		Domain:        &domain,
+		AdminName:     "Jane Admin",
+		AdminEmail:    "jane@dreammakers.com.co",
+		AdminPassword: "SuperSecurePassword123",
+	})
+	if err != nil {
+		t.Fatalf("expected successful onboarding, got error: %v", err)
+	}
+
+	var company companies.Company
+	if err := db.Where("slug = ?", "dreammakers").First(&company).Error; err != nil {
+		t.Fatalf("expected company: %v", err)
+	}
+	var domainRow companies.CompanyDomain
+	if err := db.Where("company_id = ? AND domain = ?", company.ID, "dreammakers.com.co").First(&domainRow).Error; err != nil {
+		t.Fatalf("expected primary domain row: %v", err)
+	}
+	if domainRow.Kind != companies.CompanyDomainKindPrimary || domainRow.Status != companies.CompanyDomainStatusActive || domainRow.RedirectToPrimary {
+		t.Fatalf("unexpected primary domain row: %#v", domainRow)
+	}
+}
+
+func TestService_Onboard_CreatesTechnicalDomainWhenRequested(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewService(db, fakePasswordHasher{}, WithPlatformDomain("KilaShop.COM"))
+
+	_, err := svc.Onboard(context.Background(), OnboardCompanyRequest{
+		Name:                    "Dream Makers",
+		Slug:                    " DreamMakers ",
+		GenerateTechnicalDomain: true,
+		AdminName:               "Jane Admin",
+		AdminEmail:              "jane@dreammakers.com.co",
+		AdminPassword:           "SuperSecurePassword123",
+	})
+	if err != nil {
+		t.Fatalf("expected successful onboarding, got error: %v", err)
+	}
+
+	var domainRow companies.CompanyDomain
+	if err := db.Where("domain = ?", "dreammakers.kilashop.com").First(&domainRow).Error; err != nil {
+		t.Fatalf("expected technical domain row: %v", err)
+	}
+	if domainRow.Kind != companies.CompanyDomainKindTechnical || domainRow.Status != companies.CompanyDomainStatusActive {
+		t.Fatalf("unexpected technical domain row: %#v", domainRow)
+	}
+}
+
+func TestService_Onboard_SkipsTechnicalDomainWhenNotRequested(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewService(db, fakePasswordHasher{}, WithPlatformDomain("kilashop.com"))
+
+	_, err := svc.Onboard(context.Background(), OnboardCompanyRequest{
+		Name:          "Dream Makers",
+		Slug:          "dreammakers",
+		AdminName:     "Jane Admin",
+		AdminEmail:    "jane@dreammakers.com.co",
+		AdminPassword: "SuperSecurePassword123",
+	})
+	if err != nil {
+		t.Fatalf("expected successful onboarding, got error: %v", err)
+	}
+
+	var domainCount int64
+	db.Model(&companies.CompanyDomain{}).Where("domain = ?", "dreammakers.kilashop.com").Count(&domainCount)
+	if domainCount != 0 {
+		t.Fatalf("expected technical domain to be skipped, got count %d", domainCount)
+	}
+}
+
+func TestService_Onboard_DuplicateDomain_Rollback(t *testing.T) {
+	db := setupTestDB(t)
+	existingCompany := companies.Company{Name: "Existing", Slug: "existing", Status: companies.CompanyStatusActive}
+	if err := db.Create(&existingCompany).Error; err != nil {
+		t.Fatalf("seed company: %v", err)
+	}
+	if err := db.Create(&companies.CompanyDomain{CompanyID: existingCompany.ID, Domain: "dreammakers.com.co", Kind: companies.CompanyDomainKindPrimary, Status: companies.CompanyDomainStatusActive}).Error; err != nil {
+		t.Fatalf("seed company domain: %v", err)
+	}
+	svc := NewService(db, fakePasswordHasher{})
+	domain := "dreammakers.com.co"
+
+	_, err := svc.Onboard(context.Background(), OnboardCompanyRequest{
+		Name:          "Dream Makers",
+		Slug:          "dreammakers",
+		Domain:        &domain,
+		AdminName:     "Jane Admin",
+		AdminEmail:    "jane@dreammakers.com.co",
+		AdminPassword: "SuperSecurePassword123",
+	})
+	if !errors.Is(err, ErrDuplicateCompanyDomain) {
+		t.Fatalf("expected ErrDuplicateCompanyDomain, got: %v", err)
+	}
+
+	var companyCount int64
+	db.Model(&companies.Company{}).Where("slug = ?", "dreammakers").Count(&companyCount)
+	if companyCount > 0 {
+		t.Fatal("expected duplicate domain onboarding to rollback company creation")
+	}
+}
+
+func TestService_Onboard_DuplicateDomainWithTrailingDot_Rollback(t *testing.T) {
+	db := setupTestDB(t)
+	existingCompany := companies.Company{Name: "Existing", Slug: "existing", Status: companies.CompanyStatusActive}
+	if err := db.Create(&existingCompany).Error; err != nil {
+		t.Fatalf("seed company: %v", err)
+	}
+	if err := db.Create(&companies.CompanyDomain{CompanyID: existingCompany.ID, Domain: "dreammakers.com.co", Kind: companies.CompanyDomainKindPrimary, Status: companies.CompanyDomainStatusActive}).Error; err != nil {
+		t.Fatalf("seed company domain: %v", err)
+	}
+	svc := NewService(db, fakePasswordHasher{})
+	domain := "dreammakers.com.co."
+
+	_, err := svc.Onboard(context.Background(), OnboardCompanyRequest{
+		Name:          "Dream Makers",
+		Slug:          "dreammakers",
+		Domain:        &domain,
+		AdminName:     "Jane Admin",
+		AdminEmail:    "jane@dreammakers.com.co",
+		AdminPassword: "SuperSecurePassword123",
+	})
+	if !errors.Is(err, ErrDuplicateCompanyDomain) {
+		t.Fatalf("expected ErrDuplicateCompanyDomain, got: %v", err)
+	}
+
+	var companyCount int64
+	db.Model(&companies.Company{}).Where("slug = ?", "dreammakers").Count(&companyCount)
+	if companyCount > 0 {
+		t.Fatal("expected duplicate domain onboarding to rollback company creation")
+	}
+}
+
+func TestService_Onboard_DuplicateTechnicalDomain_Rollback(t *testing.T) {
+	db := setupTestDB(t)
+	existingCompany := companies.Company{Name: "Existing", Slug: "existing", Status: companies.CompanyStatusActive}
+	if err := db.Create(&existingCompany).Error; err != nil {
+		t.Fatalf("seed company: %v", err)
+	}
+	if err := db.Create(&companies.CompanyDomain{CompanyID: existingCompany.ID, Domain: "dreammakers.kilashop.com", Kind: companies.CompanyDomainKindTechnical, Status: companies.CompanyDomainStatusActive}).Error; err != nil {
+		t.Fatalf("seed technical domain: %v", err)
+	}
+	svc := NewService(db, fakePasswordHasher{}, WithPlatformDomain("kilashop.com"))
+
+	_, err := svc.Onboard(context.Background(), OnboardCompanyRequest{
+		Name:                    "Dream Makers",
+		Slug:                    "dreammakers",
+		GenerateTechnicalDomain: true,
+		AdminName:               "Jane Admin",
+		AdminEmail:              "jane@dreammakers.com.co",
+		AdminPassword:           "SuperSecurePassword123",
+	})
+	if !errors.Is(err, ErrDuplicateTechnicalDomain) {
+		t.Fatalf("expected ErrDuplicateTechnicalDomain, got: %v", err)
+	}
+
+	var companyCount int64
+	db.Model(&companies.Company{}).Where("slug = ?", "dreammakers").Count(&companyCount)
+	if companyCount > 0 {
+		t.Fatal("expected duplicate technical domain onboarding to rollback company creation")
+	}
+}
+
+func TestService_Onboard_PrimaryDomainCannotEqualGeneratedTechnicalDomain(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewService(db, fakePasswordHasher{}, WithPlatformDomain("kilashop.com"))
+	domain := "dreammakers.kilashop.com"
+
+	_, err := svc.Onboard(context.Background(), OnboardCompanyRequest{
+		Name:                    "Dream Makers",
+		Slug:                    "dreammakers",
+		Domain:                  &domain,
+		GenerateTechnicalDomain: true,
+		AdminName:               "Jane Admin",
+		AdminEmail:              "jane@dreammakers.com.co",
+		AdminPassword:           "SuperSecurePassword123",
+	})
+	if !errors.Is(err, ErrDuplicateTechnicalDomain) {
+		t.Fatalf("expected ErrDuplicateTechnicalDomain, got: %v", err)
+	}
+
+	var companyCount int64
+	db.Model(&companies.Company{}).Where("slug = ?", "dreammakers").Count(&companyCount)
+	if companyCount > 0 {
+		t.Fatal("expected matching primary/technical domain onboarding to rollback company creation")
 	}
 }
 

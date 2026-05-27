@@ -7,13 +7,13 @@ import (
 
 // OnboardCompanyRequest carries the required payload to onboard a company and provision its administrator.
 type OnboardCompanyRequest struct {
-	Name          string  `json:"name"`
-	Slug          string  `json:"slug"`
-	Domain        *string `json:"domain,omitempty"`
-	Subdomain     *string `json:"subdomain,omitempty"`
-	AdminName     string  `json:"admin_name"`
-	AdminEmail    string  `json:"admin_email"`
-	AdminPassword string  `json:"admin_password"`
+	Name                    string  `json:"name"`
+	Slug                    string  `json:"slug"`
+	Domain                  *string `json:"domain,omitempty"`
+	GenerateTechnicalDomain bool    `json:"generate_technical_domain"`
+	AdminName               string  `json:"admin_name"`
+	AdminEmail              string  `json:"admin_email"`
+	AdminPassword           string  `json:"admin_password"`
 }
 
 // OnboardCompanyResponse holds the output values after successful onboarding.

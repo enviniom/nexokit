@@ -49,8 +49,11 @@ func (h *Handler) respondError(c *gin.Context, err error) {
 	case errors.Is(err, ErrDuplicateCompanyDomain):
 		errs.Add("domain", messages.MsgConflict)
 		response.ValidationError(c, errs)
-	case errors.Is(err, ErrDuplicateCompanySubdomain):
-		errs.Add("subdomain", messages.MsgConflict)
+	case errors.Is(err, ErrDuplicateTechnicalDomain):
+		errs.Add("generate_technical_domain", messages.MsgConflict)
+		response.ValidationError(c, errs)
+	case errors.Is(err, ErrMissingPlatformDomain):
+		errs.Add("generate_technical_domain", messages.MsgInvalidFormat)
 		response.ValidationError(c, errs)
 	case errors.Is(err, ErrDuplicateAdminEmail):
 		errs.Add("admin_email", messages.MsgConflict)

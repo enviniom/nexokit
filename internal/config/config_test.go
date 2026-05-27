@@ -20,6 +20,9 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.App.Port != 8080 {
 		t.Errorf("expected default APP_PORT 8080, got %d", cfg.App.Port)
 	}
+	if cfg.App.PlatformDomain != "" {
+		t.Errorf("expected default APP_PLATFORM_DOMAIN empty, got %s", cfg.App.PlatformDomain)
+	}
 	if cfg.DB.Host != "localhost" {
 		t.Errorf("expected default DB_HOST 'localhost', got %s", cfg.DB.Host)
 	}
@@ -98,6 +101,7 @@ func TestLoad_CustomValues(t *testing.T) {
 	os.Clearenv()
 	os.Setenv("APP_NAME", "testapp")
 	os.Setenv("APP_PORT", "3000")
+	os.Setenv("APP_PLATFORM_DOMAIN", "kilashop.com")
 	os.Setenv("DB_HOST", "db.example.com")
 	os.Setenv("DB_PORT", "5433")
 	os.Setenv("SHUTDOWN_TIMEOUT_SECONDS", "10")
@@ -120,6 +124,9 @@ func TestLoad_CustomValues(t *testing.T) {
 	}
 	if cfg.App.Port != 3000 {
 		t.Errorf("expected APP_PORT 3000, got %d", cfg.App.Port)
+	}
+	if cfg.App.PlatformDomain != "kilashop.com" {
+		t.Errorf("expected APP_PLATFORM_DOMAIN 'kilashop.com', got %s", cfg.App.PlatformDomain)
 	}
 	if cfg.DB.Host != "db.example.com" {
 		t.Errorf("expected DB_HOST 'db.example.com', got %s", cfg.DB.Host)

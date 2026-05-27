@@ -15,7 +15,7 @@ import (
 
 type fakeCompanyResolver struct {
 	byIDOrSlug map[string]tenant.CompanyRef
-	byHost     map[string]tenant.CompanyRef
+	byHost     map[string]HostResolution
 	err        error
 }
 
@@ -30,15 +30,15 @@ func (f fakeCompanyResolver) FindByPublicIDOrSlug(value string) (tenant.CompanyR
 	return company, nil
 }
 
-func (f fakeCompanyResolver) FindByHost(host string) (tenant.CompanyRef, error) {
+func (f fakeCompanyResolver) ResolveHost(host string) (HostResolution, error) {
 	if f.err != nil {
-		return tenant.CompanyRef{}, f.err
+		return HostResolution{}, f.err
 	}
-	company, ok := f.byHost[host]
+	resolution, ok := f.byHost[host]
 	if !ok {
-		return tenant.CompanyRef{}, ErrTenantNotFound
+		return HostResolution{}, ErrTenantNotFound
 	}
-	return company, nil
+	return resolution, nil
 }
 
 func TestAllowRootGlobalScope(t *testing.T) {
@@ -210,24 +210,23 @@ func TestPublicTenant(t *testing.T) {
 		wantTenant tenant.TenantContext
 	}{
 		{
-			name: "host resolves exact company domain",
+			name: "host resolves exact active company domain",
 			env:  "production",
 			host: "store.acme.com",
-			resolver: fakeCompanyResolver{byHost: map[string]tenant.CompanyRef{
-				"store.acme.com": {ID: 11, Slug: "acme"},
+			resolver: fakeCompanyResolver{byHost: map[string]HostResolution{
+				"store.acme.com": {Company: tenant.CompanyRef{ID: 11, Slug: "acme"}, MatchedDomain: "store.acme.com"},
 			}},
 			wantStatus: http.StatusOK,
 			wantTenant: tenant.NewScoped(11, "acme"),
 		},
 		{
-			name: "subdomain resolves company slug",
+			name: "subdomain does not resolve company slug without explicit domain row",
 			env:  "production",
 			host: "acme.app.nexokit.com",
 			resolver: fakeCompanyResolver{byIDOrSlug: map[string]tenant.CompanyRef{
 				"acme": {ID: 12, Slug: "acme"},
 			}},
-			wantStatus: http.StatusOK,
-			wantTenant: tenant.NewScoped(12, "acme"),
+			wantStatus: http.StatusNotFound,
 		},
 		{
 			name:   "development x-tenant resolves company slug",
@@ -276,6 +275,32 @@ func TestPublicTenant(t *testing.T) {
 				assertTenant(t, w, tt.wantTenant)
 			}
 		})
+	}
+}
+
+func TestPublicTenantRedirectsAliasToPrimaryDomain(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	primary := "dreammakers.com.co"
+	r := gin.New()
+	r.Use(PublicTenant(fakeCompanyResolver{byHost: map[string]HostResolution{
+		"www.dreammakers.com.co": {
+			Company:           tenant.CompanyRef{ID: 21, Slug: "dreammakers"},
+			MatchedDomain:     "www.dreammakers.com.co",
+			RedirectToPrimary: true,
+			PrimaryDomain:     &primary,
+		},
+	}}, "production"))
+	r.GET("/products", tenantEchoHandler(t))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "https://www.dreammakers.com.co/products?tag=sale", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusPermanentRedirect {
+		t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusPermanentRedirect, w.Body.String())
+	}
+	if got := w.Header().Get("Location"); got != "https://dreammakers.com.co/products?tag=sale" {
+		t.Fatalf("Location = %q, want %q", got, "https://dreammakers.com.co/products?tag=sale")
 	}
 }
 

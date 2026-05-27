@@ -23,6 +23,15 @@ type CompanyRef struct {
 	Slug string
 }
 
+// HostResolution describes the tenant and domain metadata resolved from a public host.
+type HostResolution struct {
+	Company           CompanyRef
+	MatchedDomain     string
+	DomainKind        string
+	RedirectToPrimary bool
+	PrimaryDomain     *string
+}
+
 // NewRoot returns a tenant context with global root scope.
 func NewRoot() TenantContext {
 	return TenantContext{IsRootScope: true}

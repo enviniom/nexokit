@@ -94,6 +94,41 @@ func TestGormRepository_ListUsesExplicitSortAllowlist(t *testing.T) {
 	}
 }
 
+func TestGormRepository_ResolveHostUsesActiveCompanyDomains(t *testing.T) {
+	db := newCompanyRepositoryTestDB(t)
+	company := Company{BaseModel: shared.BaseModel{PublicID: "company_acme"}, Name: "Acme", Slug: "acme", Status: CompanyStatusActive}
+	if err := db.Create(&company).Error; err != nil {
+		t.Fatalf("create company: %v", err)
+	}
+	inactiveCompany := Company{BaseModel: shared.BaseModel{PublicID: "company_inactive_host"}, Name: "Inactive Host", Slug: "inactive-host", Status: CompanyStatusInactive}
+	if err := db.Create(&inactiveCompany).Error; err != nil {
+		t.Fatalf("create inactive company: %v", err)
+	}
+	primary := CompanyDomain{BaseModel: shared.BaseModel{PublicID: "domain_primary"}, CompanyID: company.ID, Domain: "acme.com", Status: CompanyDomainStatusActive, Kind: CompanyDomainKindPrimary}
+	alias := CompanyDomain{BaseModel: shared.BaseModel{PublicID: "domain_alias"}, CompanyID: company.ID, Domain: "www.acme.com", Status: CompanyDomainStatusActive, Kind: CompanyDomainKindAlias, RedirectToPrimary: true}
+	inactive := CompanyDomain{BaseModel: shared.BaseModel{PublicID: "domain_inactive"}, CompanyID: company.ID, Domain: "old.acme.com", Status: CompanyDomainStatusInactive, Kind: CompanyDomainKindAlias}
+	inactiveCompanyDomain := CompanyDomain{BaseModel: shared.BaseModel{PublicID: "domain_inactive_company"}, CompanyID: inactiveCompany.ID, Domain: "inactive-company.com", Status: CompanyDomainStatusActive, Kind: CompanyDomainKindPrimary}
+	if err := db.Create(&[]CompanyDomain{primary, alias, inactive, inactiveCompanyDomain}).Error; err != nil {
+		t.Fatalf("create domains: %v", err)
+	}
+	repo := NewRepository(db)
+
+	resolved, err := repo.ResolveHost("www.acme.com")
+	if err != nil {
+		t.Fatalf("resolve host: %v", err)
+	}
+	if resolved.Company.ID != company.ID || resolved.Company.Slug != "acme" || !resolved.RedirectToPrimary || resolved.PrimaryDomain == nil || *resolved.PrimaryDomain != "acme.com" {
+		t.Fatalf("unexpected host resolution: %#v", resolved)
+	}
+
+	if _, err := repo.ResolveHost("old.acme.com"); err == nil {
+		t.Fatal("expected inactive domain not to resolve")
+	}
+	if _, err := repo.ResolveHost("inactive-company.com"); err == nil {
+		t.Fatal("expected active domain for inactive company not to resolve")
+	}
+}
+
 func TestGormRepository_DeleteSoftDeletesCompanies(t *testing.T) {
 	db := newCompanyRepositoryTestDB(t)
 	company := Company{BaseModel: shared.BaseModel{PublicID: "company_delete"}, Name: "Delete Me", Slug: "delete-me", Status: CompanyStatusActive}
@@ -123,7 +158,7 @@ func newCompanyRepositoryTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite db: %v", err)
 	}
-	if err := db.AutoMigrate(&Company{}); err != nil {
+	if err := db.AutoMigrate(&Company{}, &CompanyDomain{}); err != nil {
 		t.Fatalf("migrate companies test db: %v", err)
 	}
 	return db

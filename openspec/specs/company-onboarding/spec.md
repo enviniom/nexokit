@@ -26,7 +26,7 @@ The system MUST expose `POST /api/v1/onboarding/companies`. The endpoint MUST be
 
 ### Requirement: Transactional tenant provisioning
 
-The system MUST execute company onboarding in a single database transaction. The transaction MUST create the company, tenant `admin` role, tenant `user` role, and initial admin user. The tenant `admin` and `user` roles MUST have `company_id` set to the new company and `is_system = true`. The system MUST NOT create or modify the global `root` role during onboarding.
+The system MUST execute company onboarding in a single database transaction. The transaction MUST create the company, tenant `admin` role, tenant `user` role, and initial admin user. The tenant `admin` and `user` roles MUST have `company_id` set to the new company and `is_system = true`. The system MUST NOT create or modify the global `root` role during onboarding. When the onboarding request includes a `domain` input, the transaction MUST also create a `company_domains` row with `kind = primary`, `status = active`, `redirect_to_primary = false`. The onboarding endpoint MUST NOT write `domain` or `subdomain` to the `companies` table. The onboarding endpoint MUST accept a `generate_technical_domain` boolean; when true and a platform base domain is configured, the transaction MUST also create a `company_domains` row with `kind = technical`, `status = active`, `domain = <slug>.<platform-base-domain>`.
 
 #### Scenario: Provisioned tenant roles and admin user
 
@@ -41,7 +41,14 @@ The system MUST execute company onboarding in a single database transaction. The
 - GIVEN an existing company with slug `acme`
 - WHEN root submits onboarding with slug `acme`
 - THEN the request returns a validation/conflict error
-- AND no admin user or tenant roles are created for the failed onboarding attempt
+- AND no admin user, tenant roles, or domain rows are created for the failed onboarding attempt
+
+#### Scenario: Duplicate domain rolls back onboarding
+
+- GIVEN an existing `company_domains` row for `acme.com`
+- WHEN root submits onboarding with `domain = "acme.com"`
+- THEN the request returns a validation/conflict error on `domain`
+- AND the entire transaction MUST rollback — no company, roles, users, or domain rows from the failed request MUST remain
 
 #### Scenario: Duplicate admin email rolls back
 

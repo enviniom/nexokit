@@ -67,17 +67,32 @@ The system MUST provide tenant middleware that resolves TenantContext from the a
 
 ### Requirement: Tenant middleware for public routes
 
-The system MUST provide tenant middleware for unauthenticated routes resolving company by: (1) Host header matching `domain`, (2) subdomain matching `slug`, (3) `X-Tenant` header only in development. Results MUST be cached with a short TTL.
+The system MUST provide tenant middleware for unauthenticated routes resolving company by: (1) Host header normalized and matched exactly against `company_domains.domain` where `status = active`, (2) `X-Tenant` header only in development. The system MUST NOT fallback from first subdomain to company slug for production tenant resolution. Results MUST be cached with a short TTL. When a matching domain has `redirect_to_primary = true`, the system MUST return a permanent redirect (308) to the company's active primary domain, preserving path and query string.
 
 #### Scenario: Domain resolves to company
 
-- GIVEN `Host: store.acme.com` and company with `domain = "store.acme.com"`
-- THEN `TenantContext.CompanyID` matches that company
+- GIVEN `Host: store.acme.com` and an active `company_domains` row with `domain = "store.acme.com"` for company A
+- THEN `TenantContext.CompanyID` matches company A
 
-#### Scenario: Subdomain resolves to company
+#### Scenario: Subdomain does NOT resolve to company slug (production)
 
-- GIVEN `Host: acme.app.nexokit.com` and company with `slug = "acme"`
-- THEN `TenantContext.CompanySlug` is "acme"
+- GIVEN `Host: acme.app.nexokit.com` and a company with `slug = "acme"`
+- AND no `company_domains` row exists for `acme.app.nexokit.com`
+- THEN tenant resolution MUST NOT resolve to the company by slug
+- AND the response returns HTTP 404
+
+#### Scenario: Explicit www alias resolves tenant
+
+- GIVEN active `company_domains` rows for both `acme.com` and `www.acme.com` belonging to company A
+- WHEN `Host: www.acme.com`
+- THEN `TenantContext.CompanyID` matches company A
+
+#### Scenario: Redirect alias returns 308 to primary
+
+- GIVEN company A has active primary domain `acme.com`
+- AND active alias domain `www.acme.com` with `redirect_to_primary = true`
+- WHEN `Host: www.acme.com`
+- THEN the response MUST be HTTP 308 redirecting to `https://acme.com` with preserved path and query
 
 #### Scenario: X-Tenant header in development only
 

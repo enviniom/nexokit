@@ -15,12 +15,18 @@ import (
 )
 
 type fakeCompanyService struct {
-	companies []CompanyResponse
-	company   *CompanyResponse
-	total     int64
-	err       error
-	lastID    string
-	listReq   ListCompaniesRequest
+	companies       []CompanyResponse
+	company         *CompanyResponse
+	domains         []CompanyDomainResponse
+	domain          *CompanyDomainResponse
+	total           int64
+	err             error
+	lastID          string
+	lastCompanyID   string
+	lastDomainID    string
+	listReq         ListCompaniesRequest
+	createDomainReq CreateCompanyDomainRequest
+	updateDomainReq UpdateCompanyDomainRequest
 }
 
 func (f *fakeCompanyService) List(req ListCompaniesRequest) ([]CompanyResponse, int64, error) {
@@ -57,6 +63,33 @@ func (f *fakeCompanyService) Update(publicID string, req UpdateCompanyRequest) (
 func (f *fakeCompanyService) Delete(publicID string) error {
 	f.lastID = publicID
 	return f.err
+}
+
+func (f *fakeCompanyService) ListDomains(companyPublicID string) ([]CompanyDomainResponse, error) {
+	f.lastCompanyID = companyPublicID
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.domains, nil
+}
+
+func (f *fakeCompanyService) CreateDomain(companyPublicID string, req CreateCompanyDomainRequest) (*CompanyDomainResponse, error) {
+	f.lastCompanyID = companyPublicID
+	f.createDomainReq = req
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.domain, nil
+}
+
+func (f *fakeCompanyService) UpdateDomain(companyPublicID, domainPublicID string, req UpdateCompanyDomainRequest) (*CompanyDomainResponse, error) {
+	f.lastCompanyID = companyPublicID
+	f.lastDomainID = domainPublicID
+	f.updateDomainReq = req
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.domain, nil
 }
 
 func companyJSONRequest(method, path string, body any) *http.Request {
@@ -159,7 +192,7 @@ func TestHandler_ListFiltersInactive(t *testing.T) {
 }
 
 func TestHandler_UsesPublicIDRoutes(t *testing.T) {
-	svc := &fakeCompanyService{company: &CompanyResponse{PublicID: "01HCOMPANYPUBLICID", Name: "Acme", Slug: "acme", Status: CompanyStatusActive}}
+	svc := &fakeCompanyService{company: &CompanyResponse{PublicID: "01HCOMPANYPUBLICID", Name: "Acme", Slug: "acme", Status: CompanyStatusActive, Domains: []CompanyDomainResponse{{PublicID: "01HDOMAIN", Domain: "acme.com", Kind: CompanyDomainKindPrimary, Status: CompanyDomainStatusActive}}}}
 	r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
 
 	for _, tt := range []struct {
@@ -178,6 +211,15 @@ func TestHandler_UsesPublicIDRoutes(t *testing.T) {
 			r.ServeHTTP(w, companyJSONRequest(tt.method, tt.path, tt.body))
 			if w.Code != tt.wantStatus {
 				t.Fatalf("expected status %d, got %d body=%s", tt.wantStatus, w.Code, w.Body.String())
+			}
+			if tt.method == http.MethodGet {
+				var resp response.APIResponse[CompanyResponse]
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatalf("decode get response: %v", err)
+				}
+				if len(resp.Data.Domains) != 1 || resp.Data.Domains[0].Domain != "acme.com" {
+					t.Fatalf("expected detail response to include domains, got %#v", resp.Data.Domains)
+				}
 			}
 			if tt.method == http.MethodDelete && w.Body.Len() != 0 {
 				t.Fatalf("expected empty body, got %q", w.Body.String())
@@ -199,4 +241,58 @@ func TestHandler_NotFound(t *testing.T) {
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", w.Code)
 	}
+}
+
+func TestHandler_CompanyDomainsRootAdmin(t *testing.T) {
+	t.Run("list create and update use nested public ids", func(t *testing.T) {
+		svc := &fakeCompanyService{
+			domains: []CompanyDomainResponse{{PublicID: "01HDOMAIN", Domain: "acme.com", Kind: CompanyDomainKindPrimary, Status: CompanyDomainStatusActive}},
+			domain:  &CompanyDomainResponse{PublicID: "01HDOMAIN", Domain: "www.acme.com", Kind: CompanyDomainKindAlias, Status: CompanyDomainStatusActive, RedirectToPrimary: true},
+		}
+		r := setupCompanyRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/companies/01HCOMPANY/domains", nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected list status 200, got %d body=%s", w.Code, w.Body.String())
+		}
+		if svc.lastCompanyID != "01HCOMPANY" {
+			t.Fatalf("expected company public id route param, got %q", svc.lastCompanyID)
+		}
+
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, companyJSONRequest(http.MethodPost, "/api/v1/companies/01HCOMPANY/domains", CreateCompanyDomainRequest{Domain: "www.acme.com", Kind: CompanyDomainKindAlias, Status: CompanyDomainStatusActive, RedirectToPrimary: true}))
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected create status 201, got %d body=%s", w.Code, w.Body.String())
+		}
+		if svc.createDomainReq.Domain != "www.acme.com" || !svc.createDomainReq.RedirectToPrimary {
+			t.Fatalf("expected create domain request to reach service, got %#v", svc.createDomainReq)
+		}
+
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, companyJSONRequest(http.MethodPut, "/api/v1/companies/01HCOMPANY/domains/01HDOMAIN", UpdateCompanyDomainRequest{Domain: "www.acme.com", Kind: CompanyDomainKindAlias, Status: CompanyDomainStatusInactive}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected update status 200, got %d body=%s", w.Code, w.Body.String())
+		}
+		if svc.lastCompanyID != "01HCOMPANY" || svc.lastDomainID != "01HDOMAIN" || svc.updateDomainReq.Status != CompanyDomainStatusInactive {
+			t.Fatalf("expected nested update params/request, company=%q domain=%q req=%#v", svc.lastCompanyID, svc.lastDomainID, svc.updateDomainReq)
+		}
+	})
+
+	t.Run("non-root cannot administer domains and delete route is absent", func(t *testing.T) {
+		svc := &fakeCompanyService{}
+		r := setupCompanyRouter(&authctx.User{RoleSlug: "admin", IsRoot: false}, svc)
+
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/companies/01HCOMPANY/domains", nil))
+		if w.Code != http.StatusForbidden {
+			t.Fatalf("expected non-root list status 403, got %d", w.Code)
+		}
+
+		w = httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/api/v1/companies/01HCOMPANY/domains/01HDOMAIN", nil))
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected delete route 404, got %d", w.Code)
+		}
+	})
 }
