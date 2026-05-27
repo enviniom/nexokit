@@ -6,15 +6,15 @@ import (
 )
 
 // Register mounts companies module routes onto the v1 router group.
-func Register(v1 *gin.RouterGroup, handler *Handler, requirePermission func(string) gin.HandlerFunc, requireRole func(string) gin.HandlerFunc) {
+func Register(v1 *gin.RouterGroup, container *Container, requirePermission func(string) gin.HandlerFunc, requireRole func(string) gin.HandlerFunc) {
 	companies := v1.Group("/companies")
 	{
-		companies.GET("", requireRole("root"), handler.List)
-		companies.GET("/:id", requirePermission(platformPerms.Format(platformPerms.ModuleCompanies, platformPerms.ActionView)), handler.GetByPublicID)
-		companies.PUT("/:id", requireRole("root"), handler.Update)
-		companies.DELETE("/:id", requireRole("root"), handler.Delete)
-		companies.GET("/:id/domains", requireRole("root"), handler.ListDomains)
-		companies.POST("/:id/domains", requireRole("root"), handler.CreateDomain)
-		companies.PUT("/:id/domains/:domain_id", requireRole("root"), handler.UpdateDomain)
+		companies.GET("", requireRole("root"), container.ListCompanies.Handle)
+		companies.GET("/:id", requirePermission(platformPerms.Format(platformPerms.ModuleCompanies, platformPerms.ActionView)), container.ViewCompany.Handle)
+		companies.PUT("/:id", requireRole("root"), container.UpdateCompany.Handle)
+		companies.DELETE("/:id", requireRole("root"), container.DeleteCompany.Handle)
+		companies.GET("/:id/domains", requireRole("root"), container.ListCompanyDomains.Handle)
+		companies.POST("/:id/domains", requireRole("root"), container.CreateCompanyDomain.Handle)
+		companies.PUT("/:id/domains/:domain_id", requireRole("root"), container.UpdateCompanyDomain.Handle)
 	}
 }

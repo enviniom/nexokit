@@ -27,8 +27,7 @@ import (
 type Container struct {
 	rolesHandler       *roles.Handler
 	usersHandler       *users.Handler
-	companiesHandler   *companies.Handler
-	companiesRepo      *companies.GormRepository
+	Companies          *companies.Container
 	permissionsHandler *permissions.Handler
 	permissionsService permissions.Service
 	authHandler        *auth.Handler
@@ -46,9 +45,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	_ = log
 
 	usersRepo := users.NewRepository(db)
-	companiesRepo := companies.NewRepository(db)
-	companiesService := companies.NewService(companiesRepo)
-	companiesHandler := companies.NewHandler(companiesService)
+	companiesContainer := companies.NewContainer(db)
 
 	permissionsRepo := permissions.NewRepository(db)
 	permissionsService := permissions.NewService(permissionsRepo, permissions.WithCache(cache))
@@ -78,8 +75,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	return &Container{
 		rolesHandler:       rolesHandler,
 		usersHandler:       usersHandler,
-		companiesHandler:   companiesHandler,
-		companiesRepo:      companiesRepo,
+		Companies:          companiesContainer,
 		permissionsHandler: permissionsHandler,
 		permissionsService: permissionsService,
 		authHandler:        authHandler,
@@ -95,8 +91,8 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
 	auth.Register(v1, c.authHandler, c.authMW, c.authzMW, c.loginRateLimitMW, c.refreshRateLimitMW)
 	globalProtected := v1.Group("")
-	globalProtected.Use(c.authMW, middleware.AllowRootGlobalScope(c.companiesRepo), c.authzMW)
-	companies.Register(globalProtected, c.companiesHandler, middleware.RequirePermission, middleware.RequireRole)
+	globalProtected.Use(c.authMW, middleware.AllowRootGlobalScope(c.Companies.Resolver()), c.authzMW)
+	companies.Register(globalProtected, c.Companies, middleware.RequirePermission, middleware.RequireRole)
 	// Roles and permissions are system catalog modules, so root may administer
 	// them globally while non-root requests remain scoped to their company.
 	roles.Register(globalProtected, c.rolesHandler, middleware.RequirePermission)
@@ -104,7 +100,7 @@ func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
 	onboarding.Register(globalProtected, c.onboardingHandler, middleware.RequireRole)
 
 	tenantProtected := v1.Group("")
-	tenantProtected.Use(c.authMW, middleware.RequireTenantScope(c.companiesRepo), c.authzMW)
+	tenantProtected.Use(c.authMW, middleware.RequireTenantScope(c.Companies.Resolver()), c.authzMW)
 	users.Register(tenantProtected, c.usersHandler, middleware.RequirePermission)
 }
 
