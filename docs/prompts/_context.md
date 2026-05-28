@@ -59,7 +59,7 @@ nexokit-go/
       password/     <- hash argon2id y verificación
       token/        <- generación y validación de PASETO
       validator/    <- validador propio (Rule, FieldValidator, reglas base)
-    modules/        <- módulos de negocio en estructura plana
+    modules/        <- módulos de negocio; módulos nuevos/no triviales usan vertical slice
     cli/            <- comandos, generadores y templates del CLI
     shared/
       model.go      <- BaseModel, BaseModelSimple
@@ -85,7 +85,8 @@ nexokit-go/
 - `platform/` tiene subpaquetes pequeños y enfocados. No un paquete único gigante.
 - `shared/` solo tiene `BaseModel`, `BaseModelSimple` y tipos base sin reglas de negocio.
 - `cmd/*` nunca contiene lógica de negocio.
-- Los módulos no se importan entre sí directamente. Usan contratos (interfaces pequeñas) inyectados desde `container.go`.
+- Los módulos deben ser autocontenidos: no importan repositories ni modelos de otros módulos.
+- Si un módulo necesita datos de una tabla relacionada, define su propio modelo local parcial con solo los campos que lee/escribe.
 
 ---
 
@@ -120,9 +121,72 @@ type BaseModel struct {
 
 ---
 
-## Estructura modular: plana
+## Estructura modular: vertical slice
 
-Cada módulo usa un archivo por responsabilidad, sin subdirectorios por capa:
+Los módulos nuevos o no triviales usan vertical slice. Un endpoint existente equivale a un caso de uso y vive en su propia carpeta.
+
+```txt
+internal/modules/companies/
+  container.go              <- composition root del módulo: wiring + registro de rutas
+  routes.go                 <- rutas del módulo
+  model.go                  <- aliases/compatibilidad si son necesarios
+  dto.go                    <- aliases/compatibilidad si son necesarios
+  resolver.go               <- comportamiento transversal del módulo, si aplica
+  resolver_test.go
+  routes_absence_test.go    <- tests transversales de superficie HTTP, si aplica
+  core/
+    model.go                <- modelos locales del módulo
+    dto.go                  <- DTOs/contratos del módulo
+    error.go                <- errores del módulo
+  queries/
+    get_company_by_public_id.go
+    get_company_by_public_id_test.go
+  view_company/
+    handler.go
+    handler_test.go
+    service.go
+    service_test.go
+    repository.go
+    repository_test.go
+```
+
+### Reglas de vertical slice
+
+- Un endpoint existente = un caso de uso = un slice.
+- Nombrar slices por intención de negocio: `view_company`, no `get_company`.
+- No crear slices para endpoints que no existen.
+- Cada slice debe tener `handler.go`, `service.go`, `repository.go` y su `_test.go` correspondiente.
+- Si un `repository.go` solo wrappea una query reutilizable, igual debe tener `repository_test.go`; el test puede documentar que la lógica fuerte está cubierta en `queries/` y validar delegación/wiring.
+- La raíz del módulo solo contiene archivos transversales o de compatibilidad.
+- `container.go` del módulo es solo composition root: wiring y route registration. No tiene lógica de negocio ni funciona como service locator.
+- El root container en `internal/app/container.go` solo llama al container del módulo; no conoce cada slice.
+
+### `core/`
+
+`core/` contiene elementos compartidos del módulo que no tienen lógica testeable directa:
+
+- modelos locales del módulo;
+- DTOs y contratos;
+- enums/constants;
+- errores;
+- valores compartidos del módulo.
+
+Los modelos en `core/` sirven para leer/escribir los campos que el módulo necesita. NO son la fuente del esquema completo de la base de datos; la fuente real del schema son las migraciones.
+
+### `queries/`
+
+`queries/` contiene lógica reusable de acceso a datos que se repite entre repositories de slices:
+
+- una query por archivo cuando sea práctico;
+- cada query debe tener su propio `_test.go`;
+- los repositories de slices pueden delegar en `queries/`;
+- `queries/` no contiene handlers, services, rutas ni casos de uso completos.
+
+### Módulos simples o legacy
+
+Un módulo simple existente puede permanecer plano si migrarlo no aporta valor inmediato. La migración a vertical slice debe hacerse módulo por módulo, normalmente cuando el módulo vaya a crecer o se toque de forma sustancial.
+
+Estructura plana legacy aceptable para módulos simples:
 
 ```txt
 internal/modules/example/
@@ -141,7 +205,18 @@ internal/modules/example/
 
 - Prefijo `/api/v1/` en todos los endpoints desde el inicio.
 - Los parámetros de ruta usan `:id` que representa el `PublicID`.
-- Cada módulo expone una función `Register`:
+- Cada módulo expone una función `Register`. En módulos vertical slice, `Register` recibe el container del módulo y registra handlers de slices:
+
+```go
+// internal/modules/companies/routes.go
+func Register(v1 *gin.RouterGroup, c *Container, requireRole RoleMiddleware, requirePermission PermissionMiddleware) {
+    g := v1.Group("/companies")
+    g.GET("", requireRole("root"), c.ListCompanies.Handle)
+    g.GET("/:id", requirePermission("companies.view"), c.ViewCompany.Handle)
+}
+```
+
+En módulos planos legacy, `Register` puede seguir recibiendo un handler único:
 
 ```go
 // internal/modules/users/routes.go
@@ -155,19 +230,38 @@ func Register(v1 *gin.RouterGroup, h *Handler) {
 }
 ```
 
-- El router en `server/router.go` monta todos los módulos:
+- El router/container raíz monta módulos, no slices individuales:
 
 ```go
 v1 := r.Group("/api/v1")
-users.Register(v1, container.Users.Handler)
-companies.Register(v1, container.Companies.Handler)
+users.Register(v1, container.Users.Handler)      // módulo plano legacy
+companies.Register(v1, container.Companies, ...) // módulo vertical slice
 ```
 
 ---
 
-## Comunicación entre módulos
+## Comunicación entre módulos y autonomía
 
-Los módulos NO se importan directamente entre sí. El módulo dueño de los datos expone un contrato:
+Los módulos NO se importan directamente entre sí. Tampoco deben usar repositories ni modelos GORM de otro módulo.
+
+Preferencia actual: cada módulo debe ser autocontenido. Si necesita consultar una tabla que conceptualmente pertenece a otro módulo, define un modelo local parcial en su propio `core/` con los campos mínimos que necesita.
+
+Ejemplo: `auth` no debe depender del repository de `users` para autenticar. Puede definir un modelo local parcial para la tabla `users` con email, password hash, estado y campos mínimos necesarios.
+
+```go
+// internal/modules/auth/core/model.go
+type AuthUser struct {
+    ID           uint   `gorm:"primaryKey"`
+    PublicID     string `gorm:"column:public_id"`
+    Email        string `gorm:"column:email"`
+    PasswordHash string `gorm:"column:password_hash"`
+    Status       string `gorm:"column:status"`
+}
+
+func (AuthUser) TableName() string { return "users" }
+```
+
+Cuando una dependencia externa sea inevitable, usar contratos pequeños inyectados desde `internal/app/container.go`, nunca repositories concretos:
 
 ```go
 // internal/modules/customers/contracts.go
@@ -179,7 +273,8 @@ type CustomerReader interface {
 La dependencia se inyecta desde `internal/app/container.go`.
 
 ```txt
-Permitido:   importar contratos (interfaces) de otro módulo
+Preferido:   modelo local parcial en core/ + repository propio del módulo
+Permitido:   contrato pequeño inyectado desde app/container.go cuando haga falta coordinación
 Prohibido:   importar repositories o modelos GORM de otro módulo
 ```
 
@@ -264,7 +359,9 @@ if validator.RespondIfInvalid(c, errs) {
 2. No hardcodear contraseñas, keys o secrets en el código.
 3. No devolver `password_hash` en respuestas.
 4. No revelar si falló el email o la contraseña por separado en login.
-5. No importar repositories de otro módulo desde un módulo externo.
+5. No importar módulos entre sí salvo contratos pequeños y explícitos.
 6. No usar `gin.H{}` para respuestas; usar `platform/response`.
-7. No crear subdirectorios dentro de un módulo salvo decisión explícita.
-8. No agregar lógica de negocio en `cmd/`, `infra/` ni `shared/`.
+7. No importar repositories ni modelos GORM de otro módulo.
+8. No agregar lógica de negocio en `cmd/`, `infra/`, `shared/`, `core/` ni `container.go`.
+9. No poner queries reutilizables en `core/`; deben vivir en `queries/` con tests.
+10. No crear slices para endpoints que no existen.
