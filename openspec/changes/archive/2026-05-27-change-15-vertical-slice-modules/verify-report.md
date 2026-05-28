@@ -11,7 +11,7 @@
 | Tasks complete | 27 |
 | Tasks incomplete | 0 |
 
-All 6 phases complete including Phase 6 review refinement (shared-vs-queries separation, query package with per-query tests, full slice test file parity).
+All 6 phases complete including Phase 6 review refinement (core-vs-queries separation, query package with per-query tests, full slice test file parity).
 
 ### Build & Tests Execution
 **Build**: ✅ Passed
@@ -29,7 +29,7 @@ ok   github.com/enviniom/nexokit/internal/modules/companies/delete_company      
 ok   github.com/enviniom/nexokit/internal/modules/companies/list_companies         0.011s
 ok   github.com/enviniom/nexokit/internal/modules/companies/list_company_domains   0.012s
 ok   github.com/enviniom/nexokit/internal/modules/companies/queries                0.017s
-?    github.com/enviniom/nexokit/internal/modules/companies/shared                 [no test files]
+?    github.com/enviniom/nexokit/internal/modules/companies/core                   [no test files]
 ok   github.com/enviniom/nexokit/internal/modules/companies/update_company         0.012s
 ok   github.com/enviniom/nexokit/internal/modules/companies/update_company_domain  0.011s
 ok   github.com/enviniom/nexokit/internal/modules/companies/view_company           0.016s
@@ -46,7 +46,7 @@ $ go test ./... -count=1
 | Requirement | Scenario | Test | Result |
 |-------------|----------|------|--------|
 | Module root structure | Module root has only cross-cutting files | Static: no handler.go/service.go/repository.go; model.go+dto.go are backward-compat re-exports used by onboarding, roles, tests | ✅ COMPLIANT |
-| Module root structure | Models are shared not duplicated | Static: shared/model.go defines Company/CompanyDomain; all slices import shared | ✅ COMPLIANT |
+| Module root structure | Core types are shared not duplicated | Static: core/model.go defines Company/CompanyDomain; all slices import core | ✅ COMPLIANT |
 | Module root structure | Slice imports avoid root cycle | Static: grep confirms zero slice imports root `companies` | ✅ COMPLIANT |
 | Use-case slice structure | Slice has all layers co-located | Static: each of 7 slices has handler.go, service.go, repository.go | ✅ COMPLIANT |
 | Use-case slice structure | Slice does not import sibling slices | Static: grep confirms no sibling imports across all 7 slices | ✅ COMPLIANT |
@@ -74,9 +74,9 @@ $ go test ./... -count=1
 #### company-domains/spec.md
 | Requirement | Scenario | Test | Result |
 |-------------|----------|------|--------|
-| Company Domains Model | Domain model schema | Static: shared/model.go defines CompanyDomain with all required fields | ✅ COMPLIANT |
-| Company Domains Model | Unsupported status rejected | Static: shared/dto.go validates status enum | ✅ COMPLIANT |
-| Company Domains Model | Unsupported kind rejected | Static: shared/dto.go validates kind enum | ✅ COMPLIANT |
+| Company Domains Model | Domain model schema | Static: core/model.go defines CompanyDomain with all required fields | ✅ COMPLIANT |
+| Company Domains Model | Unsupported status rejected | Static: core/dto.go validates status enum | ✅ COMPLIANT |
+| Company Domains Model | Unsupported kind rejected | Static: core/dto.go validates kind enum | ✅ COMPLIANT |
 | Root Company Domain Administration | Root lists company domains | Static: routes.go registers GET /:id/domains | ✅ COMPLIANT |
 | Root Company Domain Administration | Root creates company domain | Static: routes.go registers POST /:id/domains | ✅ COMPLIANT |
 | Root Company Domain Administration | Root updates domain status | Static: routes.go registers PUT /:id/domains/:domain_id | ✅ COMPLIANT |
@@ -104,9 +104,9 @@ $ go test ./... -count=1
 |------------|--------|-------|
 | No `create_company` slice | ✅ Implemented | Directory does not exist; proposal explicitly excludes it |
 | `view_company` naming | ✅ Implemented | Package, container field, and route all use ViewCompany/view_company |
-| Slices import `companies/shared` | ✅ Implemented | All 7 slices import `internal/modules/companies/shared` |
+| Slices import `companies/core` | ✅ Implemented | All 7 slices import `internal/modules/companies/core` |
 | No slice imports root `companies` | ✅ Implemented | grep confirms zero matches across all slice source files |
-| No sibling slice imports | ✅ Implemented | Each slice imports only `shared`, `queries`, and external packages |
+| No sibling slice imports | ✅ Implemented | Each slice imports only `core`, `queries`, and external packages |
 | Old flat layer files deleted | ✅ Implemented | handler.go, service.go, repository.go removed from root |
 | Root model.go/dto.go are re-exports | ✅ Implemented | Thin aliases to shared; actively used by onboarding, roles, tests |
 | `queries/` package with per-query tests | ✅ Implemented | 3 query files + 3 matching `_test.go` files |
@@ -123,22 +123,22 @@ $ go test ./... -count=1
 | Slice boundary = one endpoint per slice | ✅ Yes | 7 slices match 7 public endpoints |
 | Company detail name `view_company` | ✅ Yes | Matches `companies:view` permission semantics |
 | No create slice | ✅ Yes | `create_company/` does not exist |
-| Shared types in `companies/shared` | ✅ Yes | model.go + dto.go + error.go in shared/; thin re-exports at root for external consumers |
+| Shared types in `companies/core` | ✅ Yes | model.go + dto.go + error.go in core/; thin re-exports at root for external consumers |
 | Query reuse in `companies/queries` | ✅ Yes | 3 query functions extracted, each with dedicated test file |
 | Narrow per-slice GORM repos | ✅ Yes | Each slice repo defines only methods it needs; delegates repeated logic to `queries` |
 | Container: app calls companies.NewContainer(db) | ✅ Yes | app/container.go line 48 |
 | Routes stay at module root | ✅ Yes | routes.go registers from container handlers |
-| `shared/contracts.go` | ⚠️ Partial | Design listed contracts.go as a separate file; `CompanyResolver` interface lives in `middleware/tenant.go` where it is consumed. Functionally equivalent — no spec broken. |
+| `core/contracts.go` | ⚠️ Partial | Design listed contracts.go as a separate file; `CompanyResolver` interface lives in `middleware/tenant.go` where it is consumed. Functionally equivalent — no spec broken. |
 
 ### Issues Found
 **CRITICAL**: None
 
 **WARNING**:
-- `shared/contracts.go` not created as a separate file — the `CompanyResolver` interface is defined in `middleware/tenant.go` where it is consumed. This is functionally correct and does not break any spec, but deviates from the design's file list.
-- `shared/` package has no test files — contains only type definitions, constants, DTO validation, and error variables. Testable behavior lives in consuming slices and queries.
+- `core/contracts.go` not created as a separate file — the `CompanyResolver` interface is defined in `middleware/tenant.go` where it is consumed. This is functionally correct and does not break any spec, but deviates from the design's file list.
+- `core/` package has no test files — contains only type definitions, constants, DTO validation, and error variables. Testable behavior lives in consuming slices and queries.
 
 **SUGGESTION**:
-- The thin re-export files (`model.go`, `dto.go`) at the companies root are actively used by onboarding, roles, and test helpers. If those external imports are migrated to `companies/shared` in a future change, the re-exports can be removed.
+- The thin re-export files (`model.go`, `dto.go`) at the companies root are actively used by onboarding, roles, and test helpers. If those external imports are migrated to `companies/core` in a future change, the re-exports can be removed.
 - Consider adding a handler-level test for `list_company_domains` to verify the HTTP envelope and sorting order, complementing the existing repository and service tests.
 
 ### Verdict

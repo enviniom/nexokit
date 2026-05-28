@@ -8,9 +8,9 @@ Replace the current horizontal layered architecture (handler/service/repository 
 
 ### In Scope
 - Restructure `companies` module as pilot: 7 use-case slices (one per existing endpoint)
-- Module root retains only cross-cutting files: `routes.go`, `container.go`; shared models/DTOs/contracts move to `shared/`
+- Module root retains only cross-cutting files: `routes.go`, `container.go` (plus compatibility aliases/resolver tests when needed); shared non-query concerns move to `core/`
 - Module `container.go` becomes composition root — wires slices, root container calls only module containers
-- Models/DTOs/contracts shared via `internal/modules/companies/shared` — no duplication per slice and no root import cycle
+- Models/DTOs/contracts shared via `internal/modules/companies/core` — no duplication per slice and no root import cycle
 - Incremental migration pattern documented for future modules
 
 ### Out of Scope
@@ -23,7 +23,7 @@ Replace the current horizontal layered architecture (handler/service/repository 
 ## Capabilities
 
 ### New Capabilities
-- `vertical-slice-modules`: Architecture pattern introducing use-case slice organization within modules. Each module has a `container.go` composition root. Shared models/DTOs/contracts live in a module-local `shared` package when needed, so root wiring can import slices while slices import shared types without cycles. Slices co-locate handler + service + repository + tests. New modules adopt this pattern going forward.
+- `vertical-slice-modules`: Architecture pattern introducing use-case slice organization within modules. Each module has a `container.go` composition root. Shared non-query concerns live in module-local `core/`; reusable DB lookups move to `queries/` with one `_test.go` per query file. Slices co-locate handler + service + repository + tests. New or non-trivial modules adopt this pattern; simple modules may remain flat.
 
 ### Modified Capabilities
 - `companies-crud`: Requirements unchanged, but implementation moves from flat files to use-case slices. Endpoints, validation, and behavior remain identical.
@@ -32,13 +32,13 @@ Replace the current horizontal layered architecture (handler/service/repository 
 
 ## Approach
 
-**Approach 1 from exploration, corrected for Go imports**: Use-case slices with shared models in a `shared` subpackage. Mixed architecture accepted — companies pilot uses vertical slices; existing modules remain flat. New modules adopt vertical slices going forward.
+**Approach 1 from exploration, corrected for Go imports**: Use-case slices with shared non-query concerns in a `core` subpackage and reusable SQL/GORM logic in `queries/`. Mixed architecture accepted — companies pilot uses vertical slices; existing modules migrate only when substantially changed.
 
 ```
 internal/modules/companies/
 ├── routes.go             # Cross-cutting route registration
 ├── container.go          # Composition root: wires all slices
-├── shared/               # Shared entities, DTOs, constants, contracts
+├── core/                 # Shared entities, DTOs, constants, contracts, errors
 ├── list_companies/       # GET /companies
 ├── view_company/         # GET /companies/:id
 ├── update_company/       # PUT /companies/:id
@@ -49,7 +49,7 @@ internal/modules/companies/
 ```
 
 - Each slice has its own thin repository struct with only the methods it needs, sharing the same `*gorm.DB`
-- Repository interfaces and shared models/DTOs live in `companies/shared` so slices never import root `companies`
+- Repository interfaces and shared models/DTOs live in `companies/core` so slices never import root `companies`
 - Module `container.go` instantiates all slices, exposes handlers for route registration
 - Root `container.go` simplifies: calls `companies.NewContainer(db)` instead of wiring each layer
 
@@ -58,7 +58,7 @@ internal/modules/companies/
 | Area | Impact | Description |
 |------|--------|-------------|
 | `internal/modules/companies/` | Restructured | Flat files → 7 use-case slices |
-| `internal/modules/companies/shared/` | New | Shared models, DTOs, constants, and contracts for slices/middleware |
+| `internal/modules/companies/core/` | New | Shared models, DTOs, constants, contracts, and errors for slices/middleware |
 | `internal/modules/companies/container.go` | New | Module composition root |
 | `internal/app/container.go` | Simplified | Calls module container, removes per-layer wiring for companies |
 | `internal/middleware/` | Modified | `AllowRootGlobalScope` adapts to new companies repo interface location |
@@ -68,7 +68,7 @@ internal/modules/companies/
 | Risk | Likelihood | Mitigation |
 |------|------------|------------|
 | Repository method fragmentation across slices | Medium | Each slice owns only methods it needs; shared `*gorm.DB` via constructor |
-| Go import cycle between root and slices | High | Root `companies` imports slices; slices import `companies/shared`, never root `companies` |
+| Go import cycle between root and slices | High | Root `companies` imports slices; slices import `companies/core`, never root `companies` |
 | Import path cascade in tests and middleware | High | Audit all `companies.` references before deletion; use build errors as checklist |
 | Module container becomes service locator | Low | Enforce: instantiate → wire → expose only; no business logic |
 | Review budget exceeded (companies ~1700 LOC) | High | Split into 2-3 chained PRs; 800-line budget from preflight |

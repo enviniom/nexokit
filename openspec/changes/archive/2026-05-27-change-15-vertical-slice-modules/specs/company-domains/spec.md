@@ -5,7 +5,7 @@
 ### Requirement: Company Domains Model
 
 The system MUST store company-owned hostnames in a `company_domains` table. The system MUST NOT use `companies.domain` or `companies.subdomain` as tenant host sources of truth. Each company domain MUST belong to exactly one company. Each company domain MUST have a globally unique `domain` value. Each company domain MUST have a `status`. Each company domain MUST have a `kind`. The system MUST initially support domain statuses: `active`, `inactive`, and `pending_verification`. The system MUST initially support domain kinds: `primary`, `alias`, and `technical`. The system MUST support redirect behavior with `redirect_to_primary`. A company SHOULD have at most one active primary domain. A domain with `status != active` MUST NOT resolve a public tenant request.
-(Previously: Same model contract; model moves to `internal/modules/companies/shared`, domain slices own their repositories)
+(Previously: Same model contract; model moves to `internal/modules/companies/core`, domain slices own their repositories)
 
 #### Scenario: Domain model schema
 
@@ -155,7 +155,7 @@ Company response DTOs MUST NOT expose `domain` or `subdomain` as direct company 
 ### Requirement: Root Company Domain Administration
 
 The system MUST expose root-only company domain administration under the companies module. The system MUST expose `GET /api/v1/companies/:id/domains` where `:id` is the existing company public ID route parameter convention. The system MUST expose `POST /api/v1/companies/:id/domains` for root-created company domains. The system MUST expose `PUT /api/v1/companies/:id/domains/:domain_id` for root updates to an existing company domain. The system MUST NOT expose a DELETE company-domain endpoint. The list endpoint MUST return all non-deleted domains for the specified company. Create and update payloads MUST include `domain`, `kind`, `status`, and `redirect_to_primary`. Create and update MUST normalize domain values before persistence. Create and update MUST enforce global domain uniqueness. Create and update MUST reject unsupported `kind` values. Create and update MUST reject unsupported `status` values. Create and update MUST enforce at most one active primary domain per company. Create and update MUST reject `redirect_to_primary = true` when `kind = primary`. Update MUST verify `:domain_id` belongs to the company identified by `:id`. Domain deactivation/reactivation MUST be performed by changing `status` through update. Domain administration MUST preserve tenant resolver semantics: only active exact domains for active companies resolve public requests.
-(Previously: Same API surface; implementation moves to `list_company_domains/`, `create_company_domain/`, `update_company_domain/` slices, which import shared DTO/model contracts from `companies/shared`)
+(Previously: Same API surface; implementation moves to `list_company_domains/`, `create_company_domain/`, `update_company_domain/` slices, which import shared DTO/model contracts from `companies/core`)
 
 #### Scenario: Root lists company domains
 

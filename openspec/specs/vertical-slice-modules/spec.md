@@ -2,34 +2,45 @@
 
 ## Purpose
 
-Defines the vertical slice architecture pattern within modules. Each use case co-locates its handler, service, repository, and tests. Root module packages keep route/container wiring; shared models, DTOs, constants, and contracts live in a module-local `shared` subpackage when slices need them. Module `container.go` acts as composition root. Root container delegates to module containers only.
+Defines the vertical slice architecture pattern within modules. Each use case co-locates its handler, service, repository, and tests. Root module packages keep route/container wiring only. Shared non-query concerns live in module-local `core/`; reusable DB query logic lives in `queries/` with one `_test.go` per query file. Module `container.go` acts as composition root. Root container delegates to module containers only.
 
 ## Requirements
 
 ### Requirement: Module root structure
 
-The module root SHALL retain only cross-cutting wiring files such as `routes.go` and `container.go`. Shared models, DTOs, constants, and contracts used by slices SHALL live in a module-local subpackage such as `shared/`. The module root SHALL NOT contain `handler.go`, `service.go`, or `repository.go` files for individual use cases, and slices SHALL NOT import the root module package.
+The module root SHALL retain only cross-cutting wiring files such as `routes.go` and `container.go` (plus compatibility aliases, resolver, and route-absence tests when protecting module-level behavior). Shared models, DTOs/contracts, enums/constants, errors, and shared values with no direct testable logic SHALL live in a module-local `core/` package. The module root SHALL NOT contain `handler.go`, `service.go`, or `repository.go` files for individual use cases, and slices SHALL NOT import the root module package.
 
 #### Scenario: Module root has only cross-cutting files
 
 - GIVEN a module using vertical slices
 - WHEN the module root directory is inspected
-- THEN it contains route/container wiring and may contain no shared model/DTO files
+- THEN it contains route/container wiring and optional root-level compatibility/resolver files only
 - AND it does NOT contain `handler.go`, `service.go`, or `repository.go`
 
-#### Scenario: Models are shared not duplicated
+#### Scenario: Core types are shared not duplicated
 
 - GIVEN multiple use-case slices in the same module
 - WHEN any slice needs a model type
-- THEN it imports the model from the module-local `shared` package
+- THEN it imports the model from the module-local `core` package
 - AND no slice defines its own copy of the model
 
 #### Scenario: Slice imports avoid root cycle
 
 - GIVEN root `companies` imports slice packages for container and route wiring
 - WHEN a slice needs shared DTOs, models, or contracts
-- THEN it imports `internal/modules/companies/shared`
+- THEN it imports `internal/modules/companies/core`
 - AND it does NOT import `internal/modules/companies`
+
+### Requirement: Query reuse package
+
+Reusable DB lookup/count/query logic duplicated across slice repositories SHALL be extracted to `queries/`. Each query SHOULD be focused, one file per query when practical, and each query file SHALL have a corresponding `_test.go` file.
+
+#### Scenario: Query logic is extracted and tested
+
+- GIVEN repeated lookup logic exists across slice repositories
+- WHEN that logic is refactored
+- THEN shared query functions live under `internal/modules/companies/queries`
+- AND each query file has a matching `_test.go`
 
 ### Requirement: Use-case slice structure
 
@@ -100,7 +111,7 @@ The root `container.go` SHALL call module-level `NewContainer(db)` functions ins
 
 ### Requirement: Incremental migration pattern
 
-Existing modules SHALL NOT be mass-migrated unless already undergoing significant changes. New modules SHALL use the vertical slice pattern from the start. The `companies` module SHALL be the pilot migration target.
+Existing modules SHALL NOT be mass-migrated unless already undergoing substantial change. New or non-trivial modules SHALL use the vertical slice pattern from the start. Simple modules MAY remain flat. The `companies` module SHALL be the pilot migration target.
 
 #### Scenario: Companies module is migrated
 

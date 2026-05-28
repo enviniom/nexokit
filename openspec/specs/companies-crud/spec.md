@@ -8,7 +8,8 @@ Company model, migration, and management endpoints. New company creation is hand
 
 ### Requirement: Company model and migration
 
-The system MUST define a `Company` model with fields: `ID uint` (primaryKey), `PublicID string` (char(26), uniqueIndex), `Name string` (not null), `Slug string` (uniqueIndex, not null), `Status string` (not null), `CreatedAt time.Time`, `UpdatedAt time.Time`, `DeletedAt gorm.DeletedAt` (index), `CreatedBy *uint` (index), `UpdatedBy *uint` (index). The model MUST have a `Domains` relationship to `[]CompanyDomain`. The system MUST NOT include `Domain` or `Subdomain` fields on the `Company` model — tenant hostname ownership is managed exclusively through the `company_domains` table. A Goose migration MUST create the `companies` table.
+The system MUST define a `Company` model with fields: `ID uint` (primaryKey), `PublicID string` (char(26), uniqueIndex), `Name string` (not null), `Slug string` (uniqueIndex, not null), `Status string` (not null), `CreatedAt time.Time`, `UpdatedAt time.Time`, `DeletedAt gorm.DeletedAt` (index), `CreatedBy *uint` (index), `UpdatedBy *uint` (index). The model MUST have a `Domains` relationship to `[]CompanyDomain`. The system MUST NOT include `Domain` or `Subdomain` fields on the `Company` model — tenant hostname ownership is managed exclusively through the `company_domains` table. A Goose migration MUST create the `companies` table. Core model/DTO contracts MUST live in `internal/modules/companies/core` so endpoint slices can import them without importing root `companies`.
+(Previously: Model defined in flat root `model.go`; unchanged behavior, moved to module-local `core` package to avoid import cycles)
 
 #### Scenario: Migration creates companies table
 
@@ -24,7 +25,8 @@ The system MUST define a `Company` model with fields: `ID uint` (primaryKey), `P
 
 ### Requirement: Company CRUD endpoints
 
-The system MUST expose `GET /api/v1/companies`, `GET /api/v1/companies/:id`, `PUT /api/v1/companies/:id`, and `DELETE /api/v1/companies/:id`. The system MUST NOT expose `POST /api/v1/companies`; new companies MUST be created through `POST /api/v1/onboarding/companies`. Responses MUST use the standard DTO envelope except successful DELETE responses, which MUST return HTTP 204 with no body. The `:id` parameter MUST reference the `PublicID`, never the internal `ID`.
+The system MUST expose `GET /api/v1/companies`, `GET /api/v1/companies/:id`, `PUT /api/v1/companies/:id`, and `DELETE /api/v1/companies/:id`. The system MUST NOT expose `POST /api/v1/companies`; new companies MUST be created through `POST /api/v1/onboarding/companies`. Responses MUST use the standard DTO envelope except successful DELETE responses, which MUST return HTTP 204 with no body. The `:id` parameter MUST reference the `PublicID`, never the internal `ID`. Each endpoint maps to one use-case slice: `list_companies`, `view_company`, `update_company`, `delete_company`.
+(Previously: Same endpoint contract, implemented via flat handler/service/repository files)
 
 #### Scenario: List companies
 
@@ -32,7 +34,7 @@ The system MUST expose `GET /api/v1/companies`, `GET /api/v1/companies/:id`, `PU
 - WHEN `GET /api/v1/companies` is called by a root user
 - THEN the response returns HTTP 200 with all companies
 
-#### Scenario: Get company
+#### Scenario: View company
 
 - GIVEN an existing company with `PublicID = "01HXYZ"`
 - WHEN `GET /api/v1/companies/01HXYZ` is called
@@ -54,7 +56,8 @@ The system MUST expose `GET /api/v1/companies`, `GET /api/v1/companies/:id`, `PU
 
 ### Requirement: Direct company creation disabled
 
-Company creation MUST be restricted to the onboarding flow. The system MUST NOT expose `POST /api/v1/companies` for any role, including `root`.
+Company creation MUST be restricted to the onboarding flow. The system MUST NOT expose `POST /api/v1/companies` for any role, including `root`. No `create_company` slice exists.
+(Previously: Same constraint; route absence unchanged)
 
 #### Scenario: Direct create route is absent
 
@@ -65,6 +68,7 @@ Company creation MUST be restricted to the onboarding flow. The system MUST NOT 
 ### Requirement: Company slug uniqueness
 
 The `slug` field on companies MUST be unique across all companies, including soft-deleted ones.
+(Previously: Same constraint; validation logic moves to onboarding slice)
 
 #### Scenario: Duplicate slug rejected
 
@@ -81,6 +85,7 @@ The `slug` field on companies MUST be unique across all companies, including sof
 ### Requirement: Company status
 
 Companies MUST have a `status` field supporting at least `active` and `inactive` values.
+(Previously: Same constraint; status field unchanged)
 
 #### Scenario: Deactivate company
 

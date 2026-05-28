@@ -40,7 +40,7 @@ internal/modules/{module}/
 | File/Directory | Impact | Reason |
 |---|---|---|
 | `internal/modules/companies/` | **Restructure** | First migration target — split into use-case slices |
-| `internal/modules/companies/shared/` | **New shared package** | Shared models, DTOs, constants, and contracts used by slices without importing root `companies` |
+| `internal/modules/companies/core/` | **New core package** | Shared non-query models, DTOs, constants, errors, and contracts used by slices without importing root `companies` |
 | `internal/modules/companies/routes.go` | **Move to root** | Cross-cutting route registration |
 | `internal/modules/companies/container.go` | **New** | Module-level composition root (wiring) |
 | `internal/modules/companies/list_companies/` | **New slice** | `GET /companies` — handler + service + repository + tests |
@@ -59,15 +59,15 @@ internal/modules/{module}/
 
 ## Approaches
 
-### Approach 1: Use-Case Slices with Shared Models (Recommended)
+### Approach 1: Use-Case Slices with Core + Queries (Recommended)
 
-Each use case gets its own sub-package containing handler, service, repository, and tests. Models, DTOs, constants, and shared contracts live in a dedicated `shared` subpackage so slices do not import the root `companies` package and create Go import cycles. Routes and container wiring stay at module root.
+Each use case gets its own sub-package containing handler, service, repository, and tests. Shared non-query concerns (models, DTOs/contracts, constants, errors) live in a dedicated `core` subpackage. Reusable DB lookup/count/query logic lives in `queries/` with one `_test.go` per query file. Routes and container wiring stay at module root.
 
 ```
 internal/modules/companies/
 ├── routes.go                   # Cross-cutting: all route registration
 ├── container.go                # Composition root: wires all slices
-├── shared/
+├── core/
 │   ├── model.go                # Shared: Company, CompanyDomain
 │   ├── dto.go                  # Shared: request/response DTOs
 │   └── contracts.go            # Shared constants/interfaces/contracts
@@ -108,7 +108,7 @@ internal/modules/companies/
     └── *_test.go
 ```
 
-- **Pros**: Clean separation, each slice independently testable, models not duplicated, avoids Go import cycles, incremental migration possible, root container only calls module container
+- **Pros**: Clean separation, each slice independently testable, core types not duplicated, query reuse explicit and testable, avoids Go import cycles, incremental migration possible, root container only calls module container
 - **Cons**: Repository methods split across slices may need shared interface or base repository, some code duplication in repository setup
 - **Effort**: Medium for companies (pilot), Medium-High for full migration
 - **Review budget risk**: High if done all at once — MUST be incremental per module
@@ -168,15 +168,15 @@ internal/modules/companies/
 
 ## Recommendation
 
-**Approach 1** (Use-Case Slices with Shared Models) is the best fit given the constraints:
+**Approach 1** (Use-Case Slices with Core + Queries) is the best fit given the constraints:
 
-1. **Models stay shared** inside `internal/modules/companies/shared` — no duplication and no slice imports from root `companies`
+1. **Models stay shared in `core/`** inside `internal/modules/companies/core` — no duplication and no slice imports from root `companies`
 2. **Each use case is independently testable** — handler, service, repository co-located
 3. **Module container is the composition root** — root container calls only module containers
 4. **Incremental migration** — companies first, then others one at a time
 5. **Routes stay at root** — cross-cutting concern, registers all slices
 
-**Architecture correction after apply:** earlier wording said shared models/DTOs stay at module root. In Go, that creates an import cycle because root `companies` must import slice packages for routing/container wiring while slices would also import root `companies` for shared types. The corrected contract is: root `companies` contains only route/module wiring; shared models/DTOs/contracts live in `companies/shared`. The module boundary is unchanged because `shared` remains under `internal/modules/companies/`.
+**Architecture correction after apply:** earlier wording said shared models/DTOs stay at module root. In Go, that creates an import cycle because root `companies` must import slice packages for routing/container wiring while slices would also import root `companies` for shared types. The corrected contract is: root `companies` contains only route/module wiring; shared non-query concerns live in `companies/core`, and shared DB query logic lives in `companies/queries` with matching tests.
 
 For the **companies module specifically**, the slice breakdown maps 1:1 to registered endpoints (7 slices, no `create_company` since there is no public `POST /companies` route):
 
@@ -193,9 +193,9 @@ For the **companies module specifically**, the slice breakdown maps 1:1 to regis
 **Note:** The `Create` handler method exists in code but has no registered route — `create_company` is intentionally excluded from this change.
 
 **Key design decisions for the pilot:**
-- Repository interfaces and shared DTO/model contracts stay in `internal/modules/companies/shared` so slices can reference them without importing root `companies`
+- Repository interfaces and shared DTO/model contracts stay in `internal/modules/companies/core` so slices can reference them without importing root `companies`
 - Each slice has its own concrete repository implementation that embeds or references a shared DB connection
-- DTOs stay in `internal/modules/companies/shared` since they're shared between handlers and external consumers without forcing slice imports from root `companies`
+- DTOs stay in `internal/modules/companies/core` since they're shared between handlers and external consumers without forcing slice imports from root `companies`
 - The module `container.go` wires all slices and exposes only the handler(s) needed for route registration
 
 ## Risks
@@ -213,11 +213,11 @@ For the **companies module specifically**, the slice breakdown maps 1:1 to regis
    - PR 2: Wire new structure, delete old files
    - PR 3: Test updates and verification
 
-6. **Import path changes** — All imports referencing `internal/modules/companies` types will need updating to `internal/modules/companies/shared` where they refer to shared models/DTOs/contracts. The `app/container.go` and any middleware that uses companies repository contracts (like `AllowRootGlobalScope`) will need adaptation.
+6. **Import path changes** — All imports referencing `internal/modules/companies` types will need updating to `internal/modules/companies/core` where they refer to shared models/DTOs/contracts. The `app/container.go` and any middleware that uses companies repository contracts (like `AllowRootGlobalScope`) will need adaptation.
 
 ## Ready for Proposal
 
-**Yes.** The exploration is complete with sufficient detail to proceed to proposal, spec, design, and tasks phases. The companies module is a clean pilot candidate with no cross-module dependencies. The recommended approach (use-case slices with shared models/DTOs/contracts in `companies/shared`) satisfies all stated constraints.
+**Yes.** The exploration is complete with sufficient detail to proceed to proposal, spec, design, and tasks phases. The companies module is a clean pilot candidate with no cross-module dependencies. The recommended approach (use-case slices with shared non-query concerns in `companies/core` plus reusable query logic in `companies/queries`) satisfies all stated constraints.
 
 The orchestrator should tell the user:
 - Exploration complete — companies module identified as pilot candidate
