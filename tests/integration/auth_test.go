@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth"
+	"github.com/enviniom/nexokit/internal/modules/auth/core"
 	"github.com/enviniom/nexokit/internal/modules/roles"
 	"github.com/enviniom/nexokit/internal/modules/users"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/password"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/token"
@@ -25,7 +27,7 @@ func TestAuthIntegration(t *testing.T) {
 	}
 
 	gin.SetMode(gin.TestMode)
-	db := helpers.NewSQLiteDB(t, &roles.Role{}, &users.User{}, &auth.RefreshToken{})
+	db := helpers.NewSQLiteDB(t, &roles.Role{}, &users.User{}, &core.RefreshToken{})
 	adminRole := helpers.SeedRole(t, db, roles.AdminRoleSlug)
 	pw := password.Manager{}
 	hash, err := pw.HashPassword("secret123")
@@ -45,18 +47,20 @@ func TestAuthIntegration(t *testing.T) {
 	}
 
 	manager := token.NewManager("nexokit-test-secret", time.Hour)
-	svc := auth.NewService(users.NewRepository(db), pw, manager, manager, auth.NewRefreshRepository(db), 24*time.Hour)
-	h := auth.NewHandler(svc)
+	c := auth.NewContainer(db, pw, manager, 24*time.Hour)
 	r := gin.New()
 	v1 := r.Group("/api/v1")
-	auth.Register(v1, h, func(c *gin.Context) { c.Next() }, func(c *gin.Context) { c.Next() }, func(c *gin.Context) { c.Next() }, func(c *gin.Context) { c.Next() })
+	auth.Register(v1, c, func(c *gin.Context) {
+		authctx.SetGin(c, &authctx.User{PublicID: activeUser.PublicID, Name: activeUser.Name, Email: activeUser.Email, Role: adminRole.Name, RoleSlug: adminRole.Slug, RoleID: adminRole.ID, CompanyID: activeUser.CompanyID, IsActive: true, Permissions: []string{"users.list", "roles.view"}})
+		c.Next()
+	}, func(c *gin.Context) { c.Next() }, func(c *gin.Context) { c.Next() }, func(c *gin.Context) { c.Next() })
 
 	t.Run("login success returns token pair", func(t *testing.T) {
 		w := requestJSON(r, http.MethodPost, "/api/v1/auth/login", map[string]string{"email": "active@example.com", "password": "secret123"})
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}
-		var resp response.APIResponse[auth.LoginResponse]
+		var resp response.APIResponse[core.LoginResponse]
 		mustDecode(t, w.Body.Bytes(), &resp)
 		if resp.Data.AccessToken == "" || resp.Data.RefreshToken == "" {
 			t.Fatalf("expected access and refresh tokens")
@@ -79,14 +83,14 @@ func TestAuthIntegration(t *testing.T) {
 
 	t.Run("valid refresh rotates token", func(t *testing.T) {
 		login := requestJSON(r, http.MethodPost, "/api/v1/auth/login", map[string]string{"email": "active@example.com", "password": "secret123"})
-		var loginResp response.APIResponse[auth.LoginResponse]
+		var loginResp response.APIResponse[core.LoginResponse]
 		mustDecode(t, login.Body.Bytes(), &loginResp)
 
 		refresh := requestJSON(r, http.MethodPost, "/api/v1/auth/refresh", map[string]string{"refresh_token": loginResp.Data.RefreshToken})
 		if refresh.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", refresh.Code, refresh.Body.String())
 		}
-		var rotated response.APIResponse[auth.TokenPairResponse]
+		var rotated response.APIResponse[core.TokenPairResponse]
 		mustDecode(t, refresh.Body.Bytes(), &rotated)
 		if rotated.Data.RefreshToken == "" || rotated.Data.RefreshToken == loginResp.Data.RefreshToken {
 			t.Fatalf("expected rotated refresh token")
@@ -95,7 +99,7 @@ func TestAuthIntegration(t *testing.T) {
 
 	t.Run("revoked refresh token returns 401", func(t *testing.T) {
 		login := requestJSON(r, http.MethodPost, "/api/v1/auth/login", map[string]string{"email": "active@example.com", "password": "secret123"})
-		var loginResp response.APIResponse[auth.LoginResponse]
+		var loginResp response.APIResponse[core.LoginResponse]
 		mustDecode(t, login.Body.Bytes(), &loginResp)
 
 		_ = requestJSON(r, http.MethodPost, "/api/v1/auth/refresh", map[string]string{"refresh_token": loginResp.Data.RefreshToken})
@@ -107,7 +111,7 @@ func TestAuthIntegration(t *testing.T) {
 
 	t.Run("logout revokes refresh token", func(t *testing.T) {
 		login := requestJSON(r, http.MethodPost, "/api/v1/auth/login", map[string]string{"email": "active@example.com", "password": "secret123"})
-		var loginResp response.APIResponse[auth.LoginResponse]
+		var loginResp response.APIResponse[core.LoginResponse]
 		mustDecode(t, login.Body.Bytes(), &loginResp)
 
 		logout := requestJSON(r, http.MethodPost, "/api/v1/auth/logout", map[string]string{"refresh_token": loginResp.Data.RefreshToken})
@@ -118,6 +122,18 @@ func TestAuthIntegration(t *testing.T) {
 		reuse := requestJSON(r, http.MethodPost, "/api/v1/auth/refresh", map[string]string{"refresh_token": loginResp.Data.RefreshToken})
 		if reuse.Code != http.StatusUnauthorized {
 			t.Fatalf("expected 401 after logout revoke, got %d: %s", reuse.Code, reuse.Body.String())
+		}
+	})
+
+	t.Run("me returns authenticated session", func(t *testing.T) {
+		me := requestJSON(r, http.MethodGet, "/api/v1/auth/me", nil)
+		if me.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", me.Code, me.Body.String())
+		}
+		var resp response.APIResponse[core.MeResponse]
+		mustDecode(t, me.Body.Bytes(), &resp)
+		if resp.Data.PublicID != activeUser.PublicID || len(resp.Data.Permissions) != 2 {
+			t.Fatalf("unexpected /me payload: %#v", resp.Data)
 		}
 	})
 }

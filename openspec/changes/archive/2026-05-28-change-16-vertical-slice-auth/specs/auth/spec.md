@@ -1,14 +1,11 @@
-# Auth Specification
+# Delta for Auth
 
-## Purpose
-
-Token lifecycle and authentication endpoints for the NexoKit API.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Login endpoint
 
 The system MUST expose `POST /api/v1/auth/login`. It MUST accept `email` and `password`, validate the user is active, and return a standard DTO response containing a PASETO access token and an opaque refresh token. It MUST NOT reveal whether the email or password was incorrect. The endpoint implementation SHALL be provided by the `authenticate_user` vertical slice.
+(Previously: No slice affiliation specified — flat module structure.)
 
 #### Scenario: Successful login
 
@@ -31,6 +28,7 @@ The system MUST expose `POST /api/v1/auth/login`. It MUST accept `email` and `pa
 ### Requirement: Refresh endpoint
 
 The system MUST expose `POST /api/v1/auth/refresh`. It MUST accept a valid refresh token, rotate the token pair (issue new access and refresh tokens), and revoke the old refresh token. The endpoint implementation SHALL be provided by the `rotate_token` vertical slice.
+(Previously: No slice affiliation specified — flat module structure.)
 
 #### Scenario: Successful refresh
 
@@ -48,6 +46,7 @@ The system MUST expose `POST /api/v1/auth/refresh`. It MUST accept a valid refre
 ### Requirement: Logout endpoint
 
 The system MUST expose `POST /api/v1/auth/logout`. It MUST revoke the provided refresh token. The endpoint implementation SHALL be provided by the `revoke_token` vertical slice.
+(Previously: No slice affiliation specified — flat module structure.)
 
 #### Scenario: Successful logout
 
@@ -58,6 +57,7 @@ The system MUST expose `POST /api/v1/auth/logout`. It MUST revoke the provided r
 ### Requirement: Me endpoint
 
 The system MUST expose `GET /api/v1/auth/me`. It MUST return the authenticated user without `password` or `password_hash`. The response `data` object MUST include a `permissions` field containing an array of permission slug strings associated with the user's role. The endpoint implementation SHALL be provided by the `view_session` vertical slice.
+(Previously: No slice affiliation specified — flat module structure.)
 
 #### Scenario: Get current user
 
@@ -81,6 +81,7 @@ The system MUST expose `GET /api/v1/auth/me`. It MUST return the authenticated u
 ### Requirement: Token security
 
 The system MUST issue PASETO v4.local access tokens with claims `sub`, `role`, `company_id`, `token_type`, `issued_at`, and `expires_at`. Refresh tokens MUST be opaque random strings stored only as a hash. Passwords MUST be hashed with argon2id. All token operations SHALL be encapsulated within their respective vertical slices.
+(Previously: No slice affiliation specified — flat module structure.)
 
 #### Scenario: Access token claims
 

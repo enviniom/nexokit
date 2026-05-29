@@ -1,7 +1,8 @@
-package auth
+package core
 
 import (
-	"github.com/enviniom/nexokit/internal/modules/users"
+	"time"
+
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/validator"
 )
@@ -12,7 +13,6 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-// Validate performs field-level validation for LoginRequest.
 func (r LoginRequest) Validate() response.ValidationErrors {
 	errs := make(response.ValidationErrors)
 	validator.Field(errs, "email", r.Email).Required().Apply(validator.ValidEmail())
@@ -25,11 +25,25 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-// Validate performs field-level validation for RefreshRequest.
 func (r RefreshRequest) Validate() response.ValidationErrors {
 	errs := make(response.ValidationErrors)
 	validator.Field(errs, "refresh_token", r.RefreshToken).Required()
 	return errs
+}
+
+// AuthUserResponse is the auth-scoped user DTO.
+type AuthUserResponse struct {
+	PublicID  string    `json:"public_id"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	IsActive  bool      `json:"is_active"`
+	RoleID    uint      `json:"role_id"`
+	RoleName  string    `json:"role_name"`
+	CompanyID *uint     `json:"company_id,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	CreatedBy *uint     `json:"created_by,omitempty"`
+	UpdatedBy *uint     `json:"updated_by,omitempty"`
 }
 
 // TokenPairResponse returns a rotated token pair.
@@ -40,14 +54,14 @@ type TokenPairResponse struct {
 
 // LoginResponse returns tokens and a sanitized user DTO.
 type LoginResponse struct {
-	AccessToken  string             `json:"access_token"`
-	RefreshToken string             `json:"refresh_token"`
-	User         users.UserResponse `json:"user"`
+	AccessToken  string           `json:"access_token"`
+	RefreshToken string           `json:"refresh_token"`
+	User         AuthUserResponse `json:"user"`
 }
 
 // MeResponse returns the authenticated user with role and permission metadata.
 type MeResponse struct {
-	users.UserResponse
+	AuthUserResponse
 	RoleSlug    string   `json:"role_slug"`
 	Permissions []string `json:"permissions"`
 }

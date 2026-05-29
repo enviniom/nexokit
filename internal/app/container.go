@@ -30,7 +30,7 @@ type Container struct {
 	Companies          *companies.Container
 	permissionsHandler *permissions.Handler
 	permissionsService permissions.Service
-	authHandler        *auth.Handler
+	authContainer      *auth.Container
 	onboardingHandler  *onboarding.Handler
 	authMW             gin.HandlerFunc
 	authzMW            gin.HandlerFunc
@@ -60,9 +60,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	usersHandler := users.NewHandler(usersService, authctx.PublicIDFromGin)
 
 	tokenManager := token.NewManager(cfg.Auth.PASETOKey, time.Duration(cfg.Auth.AccessTTLMinutes)*time.Minute)
-	refreshRepo := auth.NewRefreshRepository(db)
-	authService := auth.NewService(usersRepo, passwordManager, tokenManager, tokenManager, refreshRepo, time.Duration(cfg.Auth.RefreshTTLDays)*24*time.Hour)
-	authHandler := auth.NewHandler(authService)
+	authContainer := auth.NewContainer(db, passwordManager, tokenManager, time.Duration(cfg.Auth.RefreshTTLDays)*24*time.Hour)
 	authMW := middleware.Auth(tokenManager, userLookup{repo: usersRepo})
 	authzMW := middleware.AttachPermissions(permissionsService)
 	window := time.Duration(cfg.RateLimit.WindowSeconds) * time.Second
@@ -78,7 +76,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 		Companies:          companiesContainer,
 		permissionsHandler: permissionsHandler,
 		permissionsService: permissionsService,
-		authHandler:        authHandler,
+		authContainer:      authContainer,
 		onboardingHandler:  onboardingHandler,
 		authMW:             authMW,
 		authzMW:            authzMW,
@@ -89,7 +87,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 
 // RegisterModules mounts all business module routes onto the v1 router group.
 func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
-	auth.Register(v1, c.authHandler, c.authMW, c.authzMW, c.loginRateLimitMW, c.refreshRateLimitMW)
+	auth.Register(v1, c.authContainer, c.authMW, c.authzMW, c.loginRateLimitMW, c.refreshRateLimitMW)
 	globalProtected := v1.Group("")
 	globalProtected.Use(c.authMW, middleware.AllowRootGlobalScope(c.Companies.Resolver()), c.authzMW)
 	companies.Register(globalProtected, c.Companies, middleware.RequirePermission, middleware.RequireRole)
