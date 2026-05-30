@@ -1,4 +1,4 @@
-# Apply Progress: change-16-vertical-slice-onboarding
+# Apply Progress: change-17-vertical-slice-onboarding
 
 ## Status
 Implemented cumulative onboarding migration for stacked-to-main delivery: PR1 foundation (Phase 1 + Phase 2) and remaining tasks (Phase 3 + Phase 4 + Phase 5). No commit created.
@@ -56,7 +56,7 @@ Implemented cumulative onboarding migration for stacked-to-main delivery: PR1 fo
 - `internal/modules/onboarding/dto.go` (deleted)
 - `internal/modules/onboarding/handler_test.go` (deleted)
 - `internal/modules/onboarding/service_test.go` (deleted)
-- `openspec/changes/change-16-vertical-slice-onboarding/tasks.md`
+- `openspec/changes/change-17-vertical-slice-onboarding/tasks.md`
 
 ## Test Commands Run
 | Command | Result |

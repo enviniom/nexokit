@@ -1,8 +1,8 @@
-# Archive Report: change-16-vertical-slice-onboarding
+# Archive Report: change-17-vertical-slice-onboarding
 
 ## Change Archived
 
-**Change**: change-16-vertical-slice-onboarding
+**Change**: change-17-vertical-slice-onboarding
 **Date**: 2026-05-30
 **Mode**: openspec
 
