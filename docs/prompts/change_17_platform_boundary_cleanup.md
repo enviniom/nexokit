@@ -21,7 +21,6 @@ Limpiar y endurecer los límites de `internal/platform/*` para que solo contenga
 - Cambios funcionales de handlers, servicios o reglas de negocio.
 - Cambios en shape JSON de respuestas API.
 - Reescritura masiva de módulos no impactados.
-- Cualquier cambio en `internal/modules/permissions/**` salvo aprobación explícita.
 
 ## Antes de implementar
 
@@ -38,4 +37,3 @@ Limpiar y endurecer los límites de `internal/platform/*` para que solo contenga
 - Mensajes/errores/constantes de dominio quedan en `modules/<mod>/core/*`.
 - `platform/response` sigue siendo única fuente del contrato de respuesta.
 - No hay cambio funcional observable (mismo comportamiento HTTP).
-- No se modifica `internal/modules/permissions/**`; si aparece dependencia, documentar como follow-up o riesgo.

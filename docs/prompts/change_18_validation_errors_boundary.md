@@ -21,7 +21,6 @@ Evaluar y refactorizar (si corresponde) la propiedad de `ValidationErrors` para 
 - Cambiar contrato JSON de `APIResponse`.
 - Cambiar comportamiento funcional de validaciones de negocio.
 - Refactors no relacionados con ownership de errores de validación.
-- Cambios en `internal/modules/permissions/**`.
 
 ## Antes de implementar
 
