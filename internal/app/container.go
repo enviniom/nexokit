@@ -25,17 +25,16 @@ import (
 
 // Container holds the dependency graph for all application modules.
 type Container struct {
-	rolesHandler       *roles.Handler
-	usersHandler       *users.Handler
-	Companies          *companies.Container
-	permissionsHandler *permissions.Handler
-	permissionsService permissions.Service
-	authContainer      *auth.Container
-	Onboarding         *onboarding.Container
-	authMW             gin.HandlerFunc
-	authzMW            gin.HandlerFunc
-	loginRateLimitMW   gin.HandlerFunc
-	refreshRateLimitMW gin.HandlerFunc
+	rolesHandler         *roles.Handler
+	usersHandler         *users.Handler
+	Companies            *companies.Container
+	permissionsContainer *permissions.Container
+	authContainer        *auth.Container
+	Onboarding           *onboarding.Container
+	authMW               gin.HandlerFunc
+	authzMW              gin.HandlerFunc
+	loginRateLimitMW     gin.HandlerFunc
+	refreshRateLimitMW   gin.HandlerFunc
 }
 
 // NewContainer creates a new Container with the given dependencies.
@@ -47,12 +46,10 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	usersRepo := users.NewRepository(db)
 	companiesContainer := companies.NewContainer(db)
 
-	permissionsRepo := permissions.NewRepository(db)
-	permissionsService := permissions.NewService(permissionsRepo, permissions.WithCache(cache))
-	permissionsHandler := permissions.NewHandler(permissionsService)
+	permissionsContainer := permissions.NewContainer(db, cache, log)
 
 	rolesRepo := roles.NewRepository(db)
-	rolesService := roles.NewService(rolesRepo, roles.WithPermissionCatalog(permissionsRepo), roles.WithRoleMembers(usersRepo), roles.WithCache(cache))
+	rolesService := roles.NewService(rolesRepo, roles.WithPermissionCatalog(permissionsContainer.Catalog), roles.WithRoleMembers(usersRepo), roles.WithCache(cache))
 	rolesHandler := roles.NewHandler(rolesService)
 
 	passwordManager := password.Manager{}
@@ -62,7 +59,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	tokenManager := token.NewManager(cfg.Auth.PASETOKey, time.Duration(cfg.Auth.AccessTTLMinutes)*time.Minute)
 	authContainer := auth.NewContainer(db, passwordManager, tokenManager, time.Duration(cfg.Auth.RefreshTTLDays)*24*time.Hour)
 	authMW := middleware.Auth(tokenManager, userLookup{repo: usersRepo})
-	authzMW := middleware.AttachPermissions(permissionsService)
+	authzMW := middleware.AttachPermissions(permissionsContainer.Resolver)
 	window := time.Duration(cfg.RateLimit.WindowSeconds) * time.Second
 	loginRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "login", cfg.RateLimit.LoginRPM, window)
 	refreshRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "refresh", cfg.RateLimit.RefreshRPM, window)
@@ -70,17 +67,16 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	onboardingContainer := onboarding.NewContainer(db, onboarding.Config{PasswordHasher: passwordManager, PlatformDomain: cfg.App.PlatformDomain})
 
 	return &Container{
-		rolesHandler:       rolesHandler,
-		usersHandler:       usersHandler,
-		Companies:          companiesContainer,
-		permissionsHandler: permissionsHandler,
-		permissionsService: permissionsService,
-		authContainer:      authContainer,
-		Onboarding:         onboardingContainer,
-		authMW:             authMW,
-		authzMW:            authzMW,
-		loginRateLimitMW:   loginRateLimitMW,
-		refreshRateLimitMW: refreshRateLimitMW,
+		rolesHandler:         rolesHandler,
+		usersHandler:         usersHandler,
+		Companies:            companiesContainer,
+		permissionsContainer: permissionsContainer,
+		authContainer:        authContainer,
+		Onboarding:           onboardingContainer,
+		authMW:               authMW,
+		authzMW:              authzMW,
+		loginRateLimitMW:     loginRateLimitMW,
+		refreshRateLimitMW:   refreshRateLimitMW,
 	}
 }
 
@@ -93,7 +89,7 @@ func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
 	// Roles and permissions are system catalog modules, so root may administer
 	// them globally while non-root requests remain scoped to their company.
 	roles.Register(globalProtected, c.rolesHandler, middleware.RequirePermission)
-	permissions.Register(globalProtected, c.permissionsHandler, middleware.RequirePermission)
+	permissions.Register(globalProtected, c.permissionsContainer, middleware.RequirePermission)
 	onboarding.Register(globalProtected, c.Onboarding, middleware.RequireRole)
 
 	tenantProtected := v1.Group("")
@@ -135,5 +131,5 @@ func (l userLookup) GetAuthUser(publicID string) (*authctx.User, error) {
 // SyncPermissions delegates synchronization of registered permissions to permissionsService.
 func (c *Container) SyncPermissions() error {
 	slugs := platformPerms.ListRegistered()
-	return c.permissionsService.SyncPermissions(slugs)
+	return c.permissionsContainer.Syncer.SyncPermissions(slugs)
 }

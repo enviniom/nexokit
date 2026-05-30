@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/enviniom/nexokit/internal/infra/cache"
-	"github.com/enviniom/nexokit/internal/modules/permissions"
+	permissions "github.com/enviniom/nexokit/internal/modules/permissions/core"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 	"github.com/enviniom/nexokit/internal/platform/query"

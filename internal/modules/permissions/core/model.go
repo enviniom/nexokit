@@ -1,18 +1,6 @@
-package permissions
+package core
 
 import "github.com/enviniom/nexokit/internal/shared"
-
-const (
-	ActionList              = "list"
-	ActionSelect            = "select"
-	ActionView              = "view"
-	ActionCreate            = "create"
-	ActionUpdate            = "update"
-	ActionDelete            = "delete"
-	ActionManage            = "manage"
-	ActionChangeRole        = "change_role"
-	ActionAssignPermissions = "assign_permissions"
-)
 
 // Permission represents an RBAC permission with UI-friendly metadata.
 type Permission struct {

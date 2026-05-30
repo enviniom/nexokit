@@ -6,11 +6,11 @@ import (
 )
 
 // Register mounts permissions module routes onto the v1 router group.
-func Register(v1 *gin.RouterGroup, handler *Handler, requirePermission func(string) gin.HandlerFunc) {
+func Register(v1 *gin.RouterGroup, container *Container, requirePermission func(string) gin.HandlerFunc) {
 	permissions := v1.Group("/permissions")
 	{
-		permissions.GET("", requirePermission(platformPerms.Format(platformPerms.ModulePermissions, platformPerms.ActionManage)), handler.List)
-		permissions.GET("/:id", requirePermission(platformPerms.Format(platformPerms.ModulePermissions, platformPerms.ActionManage)), handler.GetByPublicID)
-		permissions.PUT("/:id", requirePermission(platformPerms.Format(platformPerms.ModulePermissions, platformPerms.ActionManage)), handler.Update)
+		permissions.GET("", requirePermission(platformPerms.Format(platformPerms.ModulePermissions, platformPerms.ActionManage)), container.ListHandler.List)
+		permissions.GET("/:id", requirePermission(platformPerms.Format(platformPerms.ModulePermissions, platformPerms.ActionManage)), container.ViewHandler.GetByPublicID)
+		permissions.PUT("/:id", requirePermission(platformPerms.Format(platformPerms.ModulePermissions, platformPerms.ActionManage)), container.UpdateHandler.Update)
 	}
 }

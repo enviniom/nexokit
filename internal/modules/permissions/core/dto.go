@@ -1,4 +1,4 @@
-package permissions
+package core
 
 import (
 	"time"
@@ -61,4 +61,21 @@ func (r UpdatePermissionRequest) Validate() response.ValidationErrors {
 	errs := make(response.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required()
 	return errs
+}
+
+func ToResponse(p *Permission) *PermissionResponse {
+	return &PermissionResponse{
+		PublicID:     p.PublicID,
+		Slug:         p.Slug,
+		Name:         p.Name,
+		Module:       p.Module,
+		Action:       p.Action,
+		Description:  p.Description,
+		IsSystem:     p.IsSystem,
+		DisplayOrder: p.DisplayOrder,
+		CreatedAt:    p.CreatedAt,
+		UpdatedAt:    p.UpdatedAt,
+		CreatedBy:    p.CreatedBy,
+		UpdatedBy:    p.UpdatedBy,
+	}
 }
