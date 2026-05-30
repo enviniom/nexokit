@@ -1,4 +1,4 @@
-package onboarding
+package core
 
 import (
 	"github.com/enviniom/nexokit/internal/platform/response"

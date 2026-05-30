@@ -31,7 +31,7 @@ type Container struct {
 	permissionsHandler *permissions.Handler
 	permissionsService permissions.Service
 	authContainer      *auth.Container
-	onboardingHandler  *onboarding.Handler
+	Onboarding         *onboarding.Container
 	authMW             gin.HandlerFunc
 	authzMW            gin.HandlerFunc
 	loginRateLimitMW   gin.HandlerFunc
@@ -67,8 +67,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	loginRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "login", cfg.RateLimit.LoginRPM, window)
 	refreshRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "refresh", cfg.RateLimit.RefreshRPM, window)
 
-	onboardingService := onboarding.NewService(db, passwordManager, onboarding.WithPlatformDomain(cfg.App.PlatformDomain))
-	onboardingHandler := onboarding.NewHandler(onboardingService)
+	onboardingContainer := onboarding.NewContainer(db, onboarding.Config{PasswordHasher: passwordManager, PlatformDomain: cfg.App.PlatformDomain})
 
 	return &Container{
 		rolesHandler:       rolesHandler,
@@ -77,7 +76,7 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 		permissionsHandler: permissionsHandler,
 		permissionsService: permissionsService,
 		authContainer:      authContainer,
-		onboardingHandler:  onboardingHandler,
+		Onboarding:         onboardingContainer,
 		authMW:             authMW,
 		authzMW:            authzMW,
 		loginRateLimitMW:   loginRateLimitMW,
@@ -95,7 +94,7 @@ func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
 	// them globally while non-root requests remain scoped to their company.
 	roles.Register(globalProtected, c.rolesHandler, middleware.RequirePermission)
 	permissions.Register(globalProtected, c.permissionsHandler, middleware.RequirePermission)
-	onboarding.Register(globalProtected, c.onboardingHandler, middleware.RequireRole)
+	onboarding.Register(globalProtected, c.Onboarding, middleware.RequireRole)
 
 	tenantProtected := v1.Group("")
 	tenantProtected.Use(c.authMW, middleware.RequireTenantScope(c.Companies.Resolver()), c.authzMW)

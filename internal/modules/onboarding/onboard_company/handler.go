@@ -1,26 +1,24 @@
-package onboarding
+package onboard_company
 
 import (
 	"errors"
 
+	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
 )
 
-// Handler handles onboarding HTTP requests.
 type Handler struct {
 	service Service
 }
 
-// NewHandler creates a new onboarding Handler.
 func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
 
-// Onboard handles company onboarding HTTP POST request.
-func (h *Handler) OnboardCompany(c *gin.Context) {
-	var req OnboardCompanyRequest
+func (h *Handler) Handle(c *gin.Context) {
+	var req core.OnboardCompanyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
@@ -43,19 +41,19 @@ func (h *Handler) respondError(c *gin.Context, err error) {
 	errs := make(response.ValidationErrors)
 
 	switch {
-	case errors.Is(err, ErrDuplicateCompanySlug):
+	case errors.Is(err, core.ErrDuplicateCompanySlug):
 		errs.Add("slug", messages.MsgConflict)
 		response.ValidationError(c, errs)
-	case errors.Is(err, ErrDuplicateCompanyDomain):
+	case errors.Is(err, core.ErrDuplicateCompanyDomain):
 		errs.Add("domain", messages.MsgConflict)
 		response.ValidationError(c, errs)
-	case errors.Is(err, ErrDuplicateTechnicalDomain):
+	case errors.Is(err, core.ErrDuplicateTechnicalDomain):
 		errs.Add("generate_technical_domain", messages.MsgConflict)
 		response.ValidationError(c, errs)
-	case errors.Is(err, ErrMissingPlatformDomain):
+	case errors.Is(err, core.ErrMissingPlatformDomain):
 		errs.Add("generate_technical_domain", messages.MsgInvalidFormat)
 		response.ValidationError(c, errs)
-	case errors.Is(err, ErrDuplicateAdminEmail):
+	case errors.Is(err, core.ErrDuplicateAdminEmail):
 		errs.Add("admin_email", messages.MsgConflict)
 		response.ValidationError(c, errs)
 	default:
