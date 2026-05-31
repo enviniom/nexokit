@@ -1,9 +1,9 @@
 > Lee también `_context.md` antes de implementar este change.
 
-Quiero iniciar un nuevo change SDD/OpenSpec para migrar el módulo `<module_name>` a arquitectura vertical slice.
-Change: `<change-number>-vertical-slice-<module_name>`
+Quiero iniciar un nuevo change SDD/OpenSpec para migrar el módulo `permissions` a arquitectura vertical slice.
+Change: `18-vertical-slice-permissions`
 Objetivo:
-Refactorizar únicamente `internal/modules/<module_name>/` hacia vertical slice, manteniendo el módulo como frontera principal y haciéndolo más autocontenido. No migrar otros módulos en este change.
+Refactorizar únicamente `internal/modules/permissions/` hacia vertical slice, manteniendo el módulo como frontera principal y haciéndolo más autocontenido. No migrar otros módulos en este change.
 Reglas de arquitectura:
 - Un endpoint existente = un caso de uso = un slice.
 - Cada slice debe tener su propia carpeta con:

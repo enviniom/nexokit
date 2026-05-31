@@ -2,7 +2,7 @@
 
 Quiero iniciar un nuevo change SDD/OpenSpec para revisar frontera arquitectónica de ownership de errores de validación, sin cambio de comportamiento.
 
-Change: `18-validation-errors-boundary`
+Change: `20-validation-errors-boundary`
 
 ## Objetivo
 
