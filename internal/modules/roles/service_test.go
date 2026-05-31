@@ -8,6 +8,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/modules/companies"
 	"github.com/enviniom/nexokit/internal/modules/permissions"
+	"github.com/enviniom/nexokit/internal/modules/roles/core"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/query"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
@@ -661,6 +662,9 @@ func TestService_Delete(t *testing.T) {
 		svc := NewService(repo, WithRoleMembers(fakeRoleMemberRepository{count: 2}))
 
 		err := svc.Delete(tenant.NewRoot(), "role1")
+		if !errors.Is(err, core.ErrRoleHasAssignedUsers) {
+			t.Fatalf("expected ErrRoleHasAssignedUsers, got %v", err)
+		}
 		if !errors.Is(err, apperror.ErrUnprocessable) {
 			t.Fatalf("expected ErrUnprocessable, got %v", err)
 		}

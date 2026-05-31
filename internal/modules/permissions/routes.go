@@ -1,6 +1,7 @@
 package permissions
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/permissions/core"
 	platformPerms "github.com/enviniom/nexokit/internal/platform/permissions"
 	"github.com/gin-gonic/gin"
 )
@@ -9,8 +10,8 @@ import (
 func Register(v1 *gin.RouterGroup, container *Container, requirePermission func(string) gin.HandlerFunc) {
 	permissions := v1.Group("/permissions")
 	{
-		permissions.GET("", requirePermission(platformPerms.Format(platformPerms.ModulePermissions, platformPerms.ActionManage)), container.ListHandler.List)
-		permissions.GET("/:id", requirePermission(platformPerms.Format(platformPerms.ModulePermissions, platformPerms.ActionManage)), container.ViewHandler.GetByPublicID)
-		permissions.PUT("/:id", requirePermission(platformPerms.Format(platformPerms.ModulePermissions, platformPerms.ActionManage)), container.UpdateHandler.Update)
+		permissions.GET("", requirePermission(platformPerms.Format(core.ModulePermissions, platformPerms.ActionManage)), container.ListHandler.List)
+		permissions.GET("/:id", requirePermission(platformPerms.Format(core.ModulePermissions, platformPerms.ActionManage)), container.ViewHandler.GetByPublicID)
+		permissions.PUT("/:id", requirePermission(platformPerms.Format(core.ModulePermissions, platformPerms.ActionManage)), container.UpdateHandler.Update)
 	}
 }

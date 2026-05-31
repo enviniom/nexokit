@@ -2,7 +2,7 @@
 
 Quiero iniciar un nuevo change SDD/OpenSpec para reforzar fronteras de `platform` sin cambio funcional.
 
-Change: `17-platform-boundary-cleanup`
+Change: `19-platform-boundary-cleanup`
 
 ## Objetivo
 

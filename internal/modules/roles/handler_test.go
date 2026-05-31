@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/enviniom/nexokit/internal/modules/roles/core"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/query"
@@ -474,7 +475,7 @@ func TestHandler_Delete(t *testing.T) {
 	})
 
 	t.Run("returns unprocessable when role has assigned users", func(t *testing.T) {
-		svc := &fakeService{err: apperror.ErrUnprocessable}
+		svc := &fakeService{err: core.ErrRoleHasAssignedUsers}
 		_, h := setupHandler(svc)
 
 		w := httptest.NewRecorder()
@@ -485,6 +486,14 @@ func TestHandler_Delete(t *testing.T) {
 
 		if w.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("expected status 422, got %d", w.Code)
+		}
+
+		var resp response.APIResponse[any]
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to decode response: %v", err)
+		}
+		if resp.Message != core.MsgRoleHasAssignedUsers {
+			t.Fatalf("expected message %q, got %q", core.MsgRoleHasAssignedUsers, resp.Message)
 		}
 	})
 }

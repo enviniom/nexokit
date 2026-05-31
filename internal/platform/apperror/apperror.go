@@ -50,7 +50,7 @@ var (
 	ErrBadRequest      = &AppError{Message: messages.MsgBadRequest}
 	ErrTooManyRequests = &AppError{Message: messages.MsgTooManyRequests}
 	ErrValidation      = &AppError{Message: messages.MsgValidationError}
-	ErrUnprocessable   = &AppError{Message: messages.MsgRoleHasAssignedUsers}
+	ErrUnprocessable   = &AppError{Message: ""}
 	ErrInternal        = &AppError{Message: messages.MsgInternalError}
 )
 

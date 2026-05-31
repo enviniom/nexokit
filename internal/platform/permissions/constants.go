@@ -6,15 +6,6 @@ import (
 )
 
 const (
-	ModuleUsers       = "users"
-	ModuleRoles       = "roles"
-	ModuleCompanies   = "companies"
-	ModuleSettings    = "settings"
-	ModuleAuth        = "auth"
-	ModulePermissions = "permissions"
-)
-
-const (
 	ActionList              = "list"
 	ActionSelect            = "select"
 	ActionView              = "view"

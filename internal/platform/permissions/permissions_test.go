@@ -12,9 +12,9 @@ func TestFormat(t *testing.T) {
 		action string
 		want   string
 	}{
-		{module: ModuleUsers, action: ActionList, want: "users.list"},
-		{module: ModuleRoles, action: ActionSelect, want: "roles.select"},
-		{module: ModulePermissions, action: ActionManage, want: "permissions.manage"},
+		{module: "users", action: ActionList, want: "users.list"},
+		{module: "roles", action: ActionSelect, want: "roles.select"},
+		{module: "permissions", action: ActionManage, want: "permissions.manage"},
 	}
 
 	for _, tc := range cases {

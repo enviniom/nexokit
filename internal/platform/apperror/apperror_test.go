@@ -106,4 +106,10 @@ func TestSentinels(t *testing.T) {
 	if ErrTooManyRequests.Error() != messages.MsgTooManyRequests {
 		t.Errorf("unexpected too many requests sentinel message: %s", ErrTooManyRequests.Error())
 	}
+	if ErrUnprocessable.Message != "" {
+		t.Errorf("expected ErrUnprocessable.Message to be empty, got %q", ErrUnprocessable.Message)
+	}
+	if Status(ErrUnprocessable) != http.StatusUnprocessableEntity {
+		t.Errorf("expected ErrUnprocessable to map to 422, got %d", Status(ErrUnprocessable))
+	}
 }

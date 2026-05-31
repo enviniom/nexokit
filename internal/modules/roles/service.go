@@ -9,6 +9,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	permissions "github.com/enviniom/nexokit/internal/modules/permissions/core"
+	"github.com/enviniom/nexokit/internal/modules/roles/core"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 	"github.com/enviniom/nexokit/internal/platform/query"
@@ -247,7 +248,7 @@ func (s *roleService) Delete(tc tenant.TenantContext, publicID string) error {
 			return err
 		}
 		if count > 0 {
-			return apperror.ErrUnprocessable
+			return core.ErrRoleHasAssignedUsers
 		}
 	}
 
