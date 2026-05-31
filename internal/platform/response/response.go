@@ -7,6 +7,7 @@ import (
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/query"
+	"github.com/enviniom/nexokit/internal/platform/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,7 +42,7 @@ type ValidationErrorResponse struct {
 	Message string           `json:"message"`
 	Data    any              `json:"data"`
 	Meta    any              `json:"meta"`
-	Errors  ValidationErrors `json:"errors"`
+	Errors  validator.ValidationErrors `json:"errors"`
 }
 
 // PaginatedResponse is the standard envelope for paginated list responses.
@@ -69,19 +70,6 @@ type FiltersMeta struct {
 	Sort        string `json:"sort"`
 	Order       string `json:"order"`
 	Search      string `json:"search"`
-}
-
-// ValidationErrors accumulates validation errors per field.
-type ValidationErrors map[string][]string
-
-// Add appends a message to the field's error list.
-func (ve ValidationErrors) Add(field, message string) {
-	ve[field] = append(ve[field], message)
-}
-
-// HasErrors returns true if there is at least one validation error.
-func (ve ValidationErrors) HasErrors() bool {
-	return len(ve) > 0
 }
 
 // Success returns a 200 OK success response.
@@ -159,15 +147,15 @@ func InternalServerError(c *gin.Context, message string) {
 
 // ValidationError returns a 422 Unprocessable Entity response with field errors.
 func ValidationError(c *gin.Context, errs any) {
-	validationErrs := ValidationErrors{}
+	validationErrs := validator.ValidationErrors{}
 	switch typed := errs.(type) {
-	case ValidationErrors:
+	case validator.ValidationErrors:
 		validationErrs = typed
 	case map[string][]string:
-		validationErrs = ValidationErrors(typed)
+		validationErrs = validator.ValidationErrors(typed)
 	}
 	if validationErrs == nil {
-		validationErrs = ValidationErrors{}
+		validationErrs = validator.ValidationErrors{}
 	}
 	c.JSON(http.StatusUnprocessableEntity, ValidationErrorResponse{
 		Success: false,
@@ -218,7 +206,7 @@ func HandleError(c *gin.Context, err error) {
 
 // RespondIfInvalid writes a 422 validation error response and returns true if errs has errors.
 // Use in handlers to short-circuit when validation fails.
-func RespondIfInvalid(c *gin.Context, errs ValidationErrors) bool {
+func RespondIfInvalid(c *gin.Context, errs validator.ValidationErrors) bool {
 	if len(errs) == 0 {
 		return false
 	}

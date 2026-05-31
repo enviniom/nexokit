@@ -10,6 +10,7 @@ import (
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/query"
+	"github.com/enviniom/nexokit/internal/platform/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -248,7 +249,7 @@ func TestRespondIfInvalid_NoErrors(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
-	errs := make(ValidationErrors)
+	errs := make(validator.ValidationErrors)
 	if RespondIfInvalid(c, errs) {
 		t.Error("expected RespondIfInvalid to return false when no errors")
 	}
@@ -262,7 +263,7 @@ func TestRespondIfInvalid_WithErrors(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 
-	errs := make(ValidationErrors)
+	errs := make(validator.ValidationErrors)
 	errs.Add("email", messages.MsgValidEmail)
 	if !RespondIfInvalid(c, errs) {
 		t.Error("expected RespondIfInvalid to return true when errors exist")

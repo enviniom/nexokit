@@ -3,7 +3,6 @@ package roles
 import (
 	"time"
 
-	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/validator"
 )
 
@@ -47,8 +46,8 @@ type AssignRolePermissionsRequest struct {
 }
 
 // Validate performs field-level validation for AssignRolePermissionsRequest.
-func (r AssignRolePermissionsRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r AssignRolePermissionsRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	if r.Permissions == nil {
 		errs.Add("permissions", "permissions is required")
 	}
@@ -70,8 +69,8 @@ type CreateRoleRequest struct {
 }
 
 // Validate performs field-level validation for CreateRoleRequest.
-func (r CreateRoleRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r CreateRoleRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	validator.Field(errs, "slug", r.Slug).Required().Apply(validator.ValidSlug())
 	return errs
@@ -85,8 +84,8 @@ type UpdateRoleRequest struct {
 }
 
 // Validate performs field-level validation for UpdateRoleRequest.
-func (r UpdateRoleRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r UpdateRoleRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	validator.Field(errs, "slug", r.Slug).Required().Apply(validator.ValidSlug())
 	return errs

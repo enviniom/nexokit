@@ -6,6 +6,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,7 +39,7 @@ func (h *Handler) Handle(c *gin.Context) {
 }
 
 func (h *Handler) respondError(c *gin.Context, err error) {
-	errs := make(response.ValidationErrors)
+	errs := make(validator.ValidationErrors)
 
 	switch {
 	case errors.Is(err, core.ErrDuplicateCompanySlug):

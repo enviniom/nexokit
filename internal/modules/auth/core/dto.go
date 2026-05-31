@@ -3,7 +3,6 @@ package core
 import (
 	"time"
 
-	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/validator"
 )
 
@@ -13,8 +12,8 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-func (r LoginRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r LoginRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "email", r.Email).Required().Apply(validator.ValidEmail())
 	validator.Field(errs, "password", r.Password).Required()
 	return errs
@@ -25,8 +24,8 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
-func (r RefreshRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r RefreshRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "refresh_token", r.RefreshToken).Required()
 	return errs
 }

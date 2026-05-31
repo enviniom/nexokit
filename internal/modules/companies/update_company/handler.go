@@ -6,6 +6,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,7 +25,7 @@ func (h *Handler) Handle(c *gin.Context) {
 	company, err := h.service.Update(c.Param("id"), req)
 	if err != nil {
 		if errors.Is(err, ErrDuplicateSlug) {
-			errs := make(response.ValidationErrors)
+			errs := make(validator.ValidationErrors)
 			errs.Add("slug", messages.MsgConflict)
 			response.ValidationError(c, errs)
 			return

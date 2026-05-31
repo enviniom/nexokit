@@ -2,7 +2,6 @@ package goldenmod
 
 import (
 	"github.com/enviniom/nexokit/internal/platform/messages"
-	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/validator"
 )
 
@@ -13,8 +12,8 @@ type CreateGoldenmodRequest struct {
 }
 
 // Validate performs field-level validation for CreateGoldenmodRequest.
-func (r CreateGoldenmodRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r CreateGoldenmodRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	if r.CompanyID == 0 {
 		errs.Add("company_id", messages.MsgRequired)
@@ -29,8 +28,8 @@ type UpdateGoldenmodRequest struct {
 }
 
 // Validate performs field-level validation for UpdateGoldenmodRequest.
-func (r UpdateGoldenmodRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r UpdateGoldenmodRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	if r.CompanyID == 0 {
 		errs.Add("company_id", messages.MsgRequired)

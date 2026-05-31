@@ -6,7 +6,6 @@ import (
 
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/query"
-	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/validator"
 )
 
@@ -64,8 +63,8 @@ type UpdateCompanyRequest struct {
 	Status string `json:"status"`
 }
 
-func (r CreateCompanyRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r CreateCompanyRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	validator.Field(errs, "slug", r.Slug).Required().Apply(validator.MinLength(2))
 	if r.Status != "" && !validStatus(r.Status) {
@@ -74,8 +73,8 @@ func (r CreateCompanyRequest) Validate() response.ValidationErrors {
 	return errs
 }
 
-func (r UpdateCompanyRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r UpdateCompanyRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	validator.Field(errs, "slug", r.Slug).Required().Apply(validator.MinLength(2))
 	if !validStatus(r.Status) {
@@ -84,8 +83,8 @@ func (r UpdateCompanyRequest) Validate() response.ValidationErrors {
 	return errs
 }
 
-func (r CreateCompanyDomainRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r CreateCompanyDomainRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	domain := normalizeCompanyDomain(r.Domain)
 	validator.Field(errs, "domain", domain).Required().Apply(validator.MinLength(3))
 	if !validCompanyDomainKind(r.Kind) {
@@ -100,8 +99,8 @@ func (r CreateCompanyDomainRequest) Validate() response.ValidationErrors {
 	return errs
 }
 
-func (r UpdateCompanyDomainRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r UpdateCompanyDomainRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	domain := normalizeCompanyDomain(r.Domain)
 	validator.Field(errs, "domain", domain).Required().Apply(validator.MinLength(3))
 	if !validCompanyDomainKind(r.Kind) {

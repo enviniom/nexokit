@@ -3,7 +3,6 @@ package core
 import (
 	"time"
 
-	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/validator"
 )
 
@@ -40,8 +39,8 @@ type CreatePermissionRequest struct {
 }
 
 // Validate performs field-level validation for CreatePermissionRequest.
-func (r CreatePermissionRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r CreatePermissionRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "slug", r.Slug).Required()
 	validator.Field(errs, "name", r.Name).Required()
 	validator.Field(errs, "module", r.Module).Required()
@@ -57,8 +56,8 @@ type UpdatePermissionRequest struct {
 }
 
 // Validate performs field-level validation for UpdatePermissionRequest.
-func (r UpdatePermissionRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r UpdatePermissionRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required()
 	return errs
 }

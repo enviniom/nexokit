@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/platform/messages"
-	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/validator"
 )
 
@@ -33,8 +32,8 @@ type CreateUserRequest struct {
 }
 
 // Validate performs field-level validation for CreateUserRequest.
-func (r CreateUserRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r CreateUserRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	validator.Field(errs, "email", r.Email).Required().Apply(validator.ValidEmail())
 	validator.Field(errs, "password", r.Password).Required().Apply(validator.MinLength(8))
@@ -52,8 +51,8 @@ type UpdateUserRequest struct {
 }
 
 // Validate performs field-level validation for UpdateUserRequest.
-func (r UpdateUserRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r UpdateUserRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	validator.Field(errs, "email", r.Email).Required().Apply(validator.ValidEmail())
 	return errs
@@ -65,8 +64,8 @@ type ChangeUserRoleRequest struct {
 }
 
 // Validate performs field-level validation for ChangeUserRoleRequest.
-func (r ChangeUserRoleRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r ChangeUserRoleRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "role_id", r.RoleID).Required()
 	return errs
 }
@@ -78,8 +77,8 @@ type ChangePasswordRequest struct {
 }
 
 // Validate performs field-level validation for ChangePasswordRequest.
-func (r ChangePasswordRequest) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r ChangePasswordRequest) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "current_password", r.CurrentPassword).Required()
 	validator.Field(errs, "new_password", r.NewPassword).Required().Apply(validator.MinLength(8))
 	return errs
@@ -91,6 +90,6 @@ type UpdateStatusRequest struct {
 }
 
 // Validate performs field-level validation for UpdateStatusRequest.
-func (r UpdateStatusRequest) Validate() response.ValidationErrors {
-	return make(response.ValidationErrors)
+func (r UpdateStatusRequest) Validate() validator.ValidationErrors {
+	return make(validator.ValidationErrors)
 }

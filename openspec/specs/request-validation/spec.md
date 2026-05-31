@@ -7,11 +7,11 @@ Define the composable validator: `ValidationErrors`, `FieldValidator`, reusable 
 
 ### Requirement: ValidationErrors accumulator
 
-The system MUST provide `ValidationErrors map[string][]string` with `Add(field, message)` and `HasErrors() bool`.
+The system MUST provide `ValidationErrors map[string][]string` with `Add(field, message)` and `HasErrors() bool` defined in `platform/validator`.
 
 #### Scenario: Accumulate multiple errors
 
-- GIVEN an empty `ValidationErrors`
+- GIVEN an empty `validator.ValidationErrors`
 - WHEN `Add("email", "is required")` and `Add("email", "is invalid")` are called
 - THEN `errs["email"]` contains both messages in order
 
@@ -50,7 +50,7 @@ The system MUST provide rules: `MinLength(n)`, `MaxLength(n)`, `ValidEmail()`, `
 
 ### Requirement: Gin helper
 
-The system MUST provide `RespondIfInvalid(c *gin.Context, errs ValidationErrors) bool` that writes a 422 response if errors exist.
+The system MUST provide `RespondIfInvalid(c *gin.Context, errs validator.ValidationErrors) bool` in `platform/response` that writes a 422 response if errors exist.
 
 #### Scenario: Validation fails
 
@@ -71,14 +71,14 @@ The system MUST return validation failures as field-keyed errors and `RespondIfI
 
 #### Scenario: RespondIfInvalid writes field errors
 
-- GIVEN `response.ValidationErrors{"email": {"es requerido"}}`
+- GIVEN `validator.ValidationErrors{"email": {"es requerido"}}`
 - WHEN `RespondIfInvalid(c, errs)` is called
 - THEN it returns true and writes a 422 `ValidationErrorResponse`
 - AND `errors.email` contains the validation messages
 
 #### Scenario: Empty validation errors do not write
 
-- GIVEN an empty `response.ValidationErrors`
+- GIVEN an empty `validator.ValidationErrors`
 - WHEN `RespondIfInvalid(c, errs)` is called
 - THEN it returns false and writes no response
 

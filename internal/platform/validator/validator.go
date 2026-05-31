@@ -2,8 +2,20 @@ package validator
 
 import (
 	"github.com/enviniom/nexokit/internal/platform/messages"
-	"github.com/enviniom/nexokit/internal/platform/response"
 )
+
+// ValidationErrors accumulates validation errors per field.
+type ValidationErrors map[string][]string
+
+// Add appends a message to the field's error list.
+func (ve ValidationErrors) Add(field, message string) {
+	ve[field] = append(ve[field], message)
+}
+
+// HasErrors returns true if there is at least one validation error.
+func (ve ValidationErrors) HasErrors() bool {
+	return len(ve) > 0
+}
 
 // Rule is a validation function that receives a field value and returns
 // an error message or an empty string if the value is valid.
@@ -14,11 +26,11 @@ type FieldValidator struct {
 	field string
 	value string
 	skip  bool
-	errs  response.ValidationErrors
+	errs  ValidationErrors
 }
 
 // Field initiates validation for a field.
-func Field(errs response.ValidationErrors, field, value string) *FieldValidator {
+func Field(errs ValidationErrors, field, value string) *FieldValidator {
 	return &FieldValidator{
 		field: field,
 		value: value,

@@ -6,6 +6,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,13 +25,13 @@ func (h *Handler) Handle(c *gin.Context) {
 	d, err := h.service.UpdateDomain(c.Param("id"), c.Param("domain_id"), req)
 	if err != nil {
 		if errors.Is(err, core.ErrDuplicateCompanyDomain) {
-			v := make(response.ValidationErrors)
+			v := make(validator.ValidationErrors)
 			v.Add("domain", messages.MsgConflict)
 			response.ValidationError(c, v)
 			return
 		}
 		if errors.Is(err, core.ErrActivePrimaryDomainExists) {
-			v := make(response.ValidationErrors)
+			v := make(validator.ValidationErrors)
 			v.Add("kind", messages.MsgConflict)
 			response.ValidationError(c, v)
 			return

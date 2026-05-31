@@ -61,7 +61,7 @@ The system MUST provide `NoContent(c *gin.Context)` for successful operations th
 
 ### Requirement: Explicit response DTO names
 
-The system MUST expose and document these response DTOs: `APIResponse`, `ErrorResponse`, `ValidationErrorResponse`, `PaginatedResponse`, and `PaginationMeta`.
+The system MUST expose and document these response DTOs: `APIResponse`, `ErrorResponse`, `ValidationErrorResponse`, `PaginatedResponse`, and `PaginationMeta`. `ValidationErrorResponse.Errors` MUST use `validator.ValidationErrors` as its field type.
 
 #### Scenario: Base response DTOs are available
 

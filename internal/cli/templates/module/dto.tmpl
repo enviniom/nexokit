@@ -2,7 +2,6 @@ package {{.Package}}
 
 import (
 	"github.com/enviniom/nexokit/internal/platform/messages"
-	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/validator"
 )
 
@@ -15,8 +14,8 @@ type Create{{.Struct}}Request struct {
 }
 
 // Validate performs field-level validation for Create{{.Struct}}Request.
-func (r Create{{.Struct}}Request) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r Create{{.Struct}}Request) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	{{- if .Tenant }}
 	if r.CompanyID == 0 {
@@ -35,8 +34,8 @@ type Update{{.Struct}}Request struct {
 }
 
 // Validate performs field-level validation for Update{{.Struct}}Request.
-func (r Update{{.Struct}}Request) Validate() response.ValidationErrors {
-	errs := make(response.ValidationErrors)
+func (r Update{{.Struct}}Request) Validate() validator.ValidationErrors {
+	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	{{- if .Tenant }}
 	if r.CompanyID == 0 {

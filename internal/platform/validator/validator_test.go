@@ -4,11 +4,10 @@ import (
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/platform/messages"
-	"github.com/enviniom/nexokit/internal/platform/response"
 )
 
 func TestRequired(t *testing.T) {
-	errs := make(response.ValidationErrors)
+	errs := make(ValidationErrors)
 	Field(errs, "email", "").Required()
 
 	if !errs.HasErrors() {
@@ -20,7 +19,7 @@ func TestRequired(t *testing.T) {
 }
 
 func TestRequired_NonEmpty(t *testing.T) {
-	errs := make(response.ValidationErrors)
+	errs := make(ValidationErrors)
 	Field(errs, "email", "test@example.com").Required()
 
 	if errs.HasErrors() {
@@ -29,7 +28,7 @@ func TestRequired_NonEmpty(t *testing.T) {
 }
 
 func TestOptional_SkipsRules(t *testing.T) {
-	errs := make(response.ValidationErrors)
+	errs := make(ValidationErrors)
 	Field(errs, "bio", "").Optional().Apply(MinLength(10))
 
 	if errs.HasErrors() {
@@ -38,7 +37,7 @@ func TestOptional_SkipsRules(t *testing.T) {
 }
 
 func TestOptional_AppliesWhenPresent(t *testing.T) {
-	errs := make(response.ValidationErrors)
+	errs := make(ValidationErrors)
 	Field(errs, "bio", "hi").Optional().Apply(MinLength(10))
 
 	if !errs.HasErrors() {
@@ -47,7 +46,7 @@ func TestOptional_AppliesWhenPresent(t *testing.T) {
 }
 
 func TestOptional_SkipsInList(t *testing.T) {
-	errs := make(response.ValidationErrors)
+	errs := make(ValidationErrors)
 	Field(errs, "status", "").Optional().Apply(InList("active", "inactive"))
 
 	if errs.HasErrors() {
@@ -56,7 +55,7 @@ func TestOptional_SkipsInList(t *testing.T) {
 }
 
 func TestApply_SkipAfterRequiredFailure(t *testing.T) {
-	errs := make(response.ValidationErrors)
+	errs := make(ValidationErrors)
 	Field(errs, "name", "").Required().Apply(MinLength(3))
 
 	if len(errs["name"]) != 1 {
@@ -68,7 +67,7 @@ func TestApply_SkipAfterRequiredFailure(t *testing.T) {
 }
 
 func TestValidationErrors_Add(t *testing.T) {
-	errs := make(response.ValidationErrors)
+	errs := make(ValidationErrors)
 	errs.Add("field1", "error one")
 	errs.Add("field1", "error two")
 	errs.Add("field2", "error three")
@@ -82,7 +81,7 @@ func TestValidationErrors_Add(t *testing.T) {
 }
 
 func TestValidationErrors_HasErrors(t *testing.T) {
-	errs := make(response.ValidationErrors)
+	errs := make(ValidationErrors)
 	if errs.HasErrors() {
 		t.Error("expected no errors on empty map")
 	}
