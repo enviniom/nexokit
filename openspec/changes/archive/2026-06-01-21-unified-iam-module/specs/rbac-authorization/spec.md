@@ -1,10 +1,6 @@
-# RBAC Authorization Specification
+# Delta for RBAC Authorization
 
-## Purpose
-
-RequirePermission and RequireRole middleware, PermissionResolver interface, cache-backed lazy loading, and root bypass for endpoint-level authorization.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: RequirePermission middleware
 
@@ -92,6 +88,8 @@ The system SHALL define an `AuthUserLookup` interface with method `GetAuthUser(p
 - WHEN `middleware.Auth` calls `AuthUserLookup.GetAuthUser`
 - THEN an error is returned and the request is rejected with HTTP 401
 
+## ADDED Requirements
+
 ### Requirement: Adapter delegation to IAM
 
 The system SHALL update middleware adapters in `internal/app/container.go` so that `userLookup` delegates to `c.IAM.ResolveAuthUser`, `roleResolverAdapter` delegates to `c.IAM.ResolveRoleBySlug`, and `SyncPermissions` delegates to `c.IAM.SyncPermissions`. Adapter method signatures SHALL remain compatible with existing middleware contracts.
@@ -107,25 +105,3 @@ The system SHALL update middleware adapters in `internal/app/container.go` so th
 - GIVEN the app container is built with IAM
 - WHEN `SyncPermissions` is called during bootstrap
 - THEN the call is forwarded to `c.IAM.SyncPermissions`
-
-### Requirement: Module-owned name constants
-
-Each module MUST define its own `Module<Name>` constant in `modules/<name>/core/constants.go`. Route definitions MUST reference the module-local constant, NOT `platform/permissions.Module*`. The `platform/permissions` package MUST NOT export `Module*` constants — it retains only `Action*` constants and utility functions.
-
-#### Scenario: Users module defines ModuleUsers
-
-- GIVEN `modules/users/core/constants.go` exists
-- WHEN routes reference the users module name
-- THEN they use the local `ModuleUsers` constant
-
-#### Scenario: Roles module defines ModuleRoles
-
-- GIVEN `modules/roles/core/constants.go` exists
-- WHEN routes reference the roles module name
-- THEN they use the local `ModuleRoles` constant
-
-#### Scenario: Platform permissions has no Module* constants
-
-- GIVEN `platform/permissions/constants.go`
-- WHEN the file is reviewed
-- THEN it contains zero `Module*` constants — only `Action*` constants and utility functions
