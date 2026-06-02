@@ -1,6 +1,8 @@
 package resolve_auth_user
 
 import (
+	"errors"
+
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	"gorm.io/gorm"
 )
@@ -15,6 +17,9 @@ func (r *GormRepository) GetAuthUser(publicID string) (*core.IAMUser, error) {
 		Where("public_id = ?", publicID).
 		First(&user).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, core.ErrNotFound
+		}
 		return nil, err
 	}
 	return &user, nil

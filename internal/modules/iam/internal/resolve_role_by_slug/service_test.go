@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
-	"gorm.io/gorm"
 )
 
 type fakeRepo struct {
@@ -15,10 +14,22 @@ type fakeRepo struct {
 
 func (f fakeRepo) GetRoleBySlug(string) (*core.IAMRole, error) { return f.role, f.err }
 
-func TestResolveRoleBySlugMapsNotFound(t *testing.T) {
-	svc := NewService(fakeRepo{err: gorm.ErrRecordNotFound})
+func TestResolveRoleBySlugPropagatesNotFound(t *testing.T) {
+	svc := NewService(fakeRepo{err: core.ErrNotFound})
 	_, err := svc.ResolveRoleBySlug("missing")
 	if !errors.Is(err, core.ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestResolveRoleBySlugSuccess(t *testing.T) {
+	role := &core.IAMRole{Name: "Admin", Slug: "admin"}
+	svc := NewService(fakeRepo{role: role})
+	result, err := svc.ResolveRoleBySlug("admin")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Slug != "admin" {
+		t.Fatalf("expected slug admin, got %s", result.Slug)
 	}
 }

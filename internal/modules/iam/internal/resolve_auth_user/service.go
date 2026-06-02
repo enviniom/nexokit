@@ -1,11 +1,8 @@
 package resolve_auth_user
 
 import (
-	"errors"
-
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
-	"gorm.io/gorm"
 )
 
 type Service interface {
@@ -23,9 +20,6 @@ func NewService(repo Repository) Service { return &service{repo: repo} }
 func (s *service) ResolveAuthUser(publicID string) (*authctx.User, error) {
 	user, err := s.repo.GetAuthUser(publicID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, core.ErrNotFound
-		}
 		return nil, err
 	}
 	slugs := make([]string, len(user.Role.Permissions))

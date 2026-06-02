@@ -1,6 +1,8 @@
 package sync_permissions
 
 import (
+	"errors"
+
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	"gorm.io/gorm"
 )
@@ -9,12 +11,15 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) Repository { return &GormRepository{db: db} }
 
-func (r *GormRepository) GetBySlug(slug string) (*core.IAMPermission, error) {
+func (r *GormRepository) FindBySlug(slug string) (*core.IAMPermission, bool, error) {
 	var permission core.IAMPermission
 	if err := r.db.Where("slug = ?", slug).First(&permission).Error; err != nil {
-		return nil, err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, err
 	}
-	return &permission, nil
+	return &permission, true, nil
 }
 
 func (r *GormRepository) Create(permission *core.IAMPermission) error {

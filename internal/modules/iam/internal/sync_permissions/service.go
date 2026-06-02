@@ -1,20 +1,18 @@
 package sync_permissions
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 	platformPerms "github.com/enviniom/nexokit/internal/platform/permissions"
 	"github.com/enviniom/nexokit/internal/shared"
-	"gorm.io/gorm"
 )
 
 type Service interface{ SyncPermissions(slugs []string) error }
 
 type Repository interface {
-	GetBySlug(slug string) (*core.IAMPermission, error)
+	FindBySlug(slug string) (*core.IAMPermission, bool, error)
 	Create(permission *core.IAMPermission) error
 	AutoAssignToAdmins(permissionID uint) error
 }
@@ -29,10 +27,12 @@ func (s *service) SyncPermissions(slugs []string) error {
 		if len(parts) != 2 {
 			continue
 		}
-		if _, err := s.repo.GetBySlug(slug); err == nil {
-			continue
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		_, found, err := s.repo.FindBySlug(slug)
+		if err != nil {
 			return err
+		}
+		if found {
+			continue
 		}
 		publicID, err := identity.Generate()
 		if err != nil {
