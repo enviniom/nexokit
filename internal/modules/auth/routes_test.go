@@ -15,15 +15,12 @@ func TestRegisterMountsAuthEndpoints(t *testing.T) {
 	authMiddleware := func(c *gin.Context) {
 		c.Next()
 	}
-	attachPermissions := func(c *gin.Context) {
-		c.Next()
-	}
 	rateLimit := func(c *gin.Context) {
 		c.Next()
 	}
 
 	container := &Container{}
-	Register(r.Group("/api/v1"), container, authMiddleware, attachPermissions, rateLimit, rateLimit)
+	Register(r.Group("/api/v1"), container, authMiddleware, rateLimit, rateLimit)
 
 	cases := []struct {
 		name   string

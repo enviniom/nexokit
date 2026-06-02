@@ -53,7 +53,7 @@ func TestAuthIntegration(t *testing.T) {
 	auth.Register(v1, c, func(c *gin.Context) {
 		authctx.SetGin(c, &authctx.User{PublicID: activeUser.PublicID, Name: activeUser.Name, Email: activeUser.Email, Role: adminRole.Name, RoleSlug: adminRole.Slug, RoleID: adminRole.ID, CompanyID: activeUser.CompanyID, IsActive: true, Permissions: []string{"users.list", "roles.view"}})
 		c.Next()
-	}, func(c *gin.Context) { c.Next() }, func(c *gin.Context) { c.Next() }, func(c *gin.Context) { c.Next() })
+	}, func(c *gin.Context) { c.Next() }, func(c *gin.Context) { c.Next() })
 
 	t.Run("login success returns token pair", func(t *testing.T) {
 		w := requestJSON(r, http.MethodPost, "/api/v1/auth/login", map[string]string{"email": "active@example.com", "password": "secret123"})
