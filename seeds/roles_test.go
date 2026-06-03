@@ -3,7 +3,7 @@ package seeds
 import (
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/roles"
+	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -15,7 +15,7 @@ func TestSeedRoles(t *testing.T) {
 	}
 
 	// Create roles table manually for in-memory test
-	if err := db.AutoMigrate(&roles.Role{}); err != nil {
+	if err := db.AutoMigrate(&iamcore.IAMRole{}); err != nil {
 		t.Fatalf("failed to migrate roles table: %v", err)
 	}
 
@@ -25,7 +25,7 @@ func TestSeedRoles(t *testing.T) {
 		}
 
 		var count int64
-		if err := db.Model(&roles.Role{}).Count(&count).Error; err != nil {
+		if err := db.Model(&iamcore.IAMRole{}).Count(&count).Error; err != nil {
 			t.Fatalf("failed to count roles: %v", err)
 		}
 		if count != 1 {
@@ -33,7 +33,7 @@ func TestSeedRoles(t *testing.T) {
 		}
 
 		for _, name := range []string{"root"} {
-			var role roles.Role
+			var role iamcore.IAMRole
 			if err := db.Where("name = ?", name).First(&role).Error; err != nil {
 				t.Errorf("expected role %s to exist: %v", name, err)
 				continue
@@ -59,7 +59,7 @@ func TestSeedRoles(t *testing.T) {
 		}
 
 		var count int64
-		if err := db.Model(&roles.Role{}).Count(&count).Error; err != nil {
+		if err := db.Model(&iamcore.IAMRole{}).Count(&count).Error; err != nil {
 			t.Fatalf("failed to count roles: %v", err)
 		}
 		if count != 1 {

@@ -4,8 +4,7 @@ import (
 	"errors"
 
 	"github.com/enviniom/nexokit/internal/cli/root"
-	"github.com/enviniom/nexokit/internal/modules/roles"
-	"github.com/enviniom/nexokit/internal/modules/users"
+	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
@@ -23,8 +22,8 @@ func newRootStorage(db *gorm.DB) root.RootStorage {
 
 // RootExists returns true if a user with the root role already exists.
 func (s *rootStorage) RootExists() (bool, error) {
-	var rootRole roles.Role
-	if err := s.db.Where("slug = ?", roles.RootRoleSlug).First(&rootRole).Error; err != nil {
+	var rootRole iamcore.IAMRole
+	if err := s.db.Where("slug = ?", iamcore.RootRoleSlug).First(&rootRole).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
 		}
@@ -32,7 +31,7 @@ func (s *rootStorage) RootExists() (bool, error) {
 	}
 
 	var count int64
-	if err := s.db.Model(&users.User{}).Where("role_id = ?", rootRole.ID).Count(&count).Error; err != nil {
+	if err := s.db.Model(&iamcore.IAMUser{}).Where("role_id = ?", rootRole.ID).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
@@ -40,8 +39,8 @@ func (s *rootStorage) RootExists() (bool, error) {
 
 // CreateRoot persists a new root user linked to the root role.
 func (s *rootStorage) CreateRoot(name, email, passwordHash string) error {
-	var rootRole roles.Role
-	if err := s.db.Where("slug = ?", roles.RootRoleSlug).First(&rootRole).Error; err != nil {
+	var rootRole iamcore.IAMRole
+	if err := s.db.Where("slug = ?", iamcore.RootRoleSlug).First(&rootRole).Error; err != nil {
 		return err
 	}
 
@@ -50,7 +49,7 @@ func (s *rootStorage) CreateRoot(name, email, passwordHash string) error {
 		return err
 	}
 
-	user := &users.User{
+	user := &iamcore.IAMUser{
 		BaseModel: shared.BaseModel{
 			PublicID: publicID,
 		},

@@ -1,7 +1,10 @@
 package core
 
 const (
-	ModuleIAM = "iam"
+	ModuleIAM         = "iam"
+	ModuleUsers       = "users"
+	ModuleRoles       = "roles"
+	ModulePermissions = "permissions"
 
 	RootRoleSlug  = "root"
 	AdminRoleSlug = "admin"

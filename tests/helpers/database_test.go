@@ -3,7 +3,7 @@ package helpers
 import (
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/roles"
+	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 )
 
 func TestNewSQLiteDB_IsolatedPerCall(t *testing.T) {
@@ -18,10 +18,10 @@ func TestNewSQLiteDB_IsolatedPerCall(t *testing.T) {
 		{name: "separate database stays empty", target: "dbB", expectedCount: 0},
 	}
 
-	dbA := NewSQLiteDB(t, &roles.Role{})
-	dbB := NewSQLiteDB(t, &roles.Role{})
+	dbA := NewSQLiteDB(t, &iamcore.IAMRole{})
+	dbB := NewSQLiteDB(t, &iamcore.IAMRole{})
 
-	role := SeedRole(t, dbA, roles.AdminRoleSlug)
+	role := SeedRole(t, dbA, iamcore.AdminRoleSlug)
 	if role.ID == 0 {
 		t.Fatalf("expected role id to be persisted")
 	}
@@ -37,7 +37,7 @@ func TestNewSQLiteDB_IsolatedPerCall(t *testing.T) {
 			}
 
 			var count int64
-			if err := db.Model(&roles.Role{}).Count(&count).Error; err != nil {
+			if err := db.Model(&iamcore.IAMRole{}).Count(&count).Error; err != nil {
 				t.Fatalf("count roles in %s: %v", tt.target, err)
 			}
 			if count != tt.expectedCount {

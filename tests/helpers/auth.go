@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/companies"
-	"github.com/enviniom/nexokit/internal/modules/roles"
-	"github.com/enviniom/nexokit/internal/modules/users"
+	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	"github.com/enviniom/nexokit/internal/platform/token"
 	"gorm.io/gorm"
 )
@@ -23,20 +22,20 @@ type UserOptions struct {
 }
 
 type Actor struct {
-	User users.User
-	Role roles.Role
+	User iamcore.IAMUser
+	Role iamcore.IAMRole
 }
 
-func SeedUser(t *testing.T, db *gorm.DB, opts UserOptions) users.User {
+func SeedUser(t *testing.T, db *gorm.DB, opts UserOptions) iamcore.IAMUser {
 	t.Helper()
 
 	roleSlug := opts.RoleSlug
 	if roleSlug == "" {
-		roleSlug = roles.UserRoleSlug
+		roleSlug = iamcore.UserRoleSlug
 	}
 
 	role := SeedRole(t, db, roleSlug)
-	user := users.User{
+	user := iamcore.IAMUser{
 		Name:         opts.Name,
 		Email:        opts.Email,
 		PasswordHash: "hash",
@@ -64,10 +63,10 @@ func SeedUser(t *testing.T, db *gorm.DB, opts UserOptions) users.User {
 	return user
 }
 
-func CreateTestToken(t *testing.T, db *gorm.DB, user users.User) string {
+func CreateTestToken(t *testing.T, db *gorm.DB, user iamcore.IAMUser) string {
 	t.Helper()
 
-	var withRole users.User
+	var withRole iamcore.IAMUser
 	if err := db.Preload("Role").First(&withRole, user.ID).Error; err != nil {
 		t.Fatalf("load user role: %v", err)
 	}
@@ -112,7 +111,7 @@ func httptestRequest(method, path string, body io.Reader) *http.Request {
 func SeedAuthActor(t *testing.T, db *gorm.DB, opts UserOptions) Actor {
 	t.Helper()
 	if opts.RoleSlug == "" {
-		opts.RoleSlug = roles.AdminRoleSlug
+		opts.RoleSlug = iamcore.AdminRoleSlug
 	}
 	if opts.CompanyID != nil {
 		company := companies.Company{}
@@ -121,7 +120,7 @@ func SeedAuthActor(t *testing.T, db *gorm.DB, opts UserOptions) Actor {
 		}
 	}
 	user := SeedUser(t, db, opts)
-	role := roles.Role{}
+	role := iamcore.IAMRole{}
 	if err := db.First(&role, user.RoleID).Error; err != nil {
 		t.Fatalf("load actor role: %v", err)
 	}

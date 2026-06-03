@@ -7,12 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/modules/companies"
-	"github.com/enviniom/nexokit/internal/modules/roles"
-	"github.com/enviniom/nexokit/internal/modules/users"
+	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamusers "github.com/enviniom/nexokit/internal/modules/iam/users"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
-	"github.com/enviniom/nexokit/internal/platform/password"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
@@ -24,8 +24,8 @@ import (
 func TestUsersIsolation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := newUsersIsolationDB(t)
-	rootRole := roles.Role{BaseModel: shared.BaseModel{ID: 1, PublicID: "role-root"}, Name: "root", Slug: roles.RootRoleSlug, IsSystem: true}
-	adminRole := roles.Role{BaseModel: shared.BaseModel{ID: 2, PublicID: "role-admin"}, Name: "admin", Slug: roles.AdminRoleSlug, IsSystem: true}
+	rootRole := iamcore.IAMRole{BaseModel: shared.BaseModel{ID: 1, PublicID: "role-root"}, Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
+	adminRole := iamcore.IAMRole{BaseModel: shared.BaseModel{ID: 2, PublicID: "role-admin"}, Name: "admin", Slug: iamcore.AdminRoleSlug, IsSystem: true}
 	if err := db.Create(&rootRole).Error; err != nil {
 		t.Fatalf("seed root role: %v", err)
 	}
@@ -117,7 +117,7 @@ func newUsersIsolationDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&roles.Role{}, &companies.Company{}, &users.User{}); err != nil {
+	if err := db.AutoMigrate(&iamcore.IAMRole{}, &companies.Company{}, &iamcore.IAMUser{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 	return db
@@ -125,36 +125,33 @@ func newUsersIsolationDB(t *testing.T) *gorm.DB {
 
 func seedUser(t *testing.T, db *gorm.DB, publicID, email string, roleID uint, companyID *uint) {
 	t.Helper()
-	user := users.User{BaseModel: shared.BaseModel{PublicID: publicID}, Name: publicID, Email: email, PasswordHash: "hash", RoleID: roleID, CompanyID: companyID, IsActive: true}
+	user := iamcore.IAMUser{BaseModel: shared.BaseModel{PublicID: publicID}, Name: publicID, Email: email, PasswordHash: "hash", RoleID: roleID, CompanyID: companyID, IsActive: true}
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("seed user %s: %v", publicID, err)
 	}
 }
 
 func usersIsolationRouter(db *gorm.DB) *gin.Engine {
-	repo := users.NewRepository(db)
-	rolesRepo := roles.NewRepository(db)
-	svc := users.NewService(repo, password.Manager{}, roleResolverAdapter{repo: rolesRepo})
-	handler := users.NewHandler(svc, authctx.PublicIDFromGin)
+	container := iamusers.NewContainer(db, cache.NewNoop())
 	r := gin.New()
 	r.Use(func(c *gin.Context) {
 		actor := c.GetHeader("X-Test-Actor")
 		switch actor {
 		case "root":
-			authctx.SetGin(c, &authctx.User{PublicID: "root", RoleSlug: roles.RootRoleSlug, IsRoot: true, IsActive: true, Permissions: []string{"*"}})
+			authctx.SetGin(c, &authctx.User{PublicID: "root", RoleSlug: iamcore.RootRoleSlug, IsRoot: true, IsActive: true, Permissions: []string{"*"}})
 			tenant.SetGin(c, tenant.NewRoot())
 		case "root-scoped":
 			companyID := uint(2)
-			authctx.SetGin(c, &authctx.User{PublicID: "root", RoleSlug: roles.RootRoleSlug, IsRoot: true, IsActive: true, Permissions: []string{"*"}})
+			authctx.SetGin(c, &authctx.User{PublicID: "root", RoleSlug: iamcore.RootRoleSlug, IsRoot: true, IsActive: true, Permissions: []string{"*"}})
 			tenant.SetGin(c, tenant.NewScoped(companyID, "globex"))
 		default:
 			companyID := uint(1)
-			authctx.SetGin(c, &authctx.User{PublicID: "admin-acme", RoleSlug: roles.AdminRoleSlug, CompanyID: &companyID, IsActive: true, Permissions: []string{"*"}})
+			authctx.SetGin(c, &authctx.User{PublicID: "admin-acme", RoleSlug: iamcore.AdminRoleSlug, CompanyID: &companyID, IsActive: true, Permissions: []string{"*"}})
 			tenant.SetGin(c, tenant.NewScoped(companyID, "acme"))
 		}
 		c.Next()
 	})
-	users.Register(r.Group(""), handler, func(string) gin.HandlerFunc { return middleware.RequirePermission("*") })
+	iamusers.Register(r.Group(""), container, func(string) gin.HandlerFunc { return middleware.RequirePermission("*") })
 	return r
 }
 
@@ -163,9 +160,9 @@ func withActor(req *http.Request, actor string, companyID uint) {
 	_ = companyID
 }
 
-func decodeUsers(t *testing.T, w *httptest.ResponseRecorder) response.APIResponse[[]users.UserResponse] {
+func decodeUsers(t *testing.T, w *httptest.ResponseRecorder) response.APIResponse[[]iamcore.UserResponse] {
 	t.Helper()
-	var resp response.APIResponse[[]users.UserResponse]
+	var resp response.APIResponse[[]iamcore.UserResponse]
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}

@@ -4,20 +4,19 @@ import (
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies"
-	"github.com/enviniom/nexokit/internal/modules/permissions"
-	"github.com/enviniom/nexokit/internal/modules/roles"
-	"github.com/enviniom/nexokit/internal/modules/users"
+	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
+	platformPerms "github.com/enviniom/nexokit/internal/platform/permissions"
 )
 
 func TestFixtures_SeedRelationshipAwareData(t *testing.T) {
 	t.Parallel()
 
-	db := NewSQLiteDB(t, &roles.Role{}, &companies.Company{}, &users.User{}, &permissions.Permission{})
+	db := NewSQLiteDB(t, &iamcore.IAMRole{}, &companies.Company{}, &iamcore.IAMUser{}, &iamcore.IAMPermission{})
 
 	company := SeedCompany(t, db, "acme")
-	role := SeedRole(t, db, roles.AdminRoleSlug)
+	role := SeedRole(t, db, iamcore.AdminRoleSlug)
 	user := SeedUserWithRole(t, db, "user-acme", role, &company)
-	perm := SeedPermission(t, db, "users", permissions.ActionList)
+	perm := SeedPermission(t, db, "users", platformPerms.ActionList)
 
 	tests := []struct {
 		name  string
@@ -42,8 +41,8 @@ func TestFixtures_SeedRelationshipAwareData(t *testing.T) {
 		{
 			name: "permission slug is deterministic",
 			check: func(t *testing.T) {
-				if perm.Slug != "users:list" {
-					t.Fatalf("expected deterministic permission slug users:list, got %s", perm.Slug)
+				if perm.Slug != "users.list" {
+					t.Fatalf("expected deterministic permission slug users.list, got %s", perm.Slug)
 				}
 			},
 		},

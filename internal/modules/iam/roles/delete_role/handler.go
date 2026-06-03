@@ -32,7 +32,7 @@ func mapServiceError(err error) error {
 	case errors.Is(err, core.ErrRoleProtected):
 		return apperror.ErrForbidden
 	case errors.Is(err, core.ErrRoleHasAssignedUsers):
-		return apperror.Wrap(apperror.ErrUnprocessable, "El rol tiene usuarios asignados")
+		return apperror.Wrap(apperror.ErrUnprocessable, core.MsgRoleHasAssignedUsers)
 	default:
 		return err
 	}

@@ -5,8 +5,7 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/companies"
-	"github.com/enviniom/nexokit/internal/modules/roles"
-	"github.com/enviniom/nexokit/internal/modules/users"
+	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	"github.com/enviniom/nexokit/internal/platform/token"
 	"gorm.io/gorm"
 )
@@ -22,13 +21,13 @@ func TestAuthHelpers(t *testing.T) {
 		name     string
 		publicID string
 		roleSlug string
-		exercise func(t *testing.T, db *DBState, user users.User)
+		exercise func(t *testing.T, db *DBState, user iamcore.IAMUser)
 	}{
 		{
 			name:     "SeedUser creates persisted user",
 			publicID: "u-auth-1",
-			roleSlug: roles.AdminRoleSlug,
-			exercise: func(t *testing.T, _ *DBState, user users.User) {
+			roleSlug: iamcore.AdminRoleSlug,
+			exercise: func(t *testing.T, _ *DBState, user iamcore.IAMUser) {
 				if user.ID == 0 {
 					t.Fatalf("expected persisted user id")
 				}
@@ -40,8 +39,8 @@ func TestAuthHelpers(t *testing.T) {
 		{
 			name:     "CreateTestToken issues parseable access token",
 			publicID: "u-auth-2",
-			roleSlug: roles.UserRoleSlug,
-			exercise: func(t *testing.T, dbState *DBState, user users.User) {
+			roleSlug: iamcore.UserRoleSlug,
+			exercise: func(t *testing.T, dbState *DBState, user iamcore.IAMUser) {
 				tok := CreateTestToken(t, dbState.db, user)
 				manager := token.NewManager("nexokit-test-secret", time.Hour)
 				claims, err := manager.ParseAccess(tok)
@@ -56,9 +55,9 @@ func TestAuthHelpers(t *testing.T) {
 		{
 			name:     "AuthenticatedRequest adds bearer token",
 			publicID: "u-auth-3",
-			roleSlug: roles.AdminRoleSlug,
-			exercise: func(t *testing.T, dbState *DBState, user users.User) {
-				role := roles.Role{}
+			roleSlug: iamcore.AdminRoleSlug,
+			exercise: func(t *testing.T, dbState *DBState, user iamcore.IAMUser) {
+				role := iamcore.IAMRole{}
 				if err := dbState.db.First(&role, user.RoleID).Error; err != nil {
 					t.Fatalf("load user role: %v", err)
 				}
@@ -85,7 +84,7 @@ func TestAuthHelpers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := NewSQLiteDB(t, &roles.Role{}, &companies.Company{}, &users.User{})
+			db := NewSQLiteDB(t, &iamcore.IAMRole{}, &companies.Company{}, &iamcore.IAMUser{})
 			company := SeedCompany(t, db, "acme")
 			user := SeedUser(t, db, UserOptions{PublicID: tt.publicID, Email: tt.publicID + "@example.com", Name: tt.publicID, RoleSlug: tt.roleSlug, CompanyID: &company.ID})
 			state := &DBState{db: db}

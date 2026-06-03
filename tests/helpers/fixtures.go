@@ -4,14 +4,12 @@ import (
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies"
-	"github.com/enviniom/nexokit/internal/modules/permissions"
-	"github.com/enviniom/nexokit/internal/modules/roles"
-	"github.com/enviniom/nexokit/internal/modules/users"
+	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	"github.com/enviniom/nexokit/tests/fixtures"
 	"gorm.io/gorm"
 )
 
-func SeedRole(t *testing.T, db *gorm.DB, slug string) roles.Role {
+func SeedRole(t *testing.T, db *gorm.DB, slug string) iamcore.IAMRole {
 	t.Helper()
 	role := fixtures.BuildRole(slug)
 	if err := db.Create(&role).Error; err != nil {
@@ -29,7 +27,7 @@ func SeedCompany(t *testing.T, db *gorm.DB, slug string) companies.Company {
 	return company
 }
 
-func SeedPermission(t *testing.T, db *gorm.DB, module, action string) permissions.Permission {
+func SeedPermission(t *testing.T, db *gorm.DB, module, action string) iamcore.IAMPermission {
 	t.Helper()
 	permission := fixtures.BuildPermission(module, action)
 	if err := db.Create(&permission).Error; err != nil {
@@ -38,7 +36,7 @@ func SeedPermission(t *testing.T, db *gorm.DB, module, action string) permission
 	return permission
 }
 
-func SeedUserWithRole(t *testing.T, db *gorm.DB, publicID string, role roles.Role, company *companies.Company) users.User {
+func SeedUserWithRole(t *testing.T, db *gorm.DB, publicID string, role iamcore.IAMRole, company *companies.Company) iamcore.IAMUser {
 	t.Helper()
 	var companyID *uint
 	if company != nil {

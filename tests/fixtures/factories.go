@@ -4,9 +4,8 @@ import (
 	"fmt"
 
 	"github.com/enviniom/nexokit/internal/modules/companies"
-	"github.com/enviniom/nexokit/internal/modules/permissions"
-	"github.com/enviniom/nexokit/internal/modules/roles"
-	"github.com/enviniom/nexokit/internal/modules/users"
+	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
+	platformPerms "github.com/enviniom/nexokit/internal/platform/permissions"
 	"github.com/enviniom/nexokit/internal/shared"
 )
 
@@ -22,11 +21,11 @@ func BuildCompany(slug string) companies.Company {
 	}
 }
 
-func BuildRole(slug string) roles.Role {
+func BuildRole(slug string) iamcore.IAMRole {
 	if slug == "" {
-		slug = roles.UserRoleSlug
+		slug = iamcore.UserRoleSlug
 	}
-	return roles.Role{
+	return iamcore.IAMRole{
 		BaseModel:   shared.BaseModel{PublicID: fmt.Sprintf("role-%s", slug)},
 		Name:        fmt.Sprintf("Role %s", slug),
 		Slug:        slug,
@@ -35,15 +34,15 @@ func BuildRole(slug string) roles.Role {
 	}
 }
 
-func BuildPermission(module, action string) permissions.Permission {
+func BuildPermission(module, action string) iamcore.IAMPermission {
 	if module == "" {
 		module = "users"
 	}
 	if action == "" {
-		action = permissions.ActionView
+		action = platformPerms.ActionView
 	}
-	slug := fmt.Sprintf("%s:%s", module, action)
-	return permissions.Permission{
+	slug := platformPerms.Format(module, action)
+	return iamcore.IAMPermission{
 		BaseModel:    shared.BaseModel{PublicID: fmt.Sprintf("perm-%s-%s", module, action)},
 		Slug:         slug,
 		Name:         fmt.Sprintf("%s %s", module, action),
@@ -55,11 +54,11 @@ func BuildPermission(module, action string) permissions.Permission {
 	}
 }
 
-func BuildUser(publicID string, roleID uint, companyID *uint) users.User {
+func BuildUser(publicID string, roleID uint, companyID *uint) iamcore.IAMUser {
 	if publicID == "" {
 		publicID = "user-fixture"
 	}
-	return users.User{
+	return iamcore.IAMUser{
 		BaseModel:    shared.BaseModel{PublicID: publicID},
 		Name:         publicID,
 		Email:        fmt.Sprintf("%s@example.com", publicID),
