@@ -170,12 +170,18 @@ The IAM module SHALL NOT import any package under `internal/modules/users/`, `in
 - WHEN `go list` is run on `internal/modules/iam/...`
 - THEN no import path contains `internal/modules/users`, `internal/modules/roles`, `internal/modules/permissions`, or `internal/modules/companies`
 
-### Requirement: Legacy module preservation
+### Requirement: No residual legacy references
 
-The IAM module SHALL NOT delete, move, or modify any file under `internal/modules/users/`, `internal/modules/roles/`, or `internal/modules/permissions/`. Legacy modules SHALL remain compilable and functionally independent.
+The IAM module and all production code SHALL contain zero import paths referencing `internal/modules/users/`, `internal/modules/roles/`, or `internal/modules/permissions/`. All user, role, and permission types SHALL be sourced exclusively from IAM's local models in `iam/core/model.go`.
 
-#### Scenario: Legacy modules still compile
+#### Scenario: Zero legacy imports in production code
 
-- GIVEN the IAM module is wired in the app container
-- WHEN `go build ./internal/modules/users/...` is run
-- THEN the build succeeds with no errors
+- GIVEN the full production codebase
+- WHEN `go list ./...` is run
+- THEN no package import path contains `internal/modules/users`, `internal/modules/roles`, or `internal/modules/permissions`
+
+#### Scenario: Zero legacy imports in test infrastructure
+
+- GIVEN all test files under `tests/`
+- WHEN imports are reviewed
+- THEN no test file imports `internal/modules/users`, `internal/modules/roles`, or `internal/modules/permissions`

@@ -92,7 +92,8 @@ The system SHALL replace `usersHandler`, `rolesHandler`, and `permissionsContain
 
 ### Requirement: RegisterModules mounts IAM only
 
-The system SHALL mount IAM routes via a single `iam.Register(globalProtected, c.IAM, tenantProtected, middleware.RequirePermission, middleware.RequireRole)` call. Legacy module registrations for `users`, `roles`, and `permissions` SHALL be removed from `RegisterModules`. Legacy modules SHALL remain compilable but unreachable at runtime.
+The system SHALL mount IAM routes via a single `iam.Register(globalProtected, c.IAM, tenantProtected, middleware.RequirePermission, middleware.RequireRole)` call. Legacy module registrations for `users`, `roles`, and `permissions` SHALL NOT exist in `RegisterModules`. The legacy module directories `internal/modules/users/`, `internal/modules/roles/`, and `internal/modules/permissions/` SHALL NOT exist on disk.
+(Previously: Legacy modules remained compilable but unreachable at runtime; now legacy directories are deleted entirely)
 
 #### Scenario: IAM routes mounted
 
@@ -106,11 +107,11 @@ The system SHALL mount IAM routes via a single `iam.Register(globalProtected, c.
 - WHEN a legacy route path is requested
 - THEN the response returns HTTP 404 (route not registered)
 
-#### Scenario: Legacy modules still compile
+#### Scenario: No legacy module directories exist
 
-- GIVEN the app container wires IAM instead of legacy modules
-- WHEN `go build ./internal/modules/users/... ./internal/modules/roles/... ./internal/modules/permissions/...` is run
-- THEN all three legacy modules compile successfully
+- GIVEN the codebase after legacy removal
+- WHEN `internal/modules/` is inspected
+- THEN directories `users/`, `roles/`, and `permissions/` do NOT exist
 
 ### Requirement: Start and Stop lifecycle
 
