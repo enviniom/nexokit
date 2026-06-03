@@ -1,5 +1,5 @@
 > Lee también `_context.md` antes de implementar este change.
-Change: 23-remove-legacy-iam-modules
+Change: 22-remove-legacy-iam-modules
 Objetivo:
 Eliminar los módulos legacy `internal/modules/users/`, `internal/modules/roles/` e `internal/modules/permissions/` después de que `internal/modules/iam/` quedó como frontera principal.
 Alcance:
