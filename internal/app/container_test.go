@@ -77,19 +77,6 @@ func TestUserLookup_DelegatesToIAMResolver(t *testing.T) {
 	}
 }
 
-func TestRoleResolverAdapter_DelegatesToIAMResolver(t *testing.T) {
-	expected := &iamcore.IAMRole{Slug: "admin"}
-	adapter := roleResolverAdapter{resolver: fakeRoleBySlugResolver{role: expected}}
-
-	got, err := adapter.GetBySlug("admin")
-	if err != nil {
-		t.Fatalf("GetBySlug returned error: %v", err)
-	}
-	if got != expected {
-		t.Fatalf("expected delegated role pointer")
-	}
-}
-
 func TestSyncPermissions_DelegatesToIAMSyncer(t *testing.T) {
 	slug := "iam.test.sync"
 	platformPerms.Register(slug)
@@ -107,9 +94,9 @@ func TestSyncPermissions_DelegatesToIAMSyncer(t *testing.T) {
 
 func minimalConfig() *config.Config {
 	return &config.Config{
-		App: config.AppConfig{PlatformDomain: "example.test"},
+		App:       config.AppConfig{PlatformDomain: "example.test"},
 		RateLimit: config.RateLimitConfig{Enabled: false, WindowSeconds: 60, LoginRPM: 5, RefreshRPM: 10},
-		Auth: config.AuthConfig{PASETOKey: "test-secret", AccessTTLMinutes: 15, RefreshTTLDays: 7},
+		Auth:      config.AuthConfig{PASETOKey: "test-secret", AccessTTLMinutes: 15, RefreshTTLDays: 7},
 	}
 }
 
@@ -119,7 +106,9 @@ func (f fakeAuthUserResolver) ResolveAuthUser(string) (*authctx.User, error) { r
 
 type fakeRoleBySlugResolver struct{ role *iamcore.IAMRole }
 
-func (f fakeRoleBySlugResolver) ResolveRoleBySlug(string) (*iamcore.IAMRole, error) { return f.role, nil }
+func (f fakeRoleBySlugResolver) ResolveRoleBySlug(string) (*iamcore.IAMRole, error) {
+	return f.role, nil
+}
 
 type fakePermissionSyncer struct{ slugs []string }
 

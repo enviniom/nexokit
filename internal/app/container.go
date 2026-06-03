@@ -77,14 +77,6 @@ type userLookup struct {
 	resolver iamcore.AuthUserResolver
 }
 
-type roleResolverAdapter struct {
-	resolver iamcore.RoleBySlugResolver
-}
-
-func (r roleResolverAdapter) GetBySlug(slug string) (*iamcore.IAMRole, error) {
-	return r.resolver.ResolveRoleBySlug(slug)
-}
-
 func (l userLookup) GetAuthUser(publicID string) (*authctx.User, error) {
 	return l.resolver.ResolveAuthUser(publicID)
 }
