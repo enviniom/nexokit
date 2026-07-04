@@ -44,16 +44,16 @@ func toRoleResponse(r *core.IAMRole) *core.RoleResponse {
 	}
 
 	return &core.RoleResponse{
-		PublicID:     r.PublicID,
-		CompanyID:    companyID,
-		Name:         r.Name,
-		Slug:         r.Slug,
-		Description:  r.Description,
-		IsSystem:     r.IsSystem,
-		Permissions:  perms,
-		CreatedAt:    r.CreatedAt,
-		UpdatedAt:    r.UpdatedAt,
-		CreatedBy:    r.CreatedBy,
-		UpdatedBy:    r.UpdatedBy,
+		PublicID:    r.PublicID,
+		CompanyID:   companyID,
+		Name:        r.Name,
+		Slug:        r.Slug,
+		Description: r.Description,
+		IsSystem:    r.IsSystem,
+		Permissions: perms,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
+		CreatedBy:   r.CreatedBy,
+		UpdatedBy:   r.UpdatedBy,
 	}
 }

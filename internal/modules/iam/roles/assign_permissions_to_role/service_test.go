@@ -89,11 +89,11 @@ func TestServiceAssign(t *testing.T) {
 
 	t.Run("success returns response and writes ids", func(t *testing.T) {
 		repo := &fakeRepository{
-			role:     baseRole,
-			catalog:  []core.IAMPermission{{Slug: "roles.read"}},
+			role:       baseRole,
+			catalog:    []core.IAMPermission{{Slug: "roles.read"}},
 			normalized: []string{"roles.read"},
-			selected: map[string]bool{"roles.read": true},
-			ids:      []uint{7},
+			selected:   map[string]bool{"roles.read": true},
+			ids:        []uint{7},
 		}
 		svc := NewService(repo, nil)
 

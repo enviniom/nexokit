@@ -13,7 +13,9 @@ type fakeServiceRepo struct {
 	err  error
 }
 
-func (f fakeServiceRepo) GetPermissionByPublicID(string) (*core.IAMPermission, error) { return f.item, f.err }
+func (f fakeServiceRepo) GetPermissionByPublicID(string) (*core.IAMPermission, error) {
+	return f.item, f.err
+}
 
 func TestGetByPublicIDSuccess(t *testing.T) {
 	svc := NewService(fakeServiceRepo{item: &core.IAMPermission{BaseModel: shared.BaseModel{PublicID: "perm-1"}, Slug: "permissions.manage", Name: "Manage", Module: "permissions", Action: "manage"}})

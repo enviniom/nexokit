@@ -11,10 +11,10 @@ import (
 
 func TestGormRepositoryListAllPermissions(t *testing.T) {
 	tests := []struct {
-		name        string
-		seed        func(t *testing.T, db *gorm.DB)
-		wantSlugs   []string
-		wantErr     bool
+		name      string
+		seed      func(t *testing.T, db *gorm.DB)
+		wantSlugs []string
+		wantErr   bool
 	}{
 		{
 			name: "returns ordered permissions by module display_order and slug",

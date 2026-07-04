@@ -1,6 +1,7 @@
 package delete_role
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -19,14 +20,15 @@ func TestHandlerHandle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
-		name       string
-		err        error
-		statusCode int
+		name        string
+		err         error
+		statusCode  int
+		wantMessage string
 	}{
 		{name: "success 204", err: nil, statusCode: http.StatusNoContent},
-		{name: "not found 404", err: core.ErrNotFound, statusCode: http.StatusNotFound},
-		{name: "protected 403", err: core.ErrRoleProtected, statusCode: http.StatusForbidden},
-		{name: "assigned users 422", err: core.ErrRoleHasAssignedUsers, statusCode: http.StatusUnprocessableEntity},
+		{name: "not found 404", err: core.ErrNotFound, statusCode: http.StatusNotFound, wantMessage: "Recurso no encontrado"},
+		{name: "protected 403", err: core.ErrRoleProtected, statusCode: http.StatusForbidden, wantMessage: "role is protected"},
+		{name: "assigned users 422", err: core.ErrRoleHasAssignedUsers, statusCode: http.StatusUnprocessableEntity, wantMessage: "El rol tiene usuarios asignados"},
 		{name: "generic error 500", err: errors.New("db down"), statusCode: http.StatusInternalServerError},
 	}
 
@@ -42,6 +44,17 @@ func TestHandlerHandle(t *testing.T) {
 
 			if w.Code != tt.statusCode {
 				t.Fatalf("expected status %d, got %d", tt.statusCode, w.Code)
+			}
+
+			if tt.wantMessage == "" {
+				return
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode response body: %v", err)
+			}
+			if got := payload["message"]; got != tt.wantMessage {
+				t.Errorf("message = %q, want %q", got, tt.wantMessage)
 			}
 		})
 	}

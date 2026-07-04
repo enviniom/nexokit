@@ -27,7 +27,7 @@ type GormRepository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) Repository { return &GormRepository{db: db} }
 
 func (r *GormRepository) GetByPublicID(tc tenant.TenantContext, publicID string) (*core.IAMRole, error) {
-	role, err := queries.GetRoleByPublicIDPreloads(r.db, tc, publicID)
+	role, err := queries.GetRoleByPublicID(r.db, tc, publicID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, core.ErrNotFound

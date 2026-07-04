@@ -28,14 +28,15 @@ func TestHandlerHandle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
-		name       string
-		service    Service
-		statusCode int
+		name        string
+		service     Service
+		statusCode  int
+		wantMessage string
 	}{
 		{name: "returns success payload", service: fakeService{item: &core.PermissionResponse{PublicID: "perm-1"}}, statusCode: http.StatusOK},
-		{name: "maps not found to 404", service: fakeService{err: core.ErrNotFound}, statusCode: http.StatusNotFound},
-		{name: "maps immutable system permission to 403", service: fakeService{err: core.ErrSystemImmutable}, statusCode: http.StatusForbidden},
-		{name: "maps conflict to 409", service: fakeService{err: core.ErrConflict}, statusCode: http.StatusConflict},
+		{name: "maps not found to 404 with platform message", service: fakeService{err: core.ErrNotFound}, statusCode: http.StatusNotFound, wantMessage: "Recurso no encontrado"},
+		{name: "maps immutable system permission to 403 with module message", service: fakeService{err: core.ErrSystemImmutable}, statusCode: http.StatusForbidden, wantMessage: "system resource is immutable"},
+		{name: "maps conflict to 409 with platform message", service: fakeService{err: core.ErrConflict}, statusCode: http.StatusConflict, wantMessage: "El recurso ya existe"},
 		{name: "maps unknown errors to 500", service: fakeService{err: errors.New("db down")}, statusCode: http.StatusInternalServerError},
 	}
 
@@ -59,6 +60,11 @@ func TestHandlerHandle(t *testing.T) {
 			var payload map[string]any
 			if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
 				t.Fatalf("decode response body: %v", err)
+			}
+			if tt.wantMessage != "" {
+				if got := payload["message"]; got != tt.wantMessage {
+					t.Errorf("message = %q, want %q", got, tt.wantMessage)
+				}
 			}
 		})
 	}

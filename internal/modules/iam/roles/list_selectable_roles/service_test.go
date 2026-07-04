@@ -28,9 +28,8 @@ func TestServiceList(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name: "success returns selectable roles",
-			repo: fakeRepo{items: []response.SelectResponse{{ID: "role-1", Name: "Manager", Meta: map[string]any{"slug": "manager"}}},
-			},
+			name:    "success returns selectable roles",
+			repo:    fakeRepo{items: []response.SelectResponse{{ID: "role-1", Name: "Manager", Meta: map[string]any{"slug": "manager"}}}},
 			wantLen: 1,
 		},
 		{

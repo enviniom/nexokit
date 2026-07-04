@@ -1,10 +1,7 @@
 package update_permission
 
 import (
-	"errors"
-
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
@@ -26,21 +23,8 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	item, err := h.service.Update(c.Param("id"), req)
 	if err != nil {
-		response.HandleError(c, mapServiceError(err))
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, item)
-}
-
-func mapServiceError(err error) error {
-	switch {
-	case errors.Is(err, core.ErrNotFound):
-		return apperror.ErrNotFound
-	case errors.Is(err, core.ErrConflict):
-		return apperror.ErrConflict
-	case errors.Is(err, core.ErrSystemImmutable):
-		return apperror.ErrForbidden
-	default:
-		return err
-	}
 }

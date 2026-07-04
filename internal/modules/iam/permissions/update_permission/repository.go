@@ -2,10 +2,10 @@ package update_permission
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	"github.com/enviniom/nexokit/internal/modules/iam/queries"
+	"github.com/enviniom/nexokit/internal/platform/gormutil"
 	"gorm.io/gorm"
 )
 
@@ -35,12 +35,7 @@ func (r *GormRepository) UpdatePermission(permission *core.IAMPermission) error 
 		return nil
 	}
 
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return core.ErrConflict
-	}
-
-	msg := strings.ToLower(err.Error())
-	if strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique constraint") || strings.Contains(msg, "unique failed") {
+	if gormutil.IsUniqueConstraintError(err) {
 		return core.ErrConflict
 	}
 

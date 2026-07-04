@@ -14,7 +14,9 @@ type fakeRepo struct {
 	updateErr error
 }
 
-func (f fakeRepo) GetPermissionByPublicID(string) (*core.IAMPermission, error) { return f.item, f.getErr }
+func (f fakeRepo) GetPermissionByPublicID(string) (*core.IAMPermission, error) {
+	return f.item, f.getErr
+}
 func (f fakeRepo) UpdatePermission(*core.IAMPermission) error { return f.updateErr }
 
 func TestUpdateSuccess(t *testing.T) {
