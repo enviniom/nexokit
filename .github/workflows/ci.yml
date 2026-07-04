@@ -55,3 +55,18 @@ jobs:
             echo "$unformatted"
             exit 1
           fi
+
+  module-errors-guard:
+    name: module-errors-guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check module error boundaries
+        run: make check-module-errors

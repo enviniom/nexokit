@@ -1,4 +1,4 @@
-.PHONY: dev build test test-unit test-integration test-coverage migrate-up migrate-down migrate-create migrate-status migrate-reset seed create-root lint fmt vet install-hooks uninstall-hooks check-env
+.PHONY: dev build test test-unit test-integration test-coverage migrate-up migrate-down migrate-create migrate-status migrate-reset seed create-root lint fmt vet install-hooks uninstall-hooks check-env check-module-errors
 
 # Load .env if present for Makefile variable expansion.
 # Export only the variables the app/CLI reads, avoiding accidental env bleed.
@@ -69,13 +69,34 @@ seed:
 create-root:
 	go run ./cmd/nexokit create-root
 
-lint: vet
+lint: vet check-module-errors
 
 fmt:
 	go fmt ./...
 
 vet:
 	go vet ./...
+
+# check-module-errors enforces the change-24 boundary contract:
+# module handlers, services, and repositories must not import platform/apperror
+# or gorm directly; legacy mapServiceError adapters are forbidden in non-test code.
+check-module-errors:
+	@echo "Checking for apperror. misuse in module handlers/services/repositories..."
+	@if grep -RE 'apperror\.' internal/modules/ --include='*service.go' --include='*repository.go' --include='*handler.go' | grep -v _test.go; then \
+		echo "error: apperror. found in module handler/service/repository files"; \
+		exit 1; \
+	fi
+	@echo "Checking for gorm. leaks in module services..."
+	@if grep -RE 'gorm\.' internal/modules/ --include='*service.go' | grep -v _test.go; then \
+		echo "error: gorm. found in module service files"; \
+		exit 1; \
+	fi
+	@echo "Checking for legacy mapServiceError in modules..."
+	@if grep -RE 'mapServiceError' internal/modules/ | grep -v _test.go; then \
+		echo "error: mapServiceError found in module files"; \
+		exit 1; \
+	fi
+	@echo "Module error guard passed."
 
 install-hooks:
 	@cp scripts/pre-commit.sh .git/hooks/pre-commit
