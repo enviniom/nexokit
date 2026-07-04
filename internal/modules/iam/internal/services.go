@@ -8,25 +8,29 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/iam/internal/resolve_role_by_slug"
 	"github.com/enviniom/nexokit/internal/modules/iam/internal/resolve_user_permissions"
 	"github.com/enviniom/nexokit/internal/modules/iam/internal/sync_permissions"
-	"gorm.io/gorm"
 )
 
-func NewResolveAuthUserService(db *gorm.DB) core.AuthUserResolver {
-	return resolve_auth_user.NewService(resolve_auth_user.NewRepository(db))
+// NewResolveAuthUserService wires the resolve_auth_user slice using the supplied repository.
+func NewResolveAuthUserService(repo resolve_auth_user.Repository) core.AuthUserResolver {
+	return resolve_auth_user.NewService(repo)
 }
 
-func NewResolveUserPermissionsService(db *gorm.DB, c cache.Cache) core.PermissionResolver {
-	return resolve_user_permissions.NewService(resolve_user_permissions.NewRepository(db), c)
+// NewResolveUserPermissionsService wires the resolve_user_permissions slice using the supplied repository and cache.
+func NewResolveUserPermissionsService(repo resolve_user_permissions.Repository, c cache.Cache) core.PermissionResolver {
+	return resolve_user_permissions.NewService(repo, c)
 }
 
-func NewSyncPermissionsService(db *gorm.DB) core.PermissionSyncer {
-	return sync_permissions.NewService(sync_permissions.NewRepository(db))
+// NewSyncPermissionsService wires the sync_permissions slice using the supplied repository.
+func NewSyncPermissionsService(repo sync_permissions.Repository) core.PermissionSyncer {
+	return sync_permissions.NewService(repo)
 }
 
-func NewResolveRoleBySlugService(db *gorm.DB) core.RoleBySlugResolver {
-	return resolve_role_by_slug.NewService(resolve_role_by_slug.NewRepository(db))
+// NewResolveRoleBySlugService wires the resolve_role_by_slug slice using the supplied repository.
+func NewResolveRoleBySlugService(repo resolve_role_by_slug.Repository) core.RoleBySlugResolver {
+	return resolve_role_by_slug.NewService(repo)
 }
 
-func NewListAllPermissionsService(db *gorm.DB) core.PermissionCatalogReader {
-	return list_all_permissions.NewService(list_all_permissions.NewRepository(db))
+// NewListAllPermissionsService wires the list_all_permissions slice using the supplied repository.
+func NewListAllPermissionsService(repo list_all_permissions.Repository) core.PermissionCatalogReader {
+	return list_all_permissions.NewService(repo)
 }

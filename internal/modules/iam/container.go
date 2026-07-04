@@ -6,6 +6,11 @@ import (
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iaminternal "github.com/enviniom/nexokit/internal/modules/iam/internal"
+	"github.com/enviniom/nexokit/internal/modules/iam/internal/list_all_permissions"
+	"github.com/enviniom/nexokit/internal/modules/iam/internal/resolve_auth_user"
+	"github.com/enviniom/nexokit/internal/modules/iam/internal/resolve_role_by_slug"
+	"github.com/enviniom/nexokit/internal/modules/iam/internal/resolve_user_permissions"
+	"github.com/enviniom/nexokit/internal/modules/iam/internal/sync_permissions"
 	"github.com/enviniom/nexokit/internal/modules/iam/permissions"
 	"github.com/enviniom/nexokit/internal/modules/iam/roles"
 	"github.com/enviniom/nexokit/internal/modules/iam/users"
@@ -28,13 +33,13 @@ type Container struct {
 
 func NewContainer(db *gorm.DB, c cache.Cache, _ *slog.Logger) *Container {
 	return &Container{
-		Users:           users.NewContainer(db, c),
-		Roles:           roles.NewContainer(db, c),
-		Permissions:     permissions.NewContainer(db),
-		AuthUserResolver: iaminternal.NewResolveAuthUserService(db),
-		Resolver:         iaminternal.NewResolveUserPermissionsService(db, c),
-		Syncer:           iaminternal.NewSyncPermissionsService(db),
-		RoleResolver:     iaminternal.NewResolveRoleBySlugService(db),
-		Catalog:          iaminternal.NewListAllPermissionsService(db),
+		Users:            users.NewContainer(db, c),
+		Roles:            roles.NewContainer(db, c),
+		Permissions:      permissions.NewContainer(db),
+		AuthUserResolver: iaminternal.NewResolveAuthUserService(resolve_auth_user.NewRepository(db)),
+		Resolver:         iaminternal.NewResolveUserPermissionsService(resolve_user_permissions.NewRepository(db), c),
+		Syncer:           iaminternal.NewSyncPermissionsService(sync_permissions.NewRepository(db)),
+		RoleResolver:     iaminternal.NewResolveRoleBySlugService(resolve_role_by_slug.NewRepository(db)),
+		Catalog:          iaminternal.NewListAllPermissionsService(list_all_permissions.NewRepository(db)),
 	}
 }

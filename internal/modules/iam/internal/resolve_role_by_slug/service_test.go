@@ -22,6 +22,15 @@ func TestResolveRoleBySlugPropagatesNotFound(t *testing.T) {
 	}
 }
 
+func TestResolveRoleBySlugPropagatesRepositoryError(t *testing.T) {
+	repoErr := errors.New("db down")
+	svc := NewService(fakeRepo{err: repoErr})
+	_, err := svc.ResolveRoleBySlug("admin")
+	if !errors.Is(err, repoErr) {
+		t.Fatalf("expected repo error, got %v", err)
+	}
+}
+
 func TestResolveRoleBySlugSuccess(t *testing.T) {
 	role := &core.IAMRole{Name: "Admin", Slug: "admin"}
 	svc := NewService(fakeRepo{role: role})

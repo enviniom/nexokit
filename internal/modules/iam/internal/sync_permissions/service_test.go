@@ -8,11 +8,11 @@ import (
 )
 
 type fakeRepo struct {
-	items      map[string]*core.IAMPermission
-	next       uint
-	findErr    error
-	createErr  error
-	assignErr  error
+	items       map[string]*core.IAMPermission
+	next        uint
+	findErr     error
+	createErr   error
+	assignErr   error
 	assignCalls int
 }
 
@@ -82,5 +82,25 @@ func TestSyncPermissionsIgnoresMalformedSlugs(t *testing.T) {
 	}
 	if len(repo.items) != 1 {
 		t.Fatalf("expected one permission, got %d", len(repo.items))
+	}
+}
+
+func TestSyncPermissionsPropagatesCreateError(t *testing.T) {
+	createErr := errors.New("create failed")
+	repo := &fakeRepo{items: map[string]*core.IAMPermission{}, createErr: createErr}
+	svc := NewService(repo)
+	err := svc.SyncPermissions([]string{"users.create"})
+	if !errors.Is(err, createErr) {
+		t.Fatalf("expected create error, got %v", err)
+	}
+}
+
+func TestSyncPermissionsPropagatesAssignError(t *testing.T) {
+	assignErr := errors.New("assign failed")
+	repo := &fakeRepo{items: map[string]*core.IAMPermission{}, assignErr: assignErr}
+	svc := NewService(repo)
+	err := svc.SyncPermissions([]string{"users.create"})
+	if !errors.Is(err, assignErr) {
+		t.Fatalf("expected assign error, got %v", err)
 	}
 }

@@ -24,6 +24,15 @@ func TestResolveAuthUserPropagatesNotFound(t *testing.T) {
 	}
 }
 
+func TestResolveAuthUserPropagatesRepositoryError(t *testing.T) {
+	repoErr := errors.New("db down")
+	svc := NewService(fakeRepo{err: repoErr})
+	_, err := svc.ResolveAuthUser("u1")
+	if !errors.Is(err, repoErr) {
+		t.Fatalf("expected repo error, got %v", err)
+	}
+}
+
 func TestResolveAuthUserSuccess(t *testing.T) {
 	user := &core.IAMUser{
 		Email: "test@example.com",

@@ -3,13 +3,17 @@ package resolve_user_permissions
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 )
 
-type fakeRepo struct{ slugs []string }
+type fakeRepo struct {
+	slugs []string
+	err   error
+}
 
-func (f fakeRepo) ListSlugsByUserPublicID(string) ([]string, error) { return f.slugs, nil }
+func (f fakeRepo) ListSlugsByUserPublicID(string) ([]string, error) { return f.slugs, f.err }
 
 type fakeCache struct {
 	values map[string][]byte
@@ -43,5 +47,31 @@ func TestResolveUsesCacheAndStoresTTL(t *testing.T) {
 	_ = json.Unmarshal(c.sets["rbac:permissions:u1"], &stored)
 	if len(stored) != 2 {
 		t.Fatalf("unexpected payload: %v", stored)
+	}
+}
+
+func TestResolvePropagatesRepositoryError(t *testing.T) {
+	repoErr := errors.New("db down")
+	svc := NewService(fakeRepo{err: repoErr}, &fakeCache{})
+	_, err := svc.Resolve("u1")
+	if !errors.Is(err, repoErr) {
+		t.Fatalf("expected repo error, got %v", err)
+	}
+}
+
+func TestResolveReturnsCachedSlugsWithoutCallingRepo(t *testing.T) {
+	cached := []string{"cached.read"}
+	payload, _ := json.Marshal(cached)
+	cache := &fakeCache{values: map[string][]byte{"rbac:permissions:u1": payload}}
+	svc := NewService(fakeRepo{slugs: []string{"repo.read"}}, cache)
+	got, err := svc.Resolve("u1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0] != "cached.read" {
+		t.Fatalf("expected cached slugs, got %v", got)
+	}
+	if cache.sets != nil {
+		t.Fatalf("expected cache Set to be skipped on hit, got %v", cache.sets)
 	}
 }
