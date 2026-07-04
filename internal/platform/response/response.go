@@ -1,6 +1,7 @@
 package response
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -34,14 +35,15 @@ type ErrorResponse struct {
 	Data    any    `json:"data"`
 	Meta    any    `json:"meta"`
 	Errors  any    `json:"errors"`
+	Debug   string `json:"debug,omitempty"`
 }
 
 // ValidationErrorResponse is the standard envelope for field-keyed validation errors.
 type ValidationErrorResponse struct {
-	Success bool             `json:"success"`
-	Message string           `json:"message"`
-	Data    any              `json:"data"`
-	Meta    any              `json:"meta"`
+	Success bool                       `json:"success"`
+	Message string                     `json:"message"`
+	Data    any                        `json:"data"`
+	Meta    any                        `json:"meta"`
 	Errors  validator.ValidationErrors `json:"errors"`
 }
 
@@ -197,11 +199,50 @@ func PaginatedWithFilters[T any](c *gin.Context, message string, data T, params 
 }
 
 // HandleError maps application errors to standard API error responses.
+// It attaches the error to c.Errors exactly once so the ErrorLogger middleware
+// can own the structured log line.
+//
+// Debug details are exposed only when the request context carries the
+// debug_errors flag set by middleware.DebugErrors; this flag is derived from
+// AppConfig.Env, not from the global gin mode.
 func HandleError(c *gin.Context, err error) {
 	if err == nil {
 		return
 	}
-	Error(c, apperror.Status(err), apperror.PublicMessage(err, gin.Mode()), nil)
+	_ = c.Error(err)
+
+	status := apperror.Status(err)
+	publicMsg := apperror.PublicMessage(err, "")
+
+	var debug string
+	if debugEnabled(c) {
+		debug = err.Error()
+		var ae *apperror.AppError
+		if errors.As(err, &ae) && ae.Internal != nil {
+			debug = ae.Internal.Error()
+		}
+	}
+
+	c.JSON(status, ErrorResponse{
+		Success: false,
+		Message: publicMsg,
+		Data:    nil,
+		Meta:    nil,
+		Errors:  nil,
+		Debug:   debug,
+	})
+}
+
+// debugEnabled reads the debug_errors flag from the request context. The flag
+// is set by middleware.DebugErrors; if it is missing, the safe default is false
+// so production-like contexts never leak internal details.
+func debugEnabled(c *gin.Context) bool {
+	v, ok := c.Get(messages.CtxDebugErrors)
+	if !ok {
+		return false
+	}
+	enabled, ok := v.(bool)
+	return ok && enabled
 }
 
 // RespondIfInvalid writes a 422 validation error response and returns true if errs has errors.

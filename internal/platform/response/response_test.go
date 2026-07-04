@@ -21,6 +21,12 @@ func setupRecorder() (*gin.Context, *httptest.ResponseRecorder) {
 	return c, w
 }
 
+func setupRecorderWithDebug(enabled bool) (*gin.Context, *httptest.ResponseRecorder) {
+	c, w := setupRecorder()
+	c.Set(messages.CtxDebugErrors, enabled)
+	return c, w
+}
+
 func parseBody(t *testing.T, w *httptest.ResponseRecorder) APIResponse[any] {
 	t.Helper()
 	var resp APIResponse[any]
@@ -348,12 +354,13 @@ func TestHandleError(t *testing.T) {
 		{"unauthorized", apperror.ErrUnauthorized, http.StatusUnauthorized, messages.MsgUnauthorized},
 		{"forbidden", apperror.ErrForbidden, http.StatusForbidden, messages.MsgForbidden},
 		{"conflict", apperror.ErrConflict, http.StatusConflict, messages.MsgConflict},
-		{"unknown", errors.New("database is down"), http.StatusInternalServerError, "database is down"},
+		{"app error with custom message", apperror.NotFound(apperror.CodeNotFound, "user not found", errors.New("db boom")), http.StatusNotFound, "user not found"},
+		{"unknown", errors.New("database is down"), http.StatusInternalServerError, messages.MsgInternalError},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, w := setupRecorder()
+			c, w := setupRecorderWithDebug(true)
 			HandleError(c, tt.err)
 
 			if w.Code != tt.wantStatus {
@@ -363,7 +370,76 @@ func TestHandleError(t *testing.T) {
 			if resp.Message != tt.wantMessage {
 				t.Fatalf("message = %q; want %q", resp.Message, tt.wantMessage)
 			}
+			if len(c.Errors) != 1 {
+				t.Fatalf("c.Errors length = %d; want 1", len(c.Errors))
+			}
 		})
+	}
+}
+
+func TestHandleErrorRedactsUnknownWhenDebugDisabled(t *testing.T) {
+	c, w := setupRecorderWithDebug(false)
+
+	HandleError(c, errors.New("secret stack trace"))
+
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d; want %d", w.Code, http.StatusInternalServerError)
+	}
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Message != messages.MsgInternalError {
+		t.Fatalf("message = %q; want %q", resp.Message, messages.MsgInternalError)
+	}
+	if resp.Debug != "" {
+		t.Errorf("debug = %q; want empty when debug disabled", resp.Debug)
+	}
+}
+
+func TestHandleErrorIgnoresGinModeAndUsesConfigDebugFlag(t *testing.T) {
+	gin.SetMode(gin.DebugMode)
+	defer gin.SetMode(gin.TestMode)
+
+	c, w := setupRecorderWithDebug(false)
+	HandleError(c, errors.New("secret stack trace"))
+
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Debug != "" {
+		t.Errorf("debug = %q; want empty even when gin mode is debug", resp.Debug)
+	}
+}
+
+func TestHandleErrorIncludesDebugWhenEnabledRegardlessOfGinReleaseMode(t *testing.T) {
+	gin.SetMode(gin.ReleaseMode)
+	defer gin.SetMode(gin.TestMode)
+
+	c, w := setupRecorderWithDebug(true)
+	HandleError(c, errors.New("debug info"))
+
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Debug != "debug info" {
+		t.Errorf("debug = %q; want %q", resp.Debug, "debug info")
+	}
+}
+
+func TestHandleErrorAppErrorDebugUsesInternal(t *testing.T) {
+	c, w := setupRecorderWithDebug(true)
+
+	HandleError(c, apperror.NotFound(apperror.CodeNotFound, "user not found", errors.New("db boom")))
+
+	var resp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Debug != "db boom" {
+		t.Errorf("debug = %q; want %q", resp.Debug, "db boom")
 	}
 }
 
@@ -376,5 +452,8 @@ func TestHandleErrorNilIsNoOp(t *testing.T) {
 	}
 	if w.Body.Len() != 0 {
 		t.Fatalf("body = %q; want empty", w.Body.String())
+	}
+	if len(c.Errors) != 0 {
+		t.Fatalf("c.Errors length = %d; want 0", len(c.Errors))
 	}
 }

@@ -14,3 +14,10 @@ func (c *Config) IsProduction() bool {
 func (c *Config) IsTest() bool {
 	return c.App.Env == "test"
 }
+
+// ExposeDebugErrors returns true when the application environment allows
+// internal error details to be exposed in API responses. It is the single
+// source of truth for the debug field emitted by response.HandleError.
+func (c *Config) ExposeDebugErrors() bool {
+	return c.IsLocal() || c.IsTest()
+}

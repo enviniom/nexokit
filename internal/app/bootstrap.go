@@ -27,6 +27,12 @@ func Bootstrap(ctx context.Context) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
+
+	errorLog, err := logger.NewErrorLogger(cfg.Log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create error logger: %w", err)
+	}
+
 	log.Info("configuration loaded", slog.String("env", cfg.App.Env))
 
 	database, err := db.Connect(cfg)
@@ -102,7 +108,7 @@ func Bootstrap(ctx context.Context) (*App, error) {
 		return nil, fmt.Errorf("failed to create gin writer: %w", err)
 	}
 
-	router := server.NewRouter(cfg, log, ginWriter, healthDeps, container.RegisterModules)
+	router := server.NewRouter(cfg, log, errorLog, ginWriter, healthDeps, container.RegisterModules)
 
 	if err := container.SyncPermissions(); err != nil {
 		return nil, fmt.Errorf("failed to sync permissions: %w", err)

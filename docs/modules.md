@@ -19,7 +19,7 @@ The goal is reviewability: a subagent should be able to load only the document i
 | Create a new module | [`modules/module-structure.md`](modules/module-structure.md) |
 | Create or change a slice | [`modules/vertical-slices.md`](modules/vertical-slices.md) |
 | Review or wire module dependencies | [`modules/boundaries-and-dependencies.md`](modules/boundaries-and-dependencies.md) |
-| Add or change DTOs, validation, error mapping, AppError usage | [`modules/validation-and-errors.md`](modules/validation-and-errors.md) |
+| Add or change DTOs, validation, error mapping, AppError usage | [`modules/validation-and-errors.md`](modules/validation-and-errors.md) and [`error-handling.md`](error-handling.md) |
 | Add or change a reusable query, repository translation, partial GORM model | [`modules/queries-and-persistence.md`](modules/queries-and-persistence.md) |
 | Write or review tests for a module | [`modules/testing.md`](modules/testing.md) |
 | Need the old consolidated reference | [`vertical-slice-modules.md`](vertical-slice-modules.md) (compatibility stub) |
@@ -31,7 +31,7 @@ The goal is reviewability: a subagent should be able to load only the document i
 | `modules/module-structure.md` | Standard folder shape, `container.go` / `routes.go` / `core/` / `queries/` / `slices/` responsibilities, startup order. |
 | `modules/vertical-slices.md` | Slice shape (`handler` / `service` / `repository`), single-entity vs multi-entity grouping, slice checklist, moving existing slices. |
 | `modules/boundaries-and-dependencies.md` | No direct module-to-module imports, `platform/shared` rules, module-owned implementations and module-declared interfaces, app container wiring. |
-| `modules/validation-and-errors.md` | DTO `Validate()` contract, response envelope, 400 / 422 / AppError mapping, `core/errors.go` with `apperror` helpers, expected control flow with `(*Customer, bool, error)`. |
+| `modules/validation-and-errors.md` | DTO `Validate()` contract, response envelope, 400 / 422 / AppError mapping, `core/errors.go` with module-owned `Code` constants and `apperror` helpers, expected control flow with `(*Customer, bool, error)`. |
 | `modules/queries-and-persistence.md` | When a query belongs in `queries/`, repository translation rules, GORM partial model `TableName()` rule, mapper placement. |
 | `modules/testing.md` | Handler / service / repository / query / DTO / module-error / table-name tests, CRUD-light vs business-heavy criteria. |
 
@@ -49,7 +49,7 @@ These rules apply everywhere and are restated in detail in the dedicated documen
 | A module exposes implementations of capabilities it owns and declares interfaces for capabilities it needs. The app container injects implementations. | [`boundaries-and-dependencies.md`](modules/boundaries-and-dependencies.md) |
 | DTOs own `Validate()` and return `response.ValidationErrors` keyed by field. | [`validation-and-errors.md`](modules/validation-and-errors.md) |
 | Binding / invalid JSON = 400; DTO validation = 422; `AppError` is not used for field validation. | [`validation-and-errors.md`](modules/validation-and-errors.md) |
-| Reusable module errors live in `core/errors.go` and use `platform/apperror` helpers. | [`validation-and-errors.md`](modules/validation-and-errors.md) |
+| Reusable module errors live in `core/errors.go`, use module-owned `Code` constants, and are built with `platform/apperror` helpers. | [`validation-and-errors.md`](modules/validation-and-errors.md) |
 | Services and repositories MUST NOT create ad-hoc `apperror` values inline. | [`validation-and-errors.md`](modules/validation-and-errors.md) |
 | Handlers route business / app errors through `response.HandleError`. | [`validation-and-errors.md`](modules/validation-and-errors.md) |
 | Expected control flow uses explicit contracts like `(*Customer, bool, error)`, not `AppError`. | [`validation-and-errors.md`](modules/validation-and-errors.md) |

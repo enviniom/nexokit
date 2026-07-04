@@ -1,25 +1,28 @@
 package middleware
 
 import (
+	"fmt"
+
+	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
-	"log/slog"
 )
 
-// Recovery catches panics, logs them, and returns a structured 500 response.
-func Recovery(log *slog.Logger) gin.HandlerFunc {
+// Recovery catches panics, pushes the panic value into c.Errors as an
+// *AppError, writes a structured 500 response, and aborts. Logging is owned by
+// ErrorLogger, which runs after Recovery on the Gin unwind.
+func Recovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if r := recover(); r != nil {
-				rid, _ := c.Get(messages.CtxRequestID)
-				ridStr, _ := rid.(string)
-				log.Error(messages.MsgPanicLog,
-					slog.String(messages.CtxRequestID, ridStr),
-					slog.Any("error", r),
-					slog.String("path", c.Request.URL.Path),
+				err := apperror.Internal(
+					apperror.CodeInternal,
+					messages.MsgInternalError,
+					fmt.Errorf("panic: %v", r),
 				)
-				response.InternalServerError(c, messages.MsgPanicRecovered)
+				_ = c.Error(err)
+				response.InternalServerError(c, messages.MsgInternalError)
 				c.Abort()
 			}
 		}()

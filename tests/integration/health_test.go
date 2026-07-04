@@ -18,7 +18,8 @@ func TestHealthIntegration(t *testing.T) {
 	}
 
 	cfg := &config.Config{App: config.AppConfig{Env: "test"}, CORS: config.CORSConfig{AllowedOrigins: "*"}}
-	r := server.NewRouter(cfg, slog.New(slog.NewTextHandler(io.Discard, nil)), io.Discard, server.HealthDeps{}, nil)
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	r := server.NewRouter(cfg, log, log, io.Discard, server.HealthDeps{}, nil)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)

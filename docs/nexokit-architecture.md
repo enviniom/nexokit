@@ -143,8 +143,8 @@ Platform contains shared infrastructure used by all modules. It can import `doma
 **Purpose:** Sentinel errors, `AppError` wrapper, HTTP status resolution, and public message extraction. This is the single source of truth for error classification across the entire application.
 
 **Rules:**
-- Modules use `apperror.Wrap` in their `core/errors.go` to create domain-specific errors wrapping the appropriate sentinel.
-- Handlers import `apperror` to call `HandleError`, `Status`, `PublicMessage`, and `Log`.
+- Modules declare business `Code` constants in their `core/errors.go` and build errors with `apperror.Wrap` or the HTTP helpers (`NotFound`, `Conflict`, etc.).
+- Handlers import `apperror` to call `Wrap`, `Status`, and `PublicMessage`.
 - Services and repositories must NOT import this package — they return domain errors from `core/`.
 - Sentinel messages must be generic. Specific business messages belong in the `Wrap` call inside `core/`.
 
@@ -155,88 +155,90 @@ package apperror
 import (
     "errors"
     "net/http"
-    "github.com/gin-gonic/gin"
-    "github.com/your-org/nexokit/internal/platform/messages"
+
+    "github.com/enviniom/nexokit/internal/platform/messages"
 )
 
+// Code identifies the error category. It also implements error so callers can
+// match with errors.Is(err, apperror.CodeNotFound).
+type Code string
+
+func (c Code) Error() string { return string(c) }
+
+// AppError represents an application-level error with a client-safe message,
+// an HTTP status, and an optional internal error chain for logging.
 type AppError struct {
-    Err     error  // sentinel (ErrNotFound, ErrConflict, etc.)
-    Message string // public message shown to the client
-    Cause   error  // original infrastructure error (for logs only)
+    Code          Code
+    HTTPStatus    int
+    PublicMessage string
+    Internal      error
 }
 
-func (e *AppError) Error() string { return e.Message }
-func (e *AppError) Unwrap() error { return e.Err }
+func (ae *AppError) Error() string {
+    if ae.Internal != nil {
+        return ae.Internal.Error()
+    }
+    return ae.PublicMessage
+}
 
-// Sentinel errors — messages must be generic.
-var (
-    ErrNotFound         = &AppError{Message: messages.MsgNotFound}
-    ErrForbidden        = &AppError{Message: messages.MsgForbidden}
-    ErrUnauthorized     = &AppError{Message: messages.MsgUnauthorized}
-    ErrConflict         = &AppError{Message: messages.MsgConflict}
-    ErrBadRequest       = &AppError{Message: messages.MsgBadRequest}
-    ErrTooManyRequests  = &AppError{Message: messages.MsgTooManyRequests}
-    ErrValidation       = &AppError{Message: messages.MsgValidationError}
-    ErrUnprocessable    = &AppError{Message: messages.MsgUnprocessable}
-    ErrInternal         = &AppError{Message: messages.MsgInternalError}
+func (ae *AppError) Unwrap() error { return ae.Internal }
+
+// HTTP-category codes owned by the platform. Modules MUST declare their own
+// business codes; these are generic fallbacks.
+const (
+    CodeNotFound        Code = "not_found"
+    CodeBadRequest      Code = "bad_request"
+    CodeForbidden       Code = "forbidden"
+    CodeConflict        Code = "conflict"
+    CodeUnauthorized    Code = "unauthorized"
+    CodeTooManyRequests Code = "too_many_requests"
+    CodeValidation      Code = "validation"
+    CodeUnprocessable   Code = "unprocessable"
+    CodeInternal        Code = "internal"
 )
 
-// Wrap creates a domain-specific error wrapping a sentinel.
-// Use this in modules/<m>/core/errors.go.
-//
-//   ErrCartNotFound = apperror.Wrap(apperror.ErrNotFound, "Carrito no encontrado")
-//
-// The optional cause is the original infrastructure error and is only used for logging.
-func Wrap(sentinel error, message string, cause ...error) *AppError {
-    var c error
-    if len(cause) > 0 {
-        c = cause[0]
-    }
-    return &AppError{Err: sentinel, Message: message, Cause: c}
-}
+// Sentinel errors for common application states.
+var (
+    ErrNotFound        = &AppError{Code: CodeNotFound, HTTPStatus: http.StatusNotFound, PublicMessage: messages.MsgNotFound}
+    ErrForbidden       = &AppError{Code: CodeForbidden, HTTPStatus: http.StatusForbidden, PublicMessage: messages.MsgForbidden}
+    ErrUnauthorized    = &AppError{Code: CodeUnauthorized, HTTPStatus: http.StatusUnauthorized, PublicMessage: messages.MsgUnauthorized}
+    ErrConflict        = &AppError{Code: CodeConflict, HTTPStatus: http.StatusConflict, PublicMessage: messages.MsgConflict}
+    ErrBadRequest      = &AppError{Code: CodeBadRequest, HTTPStatus: http.StatusBadRequest, PublicMessage: messages.MsgBadRequest}
+    ErrTooManyRequests = &AppError{Code: CodeTooManyRequests, HTTPStatus: http.StatusTooManyRequests, PublicMessage: messages.MsgTooManyRequests}
+    ErrValidation      = &AppError{Code: CodeValidation, HTTPStatus: http.StatusUnprocessableEntity, PublicMessage: messages.MsgValidationError}
+    ErrUnprocessable   = &AppError{Code: CodeUnprocessable, HTTPStatus: http.StatusUnprocessableEntity, PublicMessage: ""}
+    ErrInternal        = &AppError{Code: CodeInternal, HTTPStatus: http.StatusInternalServerError, PublicMessage: messages.MsgInternalError}
+)
 
-// Status resolves the HTTP status code from any error.
-// Returns 500 for unknown/unwrapped errors.
-func Status(err error) int {
-    var e *AppError
-    if !errors.As(err, &e) {
-        return http.StatusInternalServerError
-    }
-    switch {
-    case errors.Is(e.Err, ErrNotFound):        return http.StatusNotFound
-    case errors.Is(e.Err, ErrForbidden):       return http.StatusForbidden
-    case errors.Is(e.Err, ErrUnauthorized):    return http.StatusUnauthorized
-    case errors.Is(e.Err, ErrConflict):        return http.StatusConflict
-    case errors.Is(e.Err, ErrBadRequest):      return http.StatusBadRequest
-    case errors.Is(e.Err, ErrValidation):      return http.StatusUnprocessableEntity
-    case errors.Is(e.Err, ErrUnprocessable):   return http.StatusUnprocessableEntity
-    case errors.Is(e.Err, ErrTooManyRequests): return http.StatusTooManyRequests
-    default:                                   return http.StatusInternalServerError
-    }
-}
+// Helper constructors bind a code and HTTP status to a public message.
+// The internal argument may be nil for sentinel-style errors.
+func New(code Code, status int, publicMsg string, internal error) *AppError
+func NotFound(code Code, publicMsg string, internal error) *AppError      // 404
+func BadRequest(code Code, publicMsg string, internal error) *AppError     // 400
+func Forbidden(code Code, publicMsg string, internal error) *AppError      // 403
+func Conflict(code Code, publicMsg string, internal error) *AppError       // 409
+func Unauthorized(code Code, publicMsg string, internal error) *AppError   // 401
+func TooManyRequests(code Code, publicMsg string, internal error) *AppError // 429
+func Validation(code Code, publicMsg string, internal error) *AppError     // 422
+func Unprocessable(code Code, publicMsg string, internal error) *AppError  // 422
+func Internal(code Code, publicMsg string, internal error) *AppError       // 500
 
-// PublicMessage returns the safe message to send to the client.
-// In release mode, unexpected errors (not AppError) return a generic message.
-func PublicMessage(err error, mode string) string {
-    var e *AppError
-    if !errors.As(err, &e) {
-        if mode == gin.ReleaseMode {
-            return messages.MsgInternalError
-        }
-        return err.Error()
-    }
-    return e.Message
-}
+// Wrap creates a new AppError wrapping an existing error. If err is an
+// *AppError or matches a known sentinel via errors.Is, the returned AppError
+// inherits its Code and HTTPStatus; otherwise it defaults to CodeInternal/500.
+// The passed message becomes the PublicMessage. Optional cause arguments are
+// appended to the unwrap chain after err.
+func Wrap(err error, message string, cause ...error) *AppError
 
-// Log extracts the underlying infrastructure cause for logging.
-// Returns nil if no cause was recorded (expected domain errors need no logging).
-func Log(err error) error {
-    var e *AppError
-    if errors.As(err, &e) {
-        return e.Cause
-    }
-    return err
-}
+// Status returns the appropriate HTTP status code for an error.
+func Status(err error) int
+
+// PublicMessage returns a safe message to expose to API consumers.
+// *AppError values always expose their PublicMessage. Unknown errors are always
+// redacted to messages.MsgInternalError. The mode parameter is kept for API
+// compatibility but is no longer used; redaction is encoded in the AppError
+// contract and debug exposure is owned by the response layer.
+func PublicMessage(err error, mode string) string
 ```
 
 **Domain errors in `core/` wrap sentinels — never the reverse:**
@@ -245,7 +247,7 @@ func Log(err error) error {
 // internal/modules/sales/core/errors.go
 package core
 
-import "github.com/your-org/nexokit/internal/platform/apperror"
+import "github.com/enviniom/nexokit/internal/platform/apperror"
 
 var (
     ErrCartNotFound            = apperror.Wrap(apperror.ErrNotFound,       "Carrito no encontrado")
@@ -260,7 +262,7 @@ var (
 // internal/modules/iam/core/errors.go
 package core
 
-import "github.com/your-org/nexokit/internal/platform/apperror"
+import "github.com/enviniom/nexokit/internal/platform/apperror"
 
 var (
     ErrRoleNotFound        = apperror.Wrap(apperror.ErrNotFound,      "Rol no encontrado")
@@ -271,47 +273,76 @@ var (
 
 ### `platform/response/`
 
-**Purpose:** `APIResponse[T]` envelope and HTTP writing helpers including `HandleError`.
+**Purpose:** Standard API response envelopes and HTTP writing helpers including `HandleError`.
 
 ```go
 // internal/platform/response/response.go
 package response
 
 import (
+    "errors"
     "net/http"
+
+    "github.com/enviniom/nexokit/internal/platform/apperror"
+    "github.com/enviniom/nexokit/internal/platform/messages"
     "github.com/gin-gonic/gin"
-    "github.com/your-org/nexokit/internal/platform/apperror"
 )
 
-type APIResponse[T any] struct {
+// ErrorResponse is the standard envelope for non-validation errors.
+type ErrorResponse struct {
     Success bool   `json:"success"`
-    Data    T      `json:"data,omitempty"`
-    Error   *Error `json:"error,omitempty"`
+    Message string `json:"message"`
+    Data    any    `json:"data"`
+    Meta    any    `json:"meta"`
+    Errors  any    `json:"errors"`
+    Debug   string `json:"debug,omitempty"`
 }
 
-type Error struct {
-    Message string              `json:"message"`
-    Fields  map[string][]string `json:"fields,omitempty"`
-}
-
+// HandleError maps application errors to standard API error responses.
+// It attaches the error to c.Errors exactly once so the ErrorLogger middleware
+// can own the structured log line.
+//
+// Debug details are exposed only when the request context carries the
+// debug_errors flag set by middleware.DebugErrors; this flag is derived from
+// AppConfig.Env via Config.ExposeDebugErrors(), not from the global gin mode.
 func HandleError(c *gin.Context, err error) {
     if err == nil {
         return
     }
+    _ = c.Error(err)
+
     status := apperror.Status(err)
-    message := apperror.PublicMessage(err, gin.Mode())
-    c.JSON(status, APIResponse[any]{
+    publicMsg := apperror.PublicMessage(err, "")
+
+    var debug string
+    if debugEnabled(c) {
+        debug = err.Error()
+        var ae *apperror.AppError
+        if errors.As(err, &ae) && ae.Internal != nil {
+            debug = ae.Internal.Error()
+        }
+    }
+
+    c.JSON(status, ErrorResponse{
         Success: false,
-        Error:   &Error{Message: message},
+        Message: publicMsg,
+        Data:    nil,
+        Meta:    nil,
+        Errors:  nil,
+        Debug:   debug,
     })
 }
 
-func Created[T any](data T) APIResponse[T] {
-    return APIResponse[T]{Success: true, Data: data}
-}
-
-func OK[T any](data T) APIResponse[T] {
-    return APIResponse[T]{Success: true, Data: data}
+// debugEnabled reads the debug_errors flag from the request context. The flag
+// is set by middleware.DebugErrors; if it is missing, the safe default is false
+// so production-like contexts never leak internal details.
+func debugEnabled(c *gin.Context) bool {
+    v, ok := c.Get(messages.CtxDebugErrors)
+    if !ok {
+        return false
+    }
+    enabled, ok := v.(bool)
+    return ok && enabled
 }
 ```
 
@@ -391,7 +422,7 @@ package core
 
 import (
     "github.com/shopspring/decimal"
-    "github.com/your-org/nexokit/internal/domain"
+    "github.com/enviniom/nexokit/internal/domain"
 )
 
 type ProductResponse struct {
@@ -422,7 +453,7 @@ func ProductToResponse(p domain.Product, c domain.Category) ProductResponse {
 // internal/modules/sales/core/cart_dto.go
 package core
 
-import "github.com/your-org/nexokit/internal/domain"
+import "github.com/enviniom/nexokit/internal/domain"
 
 // CartProductSummary is sales' own projection of domain.Product.
 // It does not import nor depend on catalog's ProductResponse.
@@ -471,8 +502,8 @@ import (
     "context"
     "errors"
     "gorm.io/gorm"
-    "github.com/your-org/nexokit/internal/domain"
-    "github.com/your-org/nexokit/internal/modules/catalog/core"
+    "github.com/enviniom/nexokit/internal/domain"
+    "github.com/enviniom/nexokit/internal/modules/catalog/core"
 )
 
 func FindProductBySlug(ctx context.Context, db *gorm.DB, slug string) (*domain.Product, error) {
@@ -544,12 +575,9 @@ create_product/
 package create_product
 
 import (
-    "net/http"
+    "github.com/enviniom/nexokit/internal/platform/apperror"
+    "github.com/enviniom/nexokit/internal/platform/response"
     "github.com/gin-gonic/gin"
-    "github.com/your-org/nexokit/internal/platform/apperror"
-    "github.com/your-org/nexokit/internal/platform/logger"
-    "github.com/your-org/nexokit/internal/platform/response"
-    "go.uber.org/zap"
 )
 
 type Handler struct{ svc Service }
@@ -565,15 +593,11 @@ func (h *Handler) Handle(c *gin.Context) {
 
     result, err := h.svc.Execute(c.Request.Context(), req)
     if err != nil {
-        // log the infrastructure cause if present — expected domain errors have no cause
-        if cause := apperror.Log(err); cause != nil {
-            logger.Error(c, "create_product failed", zap.Error(cause))
-        }
         response.HandleError(c, err)
         return
     }
 
-    c.JSON(http.StatusCreated, response.Created(result))
+    response.Created(c, "Product created", result)
 }
 ```
 
@@ -591,9 +615,9 @@ package create_product
 
 import (
     "context"
-    "github.com/your-org/nexokit/internal/domain"
-    "github.com/your-org/nexokit/internal/modules/catalog/core"
-    "github.com/your-org/nexokit/internal/modules/catalog/slices/create_product/sku"
+    "github.com/enviniom/nexokit/internal/domain"
+    "github.com/enviniom/nexokit/internal/modules/catalog/core"
+    "github.com/enviniom/nexokit/internal/modules/catalog/slices/create_product/sku"
 )
 
 type Service interface {
@@ -656,8 +680,8 @@ import (
     "time"
     "gorm.io/gorm"
     "github.com/shopspring/decimal"
-    "github.com/your-org/nexokit/internal/domain"
-    "github.com/your-org/nexokit/internal/modules/catalog/core"
+    "github.com/enviniom/nexokit/internal/domain"
+    "github.com/enviniom/nexokit/internal/modules/catalog/core"
 )
 
 type Repository interface {
@@ -737,7 +761,8 @@ Errors travel inward as domain errors and outward as API responses:
 DB/GORM error
     → repository translates to core domain error (core.ErrXxx)
         → service propagates or wraps with additional context
-            → handler: apperror.Log() for logger + response.HandleError() for client
+            → handler: response.HandleError(c, err)
+                → ErrorLogger middleware owns the structured log line
 ```
 
 | Case | Repository returns | HTTP response |
@@ -758,8 +783,12 @@ FindBySlug(ctx context.Context, slug string) (*domain.Product, bool, error)
 
 **Expected vs unexpected errors:**
 
-- Expected domain errors (`core.ErrXxx` wrapping a sentinel) carry a public message and no `Cause`. The handler calls `response.HandleError` directly — no logging needed.
-- Unexpected errors (raw DB errors, panics) carry no public message and have a `Cause`. The handler logs the cause via `apperror.Log(err)` before calling `response.HandleError`.
+- Expected domain errors (`core.ErrXxx` wrapping a sentinel) carry a `PublicMessage` and no `Internal` cause. The handler calls `response.HandleError` directly — no logging needed.
+- Unexpected errors (raw DB errors, panics) have no public message and become 500 responses. `response.HandleError` redacts the message to `messages.MsgInternalError`. The `ErrorLogger` middleware logs the error via `c.Errors`; handlers do not log it themselves.
+
+**Debug exposure:**
+
+The `debug` field in the error response is controlled by `Config.ExposeDebugErrors()`, not by `gin.Mode()`. At startup, `middleware.DebugErrors(cfg.ExposeDebugErrors())` stores the flag in the request context under `messages.CtxDebugErrors`. `response.HandleError` reads that flag; if it is missing, the safe default is `false` so production-like contexts never leak internal details.
 
 ---
 
@@ -778,8 +807,8 @@ package campaigns
 
 import (
     "gorm.io/gorm"
-    "github.com/your-org/nexokit/internal/platform/contracts"
-    "github.com/your-org/nexokit/internal/modules/campaigns/slices/apply_discount"
+    "github.com/enviniom/nexokit/internal/platform/contracts"
+    "github.com/enviniom/nexokit/internal/modules/campaigns/slices/apply_discount"
 )
 
 type Container struct {
@@ -845,9 +874,9 @@ package app
 import (
     "github.com/gin-gonic/gin"
     "gorm.io/gorm"
-    "github.com/your-org/nexokit/internal/modules/campaigns"
-    "github.com/your-org/nexokit/internal/modules/catalog"
-    "github.com/your-org/nexokit/internal/modules/sales"
+    "github.com/enviniom/nexokit/internal/modules/campaigns"
+    "github.com/enviniom/nexokit/internal/modules/catalog"
+    "github.com/enviniom/nexokit/internal/modules/sales"
 )
 
 type Container struct {
@@ -929,7 +958,7 @@ Checklist:
 
 ```
 domain/                       canonical models — no GORM tags, no behavior
-platform/apperror/            AppError, sentinels, Status(), PublicMessage(), Log(), Wrap()
+platform/apperror/            Code, AppError, sentinels, Status(), PublicMessage(), Wrap()
 platform/contracts/           cross-module interfaces + their input/output types
 platform/response/            APIResponse[T], HandleError, HTTP helpers
 platform/*/                   DB, tenant, logger, config
@@ -937,7 +966,7 @@ platform/*/                   DB, tenant, logger, config
 modules/<m>/core/             DTOs, domain errors (Wrap sentinels), pure mappers, constants
 modules/<m>/queries/          reusable persistence queries (2+ slice consumers)
 modules/<m>/slices/<s>/
-  handler.go                  HTTP in/out, log cause, call response.HandleError
+  handler.go                  HTTP in/out, call response.HandleError
   service.go                  business rules, build domain.Model, no GORM, no apperror
   repository.go               persistence record (GORM tags), GORM calls,
                               record ↔ domain conversion, DB→domain error translation

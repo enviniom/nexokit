@@ -43,6 +43,7 @@ const (
 const (
 	MsgHTTPRequest = "http request"
 	CtxRequestID   = "request_id"
+	CtxDebugErrors = "debug_errors"
 )
 
 // Middleware — Request ID

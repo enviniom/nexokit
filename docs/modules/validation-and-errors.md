@@ -65,7 +65,7 @@ Handlers call `response.RespondIfInvalid(c, req.Validate())` immediately after b
 | Request binding / invalid JSON. | 400 Bad Request. | Gin binding error. |
 | DTO `Validate()` failure. | 422 Unprocessable Entity. | `response.RespondIfInvalid` with `response.ValidationErrors`. |
 | Business / app outcome (not found, forbidden, conflict, insufficient stock, etc.). | `AppError`-based status (404, 403, 409, ...). | `response.HandleError(c, err)` reads the `AppError` code. |
-| Unexpected internal error. | 500. | `response.HandleError` writes a generic message; the original error is logged by the error middleware. |
+| Unexpected internal error. | 500. | `response.HandleError` redacts the message to `messages.MsgInternalError`; the original error is logged by `ErrorLogger`. A `debug` field is added only when `Config.ExposeDebugErrors()` is true (local/development/test). |
 
 Keep this contract visible in code review: 400 is for malformed input, 422 is for valid-shape-but-invalid-content, and `AppError` is for business outcomes.
 
@@ -73,33 +73,44 @@ Keep this contract visible in code review: 400 is for malformed input, 422 is fo
 
 | Concern | Owner |
 |---|---|
-| HTTP status, public message, internal error, `Unwrap()` chain, helper constructors (`NotFound`, `BadRequest`, `Forbidden`, `Conflict`, `Internal`). | `platform/apperror` (`AppError` + helpers). |
-| Reusable, module-scoped application errors used across slices. | `internal/modules/<module>/core/errors.go`, built with `apperror` helpers. |
+| HTTP status, public message, internal error chain, `Unwrap()`, helper constructors, platform HTTP-category `Code` constants. | `platform/apperror` (`AppError` + helpers). |
+| Reusable, module-scoped application errors used across slices. | `internal/modules/<module>/core/errors.go`, built with `apperror` helpers and module-owned `Code` constants. |
 | Ad-hoc, slice-scoped business error values. | Declared in `slices/<slice>/` only when not reused. |
+| Centralized structured logging of handled errors and panics. | `middleware.ErrorLogger`. |
+| Panic recovery and pushing panic errors into `c.Errors`. | `middleware.Recovery`. |
+
+See [`docs/error-handling.md`](../error-handling.md) for the full platform contract, `AppError` shape, `Wrap` semantics, `ErrorLogger` flow, and release-mode redaction rules.
 
 ## `core/errors.go` pattern
 
-A module's reusable errors live in a single file, declared with `apperror` helpers:
+A module's reusable errors live in a single file, declared with `apperror` helpers and module-owned `Code` constants:
 
 ```go
 package core
 
 import "github.com/enviniom/nexokit/internal/platform/apperror"
 
+const (
+    CodeUserNotFound    apperror.Code = "user_not_found"
+    CodeEmailAlreadyTaken apperror.Code = "email_already_taken"
+    CodeCannotDeleteSelf  apperror.Code = "cannot_delete_self"
+)
+
 var (
-    ErrUserNotFound      = apperror.NotFound("user not found", nil)
-    ErrEmailAlreadyTaken = apperror.Conflict("email already taken", nil)
-    ErrCannotDeleteSelf  = apperror.Forbidden("cannot delete your own account", nil)
+    ErrUserNotFound      = apperror.NotFound(CodeUserNotFound, "user not found", nil)
+    ErrEmailAlreadyTaken = apperror.Conflict(CodeEmailAlreadyTaken, "email already taken", nil)
+    ErrCannotDeleteSelf  = apperror.Forbidden(CodeCannotDeleteSelf, "cannot delete your own account", nil)
 )
 
 func UserNotFound(err error) error {
-    return apperror.NotFound("user not found", err)
+    return apperror.NotFound(CodeUserNotFound, "user not found", err)
 }
 ```
 
 | Rule | Why |
 |---|---|
 | Reusable errors are declared in `core/errors.go` only. | The module's error vocabulary is centralized and reviewable. |
+| Modules own their business `apperror.Code` constants; platform only owns HTTP-category codes. | Business semantics belong to modules; platform stays infrastructure. |
 | Construct error values with `apperror` helpers. | Helpers set the right HTTP status, public message, and `Unwrap()` chain. |
 | Do not construct ad-hoc `apperror` values inline inside `service.go` or `repository.go`. | Inline declarations hide the module's error contract and drift. |
 | Ad-hoc, slice-scoped errors stay in a slice-local `errors.go` only when not reused. | They are not part of the module's shared vocabulary. |
