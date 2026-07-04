@@ -115,6 +115,8 @@ func UserNotFound(err error) error {
 | Do not construct ad-hoc `apperror` values inline inside `service.go` or `repository.go`. | Inline declarations hide the module's error contract and drift. |
 | Ad-hoc, slice-scoped errors stay in a slice-local `errors.go` only when not reused. | They are not part of the module's shared vocabulary. |
 
+See [`docs/module-error-conventions.md`](../module-error-conventions.md) for the canonical table of every module sentinel and its HTTP status / public message.
+
 ## Layer rules for errors
 
 | Layer | Rule |
