@@ -1,7 +1,30 @@
 package core
 
-import "errors"
+import "github.com/enviniom/nexokit/internal/platform/apperror"
 
-var ErrDuplicateCompanyDomain = errors.New("company domain already exists")
-var ErrActivePrimaryDomainExists = errors.New("company already has an active primary domain")
-var ErrCompanyDomainDoesNotBelong = errors.New("company domain does not belong to company")
+// Module-owned business codes for the companies module.
+const (
+	CodeCompanyNotFound            apperror.Code = "code:company_not_found"
+	CodeCompanyDomainNotFound      apperror.Code = "code:company_domain_not_found"
+	CodeCompanyDomainDuplicate     apperror.Code = "code:company_domain_duplicate"
+	CodePrimaryDomainExists        apperror.Code = "code:primary_domain_exists"
+	CodeCompanyDomainDoesNotBelong apperror.Code = "code:company_domain_does_not_belong"
+	CodeCompanySlugDuplicate       apperror.Code = "code:company_slug_duplicate"
+)
+
+// Sentinel errors for the companies module.
+//
+// Duplicate domain/slug conflicts are modeled as 409 Conflict so the sentinel
+// status reflects the resource conflict semantics required by the change
+// acceptance criteria. The create/update handlers preserve the original public
+// contract by mapping those sentinels to field-keyed 422 validation responses.
+// Active-primary-domain and ownership failures keep the status that matches
+// their existing handler presentation.
+var (
+	ErrCompanyNotFound            = apperror.NotFound(CodeCompanyNotFound, "company not found", nil)
+	ErrCompanyDomainNotFound      = apperror.NotFound(CodeCompanyDomainNotFound, "company domain not found", nil)
+	ErrDuplicateCompanyDomain     = apperror.Conflict(CodeCompanyDomainDuplicate, "company domain already exists", nil)
+	ErrActivePrimaryDomainExists  = apperror.Validation(CodePrimaryDomainExists, "company already has an active primary domain", nil)
+	ErrCompanyDomainDoesNotBelong = apperror.NotFound(CodeCompanyDomainDoesNotBelong, "company domain does not belong to company", nil)
+	ErrDuplicateCompanySlug       = apperror.Conflict(CodeCompanySlugDuplicate, "company slug already exists", nil)
+)

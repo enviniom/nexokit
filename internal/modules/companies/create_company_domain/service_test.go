@@ -6,7 +6,6 @@ import (
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
 	"github.com/enviniom/nexokit/internal/shared"
-	"gorm.io/gorm"
 )
 
 type fakeDomainRepo struct {
@@ -18,7 +17,7 @@ type fakeDomainRepo struct {
 
 func (f *fakeDomainRepo) GetByPublicID(string) (*core.Company, error) {
 	if f.company == nil {
-		return nil, gorm.ErrRecordNotFound
+		return nil, core.ErrCompanyNotFound
 	}
 	return f.company, nil
 }
@@ -26,7 +25,7 @@ func (f *fakeDomainRepo) GetDomainByDomain(d string) (*core.CompanyDomain, error
 	if v, ok := f.byDomain[d]; ok {
 		return v, nil
 	}
-	return nil, gorm.ErrRecordNotFound
+	return nil, core.ErrCompanyDomainNotFound
 }
 func (f *fakeDomainRepo) CountActivePrimaryDomains(uint, string) (int64, error) {
 	return f.activeCount, nil
@@ -49,5 +48,15 @@ func TestService_CreateDomain_DuplicateAndPrimaryConflict(t *testing.T) {
 	_, err = svc.CreateDomain("01H", core.CreateCompanyDomainRequest{Domain: "primary.acme.com", Kind: core.CompanyDomainKindPrimary, Status: core.CompanyDomainStatusActive})
 	if !errors.Is(err, core.ErrActivePrimaryDomainExists) {
 		t.Fatalf("expected active primary conflict, got %v", err)
+	}
+}
+
+func TestService_CreateDomain_CompanyNotFound(t *testing.T) {
+	repo := &fakeDomainRepo{}
+	svc := NewService(repo)
+
+	_, err := svc.CreateDomain("missing", core.CreateCompanyDomainRequest{Domain: "acme.com", Kind: core.CompanyDomainKindPrimary, Status: core.CompanyDomainStatusActive})
+	if !errors.Is(err, core.ErrCompanyNotFound) {
+		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
 	}
 }

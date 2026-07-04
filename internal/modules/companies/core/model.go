@@ -27,6 +27,8 @@ type Company struct {
 	Domains []CompanyDomain `gorm:"foreignKey:CompanyID"`
 }
 
+func (Company) TableName() string { return "companies" }
+
 type CompanyDomain struct {
 	internalshared.BaseModel
 	CompanyID         uint    `gorm:"not null;index"`
@@ -36,3 +38,5 @@ type CompanyDomain struct {
 	Kind              string  `gorm:"type:varchar(40);not null;index"`
 	RedirectToPrimary bool    `gorm:"not null;default:false"`
 }
+
+func (CompanyDomain) TableName() string { return "company_domains" }

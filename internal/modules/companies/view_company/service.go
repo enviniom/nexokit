@@ -1,12 +1,6 @@
 package view_company
 
-import (
-	"errors"
-
-	"github.com/enviniom/nexokit/internal/modules/companies/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
-	"gorm.io/gorm"
-)
+import "github.com/enviniom/nexokit/internal/modules/companies/core"
 
 type Service interface {
 	GetByPublicID(publicID string) (*core.CompanyResponse, error)
@@ -17,9 +11,6 @@ func NewService(repo Repository) Service { return &service{repo: repo} }
 func (s *service) GetByPublicID(publicID string) (*core.CompanyResponse, error) {
 	c, err := s.repo.GetByPublicID(publicID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperror.ErrNotFound
-		}
 		return nil, err
 	}
 	r := &core.CompanyResponse{PublicID: c.PublicID, Name: c.Name, Slug: c.Slug, Status: c.Status, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt, CreatedBy: c.CreatedBy, UpdatedBy: c.UpdatedBy}

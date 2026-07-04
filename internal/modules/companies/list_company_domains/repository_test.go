@@ -1,6 +1,7 @@
 package list_company_domains
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -19,5 +20,16 @@ func TestGormRepository_GetByPublicID_DelegatesToQueries(t *testing.T) {
 	got, err := repo.GetByPublicID("cmp_01")
 	if err != nil || got.PublicID != "cmp_01" {
 		t.Fatalf("expected delegated company lookup, got err=%v company=%#v", err, got)
+	}
+}
+
+func TestGormRepository_GetByPublicID_NotFound(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	_ = db.AutoMigrate(&core.Company{})
+
+	repo := NewRepository(db)
+	_, err := repo.GetByPublicID("missing")
+	if !errors.Is(err, core.ErrCompanyNotFound) {
+		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
 	}
 }

@@ -1,11 +1,11 @@
 package core
 
 import (
-	"strings"
 	"time"
 
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/query"
+	"github.com/enviniom/nexokit/internal/platform/shared/string"
 	"github.com/enviniom/nexokit/internal/platform/validator"
 )
 
@@ -85,7 +85,7 @@ func (r UpdateCompanyRequest) Validate() validator.ValidationErrors {
 
 func (r CreateCompanyDomainRequest) Validate() validator.ValidationErrors {
 	errs := make(validator.ValidationErrors)
-	domain := normalizeCompanyDomain(r.Domain)
+	domain := str.NormalizeDomain(r.Domain)
 	validator.Field(errs, "domain", domain).Required().Apply(validator.MinLength(3))
 	if !validCompanyDomainKind(r.Kind) {
 		errs.Add("kind", messages.MsgInvalidFormat)
@@ -101,7 +101,7 @@ func (r CreateCompanyDomainRequest) Validate() validator.ValidationErrors {
 
 func (r UpdateCompanyDomainRequest) Validate() validator.ValidationErrors {
 	errs := make(validator.ValidationErrors)
-	domain := normalizeCompanyDomain(r.Domain)
+	domain := str.NormalizeDomain(r.Domain)
 	validator.Field(errs, "domain", domain).Required().Apply(validator.MinLength(3))
 	if !validCompanyDomainKind(r.Kind) {
 		errs.Add("kind", messages.MsgInvalidFormat)
@@ -113,11 +113,6 @@ func (r UpdateCompanyDomainRequest) Validate() validator.ValidationErrors {
 		errs.Add("redirect_to_primary", messages.MsgInvalidFormat)
 	}
 	return errs
-}
-
-func normalizeCompanyDomain(input string) string {
-	normalized := strings.TrimSpace(strings.ToLower(input))
-	return strings.TrimSuffix(normalized, ".")
 }
 
 func validStatus(status string) bool {

@@ -1,6 +1,8 @@
 package delete_company
 
 import (
+	"errors"
+
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
 	"github.com/enviniom/nexokit/internal/modules/companies/queries"
 	"gorm.io/gorm"
@@ -14,7 +16,14 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 func (r *GormRepository) GetByPublicID(id string) (*core.Company, error) {
-	return queries.GetCompanyByPublicID(r.db, id)
+	c, err := queries.GetCompanyByPublicID(r.db, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, core.ErrCompanyNotFound
+		}
+		return nil, err
+	}
+	return c, nil
 }
 func (r *GormRepository) Delete(id string) error {
 	return r.db.Where("public_id = ?", id).Delete(&core.Company{}).Error

@@ -1,12 +1,6 @@
 package list_company_domains
 
-import (
-	"errors"
-
-	"github.com/enviniom/nexokit/internal/modules/companies/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
-	"gorm.io/gorm"
-)
+import "github.com/enviniom/nexokit/internal/modules/companies/core"
 
 type Service interface {
 	ListDomains(companyPublicID string) ([]core.CompanyDomainResponse, error)
@@ -17,9 +11,6 @@ func NewService(repo Repository) Service { return &service{repo: repo} }
 func (s *service) ListDomains(id string) ([]core.CompanyDomainResponse, error) {
 	c, err := s.repo.GetByPublicID(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperror.ErrNotFound
-		}
 		return nil, err
 	}
 	d, err := s.repo.ListDomains(c.ID)

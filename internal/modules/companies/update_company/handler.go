@@ -24,7 +24,7 @@ func (h *Handler) Handle(c *gin.Context) {
 	}
 	company, err := h.service.Update(c.Param("id"), req)
 	if err != nil {
-		if errors.Is(err, ErrDuplicateSlug) {
+		if errors.Is(err, core.ErrDuplicateCompanySlug) {
 			errs := make(validator.ValidationErrors)
 			errs.Add("slug", messages.MsgConflict)
 			response.ValidationError(c, errs)

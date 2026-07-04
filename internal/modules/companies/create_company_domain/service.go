@@ -2,13 +2,11 @@ package create_company_domain
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
+	"github.com/enviniom/nexokit/internal/platform/shared/string"
 	"github.com/enviniom/nexokit/internal/shared"
-	"gorm.io/gorm"
 )
 
 type Service interface {
@@ -20,15 +18,12 @@ func NewService(repo Repository) Service { return &service{repo: repo} }
 func (s *service) CreateDomain(companyPublicID string, req core.CreateCompanyDomainRequest) (*core.CompanyDomainResponse, error) {
 	c, err := s.repo.GetByPublicID(companyPublicID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperror.ErrNotFound
-		}
 		return nil, err
 	}
-	domain := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(req.Domain)), ".")
+	domain := str.NormalizeDomain(req.Domain)
 	if _, err := s.repo.GetDomainByDomain(domain); err == nil {
 		return nil, core.ErrDuplicateCompanyDomain
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+	} else if !errors.Is(err, core.ErrCompanyDomainNotFound) {
 		return nil, err
 	}
 	if req.Kind == core.CompanyDomainKindPrimary && req.Status == core.CompanyDomainStatusActive {

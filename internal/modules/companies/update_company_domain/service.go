@@ -2,11 +2,9 @@ package update_company_domain
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
-	"gorm.io/gorm"
+	"github.com/enviniom/nexokit/internal/platform/shared/string"
 )
 
 type Service interface {
@@ -18,25 +16,19 @@ func NewService(repo Repository) Service { return &service{repo: repo} }
 func (s *service) UpdateDomain(companyPublicID, domainPublicID string, req core.UpdateCompanyDomainRequest) (*core.CompanyDomainResponse, error) {
 	c, err := s.repo.GetByPublicID(companyPublicID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperror.ErrNotFound
-		}
 		return nil, err
 	}
 	d, err := s.repo.GetDomainByPublicID(domainPublicID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperror.ErrNotFound
-		}
 		return nil, err
 	}
 	if d.CompanyID != c.ID {
 		return nil, core.ErrCompanyDomainDoesNotBelong
 	}
-	domain := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(req.Domain)), ".")
+	domain := str.NormalizeDomain(req.Domain)
 	if ex, err := s.repo.GetDomainByDomain(domain); err == nil && ex.PublicID != d.PublicID {
 		return nil, core.ErrDuplicateCompanyDomain
-	} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	} else if err != nil && !errors.Is(err, core.ErrCompanyDomainNotFound) {
 		return nil, err
 	}
 	if req.Kind == core.CompanyDomainKindPrimary && req.Status == core.CompanyDomainStatusActive {

@@ -1,6 +1,7 @@
 package view_company
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -24,5 +25,16 @@ func TestGormRepository_GetByPublicID_WithDomains(t *testing.T) {
 	got, err := repo.GetByPublicID("cmp_01")
 	if err != nil || len(got.Domains) != 1 {
 		t.Fatalf("expected company with one domain, got err=%v domains=%d", err, len(got.Domains))
+	}
+}
+
+func TestGormRepository_GetByPublicID_NotFound(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	_ = db.AutoMigrate(&core.Company{})
+
+	repo := NewRepository(db)
+	_, err := repo.GetByPublicID("missing")
+	if !errors.Is(err, core.ErrCompanyNotFound) {
+		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
 	}
 }

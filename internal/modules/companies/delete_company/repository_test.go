@@ -1,6 +1,7 @@
 package delete_company
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -26,7 +27,18 @@ func TestGormRepository_DeleteSoftDeletes(t *testing.T) {
 	if err := repo.Delete("company_delete"); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	if _, err := repo.GetByPublicID("company_delete"); err != gorm.ErrRecordNotFound {
-		t.Fatalf("expected not found, got %v", err)
+	if _, err := repo.GetByPublicID("company_delete"); !errors.Is(err, core.ErrCompanyNotFound) {
+		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
+	}
+}
+
+func TestGormRepository_GetByPublicID_NotFound(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	_ = db.AutoMigrate(&core.Company{})
+
+	repo := NewRepository(db)
+	_, err := repo.GetByPublicID("missing")
+	if !errors.Is(err, core.ErrCompanyNotFound) {
+		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
 	}
 }
