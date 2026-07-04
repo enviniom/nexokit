@@ -81,13 +81,13 @@ func successResponse() *core.UserResponse {
 
 func TestChangeRole(t *testing.T) {
 	tests := []struct {
-		name          string
-		repo          fakeRepo
-		targetID      string
-		actorID       string
-		req           core.ChangeUserRoleRequest
-		wantErr       error
-		assertResp    func(t *testing.T, resp *core.UserResponse)
+		name       string
+		repo       fakeRepo
+		targetID   string
+		actorID    string
+		req        core.ChangeUserRoleRequest
+		wantErr    error
+		assertResp func(t *testing.T, resp *core.UserResponse)
 	}{
 		{
 			name: "success",
@@ -187,7 +187,7 @@ func TestChangeRole(t *testing.T) {
 			wantErr:  core.ErrForbiddenRoleAssignment,
 		},
 		{
-			name: "company scope mismatch",
+			name: "forbidden company scope mismatch",
 			repo: fakeRepo{
 				user:     regularUser(),
 				rootRole: rootRole(),
@@ -200,7 +200,7 @@ func TestChangeRole(t *testing.T) {
 			targetID: "user-1",
 			actorID:  "actor-1",
 			req:      core.ChangeUserRoleRequest{RoleID: "role-other"},
-			wantErr:  core.ErrInvalidCompanyScope,
+			wantErr:  core.ErrForbiddenCompanyScope,
 		},
 		{
 			name: "assign persistence error",

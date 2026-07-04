@@ -1,10 +1,6 @@
 package view_user
 
 import (
-	"errors"
-
-	"github.com/enviniom/nexokit/internal/modules/iam/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
@@ -25,17 +21,8 @@ func (h *Handler) Handle(c *gin.Context) {
 	}
 	data, err := h.service.GetByPublicID(tc, c.Param("id"))
 	if err != nil {
-		response.HandleError(c, mapServiceError(err))
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, data)
-}
-
-func mapServiceError(err error) error {
-	switch {
-	case errors.Is(err, core.ErrNotFound):
-		return apperror.ErrNotFound
-	default:
-		return err
-	}
 }

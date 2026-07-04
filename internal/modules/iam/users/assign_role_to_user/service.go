@@ -45,7 +45,7 @@ func (s *service) ChangeRole(tc tenant.TenantContext, targetPublicID, actorPubli
 		return nil, core.ErrForbiddenRoleAssignment
 	}
 	if targetUser.CompanyID != nil && targetRole.CompanyID != nil && *targetUser.CompanyID != *targetRole.CompanyID {
-		return nil, core.ErrInvalidCompanyScope
+		return nil, core.ErrForbiddenCompanyScope
 	}
 
 	return s.repo.AssignRole(tc, targetUser, targetRole.ID)

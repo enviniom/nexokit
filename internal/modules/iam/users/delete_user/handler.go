@@ -1,10 +1,6 @@
 package delete_user
 
 import (
-	"errors"
-
-	"github.com/enviniom/nexokit/internal/modules/iam/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
@@ -23,17 +19,8 @@ func (h *Handler) Handle(c *gin.Context) {
 		tc = tenant.NewRoot()
 	}
 	if err := h.service.Delete(tc, c.Param("id")); err != nil {
-		response.HandleError(c, mapServiceError(err))
+		response.HandleError(c, err)
 		return
 	}
 	response.NoContent(c)
-}
-
-func mapServiceError(err error) error {
-	switch {
-	case errors.Is(err, core.ErrNotFound):
-		return apperror.ErrNotFound
-	default:
-		return err
-	}
 }

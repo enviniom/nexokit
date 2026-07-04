@@ -21,7 +21,7 @@ type fakeCache struct {
 	deleteErr   error
 }
 
-func (f *fakeCache) Get(context.Context, string) ([]byte, error) { return nil, cache.ErrCacheMiss }
+func (f *fakeCache) Get(context.Context, string) ([]byte, error)              { return nil, cache.ErrCacheMiss }
 func (f *fakeCache) Set(context.Context, string, []byte, time.Duration) error { return nil }
 func (f *fakeCache) Delete(_ context.Context, key string) error {
 	f.deletedKeys = append(f.deletedKeys, key)

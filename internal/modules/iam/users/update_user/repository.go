@@ -2,10 +2,10 @@ package update_user
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	"github.com/enviniom/nexokit/internal/modules/iam/queries"
+	"github.com/enviniom/nexokit/internal/platform/gormutil"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"gorm.io/gorm"
 )
@@ -48,7 +48,7 @@ func (r *GormRepository) GetRoleBySlug(slug string) (*core.IAMRole, error) {
 
 func (r *GormRepository) Update(user *core.IAMUser) error {
 	if err := r.db.Save(user).Error; err != nil {
-		if isUniqueConstraintError(err) {
+		if gormutil.IsUniqueConstraintError(err) {
 			return core.ErrUserEmailAlreadyExists
 		}
 		return err
@@ -81,12 +81,4 @@ func toUserResponse(u *core.IAMUser) *core.UserResponse {
 		CreatedBy: u.CreatedBy,
 		UpdatedBy: u.UpdatedBy,
 	}
-}
-
-func isUniqueConstraintError(err error) bool {
-	if errors.Is(err, gorm.ErrDuplicatedKey) {
-		return true
-	}
-	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "duplicate key") || strings.Contains(message, "unique constraint")
 }

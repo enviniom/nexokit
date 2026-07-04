@@ -1,10 +1,7 @@
 package assign_role_to_user
 
 import (
-	"errors"
-
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
@@ -36,21 +33,8 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	data, err := h.service.ChangeRole(tc, c.Param("id"), authctx.PublicIDFromGin(c), req)
 	if err != nil {
-		response.HandleError(c, mapServiceError(err))
+		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, data)
-}
-
-func mapServiceError(err error) error {
-	switch {
-	case errors.Is(err, core.ErrNotFound):
-		return apperror.ErrNotFound
-	case errors.Is(err, core.ErrForbidden),
-		errors.Is(err, core.ErrForbiddenRoleAssignment),
-		errors.Is(err, core.ErrInvalidCompanyScope):
-		return apperror.ErrForbidden
-	default:
-		return err
-	}
 }

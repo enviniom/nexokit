@@ -35,12 +35,12 @@ func seedToggleDB(t *testing.T, db *gorm.DB) {
 
 func TestGormRepositoryToggleStatus(t *testing.T) {
 	tests := []struct {
-		name      string
-		publicID  string
-		isActive  bool
-		seed      func(t *testing.T, db *gorm.DB)
-		wantErr   error
-		assertFn  func(t *testing.T, resp *core.UserResponse)
+		name     string
+		publicID string
+		isActive bool
+		seed     func(t *testing.T, db *gorm.DB)
+		wantErr  error
+		assertFn func(t *testing.T, resp *core.UserResponse)
 	}{
 		{
 			name:     "deactivates active user",

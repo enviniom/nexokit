@@ -26,10 +26,11 @@ func TestHandlerHandle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
-		name       string
-		service    Service
-		body       any
-		statusCode int
+		name        string
+		service     Service
+		body        any
+		statusCode  int
+		wantMessage string
 	}{
 		{
 			name:       "returns success on role assignment",
@@ -38,28 +39,32 @@ func TestHandlerHandle(t *testing.T) {
 			statusCode: http.StatusOK,
 		},
 		{
-			name:       "maps not found to 404",
-			service:    fakeHandlerService{err: core.ErrNotFound},
-			body:       core.ChangeUserRoleRequest{RoleID: "role-admin"},
-			statusCode: http.StatusNotFound,
+			name:        "maps not found to 404 with platform message",
+			service:     fakeHandlerService{err: core.ErrNotFound},
+			body:        core.ChangeUserRoleRequest{RoleID: "role-admin"},
+			statusCode:  http.StatusNotFound,
+			wantMessage: "Recurso no encontrado",
 		},
 		{
-			name:       "maps forbidden to 403",
-			service:    fakeHandlerService{err: core.ErrForbidden},
-			body:       core.ChangeUserRoleRequest{RoleID: "role-admin"},
-			statusCode: http.StatusForbidden,
+			name:        "maps forbidden to 403 with platform message",
+			service:     fakeHandlerService{err: core.ErrForbidden},
+			body:        core.ChangeUserRoleRequest{RoleID: "role-admin"},
+			statusCode:  http.StatusForbidden,
+			wantMessage: "Acceso denegado",
 		},
 		{
-			name:       "maps forbidden role assignment to 403",
-			service:    fakeHandlerService{err: core.ErrForbiddenRoleAssignment},
-			body:       core.ChangeUserRoleRequest{RoleID: "role-root"},
-			statusCode: http.StatusForbidden,
+			name:        "maps forbidden role assignment to 403 with module message",
+			service:     fakeHandlerService{err: core.ErrForbiddenRoleAssignment},
+			body:        core.ChangeUserRoleRequest{RoleID: "role-root"},
+			statusCode:  http.StatusForbidden,
+			wantMessage: "forbidden role assignment",
 		},
 		{
-			name:       "maps invalid company scope to 403",
-			service:    fakeHandlerService{err: core.ErrInvalidCompanyScope},
-			body:       core.ChangeUserRoleRequest{RoleID: "role-other"},
-			statusCode: http.StatusForbidden,
+			name:        "maps forbidden company scope to 403 with slice message",
+			service:     fakeHandlerService{err: core.ErrForbiddenCompanyScope},
+			body:        core.ChangeUserRoleRequest{RoleID: "role-other"},
+			statusCode:  http.StatusForbidden,
+			wantMessage: "forbidden company scope",
 		},
 		{
 			name:       "maps unknown errors to 500",
@@ -102,6 +107,17 @@ func TestHandlerHandle(t *testing.T) {
 
 			if w.Code != tt.statusCode {
 				t.Fatalf("expected status %d, got %d", tt.statusCode, w.Code)
+			}
+
+			if tt.wantMessage == "" {
+				return
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode response body: %v", err)
+			}
+			if got := payload["message"]; got != tt.wantMessage {
+				t.Errorf("message = %q, want %q", got, tt.wantMessage)
 			}
 		})
 	}
