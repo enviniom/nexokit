@@ -10,10 +10,12 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Handler handles HTTP requests for company onboarding.
 type Handler struct {
 	service Service
 }
 
+// NewHandler creates a new onboarding handler.
 func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
@@ -31,14 +33,18 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	res, err := h.service.Onboard(c.Request.Context(), req)
 	if err != nil {
-		h.respondError(c, err)
+		h.respondOnboardingError(c, err)
 		return
 	}
 
 	response.Created(c, messages.MsgCreated, res)
 }
 
-func (h *Handler) respondError(c *gin.Context, err error) {
+// respondOnboardingError preserves the original public HTTP contract for the
+// known onboarding conflict paths: a 422 Unprocessable Entity response with
+// field-keyed validation errors. Any other error is funneled through the
+// standard response.HandleError path.
+func (h *Handler) respondOnboardingError(c *gin.Context, err error) {
 	errs := make(validator.ValidationErrors)
 
 	switch {

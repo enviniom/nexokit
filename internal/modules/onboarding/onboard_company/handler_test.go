@@ -102,34 +102,50 @@ func TestHandler_Onboard_NonRootForbidden(t *testing.T) {
 	}
 }
 
-func TestHandler_Onboard_ConflictErrors(t *testing.T) {
-	for _, tt := range []struct {
-		name         string
-		serviceError error
-		errorField   string
+func TestHandler_Onboard_ValidationErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		err       error
+		wantField string
+		wantMsg   string
 	}{
-		{name: "duplicate company slug", serviceError: core.ErrDuplicateCompanySlug, errorField: "slug"},
-		{name: "duplicate company domain", serviceError: core.ErrDuplicateCompanyDomain, errorField: "domain"},
-		{name: "duplicate technical domain", serviceError: core.ErrDuplicateTechnicalDomain, errorField: "generate_technical_domain"},
-		{name: "missing platform domain", serviceError: core.ErrMissingPlatformDomain, errorField: "generate_technical_domain"},
-		{name: "duplicate admin email", serviceError: core.ErrDuplicateAdminEmail, errorField: "admin_email"},
-	} {
+		{name: "duplicate company slug", err: core.ErrDuplicateCompanySlug, wantField: "slug", wantMsg: "El recurso ya existe"},
+		{name: "duplicate company domain", err: core.ErrDuplicateCompanyDomain, wantField: "domain", wantMsg: "El recurso ya existe"},
+		{name: "duplicate technical domain", err: core.ErrDuplicateTechnicalDomain, wantField: "generate_technical_domain", wantMsg: "El recurso ya existe"},
+		{name: "missing platform domain", err: core.ErrMissingPlatformDomain, wantField: "generate_technical_domain", wantMsg: "formato inválido"},
+		{name: "duplicate admin email", err: core.ErrDuplicateAdminEmail, wantField: "admin_email", wantMsg: "El recurso ya existe"},
+	}
+
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := setupOnboardingRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, &fakeOnboardingService{err: tt.serviceError})
+			r := setupOnboardingRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, &fakeOnboardingService{err: tt.err})
 			w := httptest.NewRecorder()
 			payload := core.OnboardCompanyRequest{Name: "Acme Corp", Slug: "acme", AdminName: "Jane Doe", AdminEmail: "jane@acme.com", AdminPassword: "SuperSecurePassword123"}
 			r.ServeHTTP(w, onboardJSONRequest(payload))
 			if w.Code != http.StatusUnprocessableEntity {
-				t.Fatalf("expected status 422 Unprocessable, got %d. Body: %s", w.Code, w.Body.String())
+				t.Fatalf("expected status 422 Unprocessable Entity, got %d. Body: %s", w.Code, w.Body.String())
 			}
 
-			var resp response.APIResponse[any]
+			var resp response.ValidationErrorResponse
 			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 				t.Fatalf("decode response: %v", err)
 			}
-			errs, ok := resp.Errors.(map[string]any)
-			if !ok || errs[tt.errorField] == nil {
-				t.Errorf("expected error field %q to be set, got: %#v", tt.errorField, resp.Errors)
+			if resp.Success {
+				t.Errorf("expected error response")
+			}
+			fieldErrs, ok := resp.Errors[tt.wantField]
+			if !ok {
+				t.Fatalf("expected field %q in errors, got %v", tt.wantField, resp.Errors)
+			}
+			found := false
+			for _, m := range fieldErrs {
+				if m == tt.wantMsg {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("expected message %q for field %q, got %v", tt.wantMsg, tt.wantField, fieldErrs)
 			}
 		})
 	}

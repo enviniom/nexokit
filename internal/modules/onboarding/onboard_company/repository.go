@@ -1,44 +1,60 @@
 package onboard_company
 
 import (
+	"context"
+
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
 	"github.com/enviniom/nexokit/internal/modules/onboarding/queries"
+	"github.com/enviniom/nexokit/internal/platform/gormutil"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
 
+// Repository defines persistence operations for the onboard_company slice.
 type Repository interface {
-	EnsureCompanySlugAvailable(tx *gorm.DB, slug string) error
-	EnsureDomainAvailable(tx *gorm.DB, domain string, duplicateErr error) error
-	EnsureEmailAvailable(tx *gorm.DB, email string) error
-	CreateCompany(tx *gorm.DB, name, slug string) (*core.OnboardingCompany, error)
-	CreateCompanyDomain(tx *gorm.DB, companyID uint, domain, kind string) error
-	CreateRole(tx *gorm.DB, companyID uint, name, slug, description string) (*core.OnboardingRole, error)
-	ListSystemPermissions(tx *gorm.DB) ([]core.OnboardingPermission, error)
-	AssignPermissionToRole(tx *gorm.DB, roleID, permissionID uint) error
-	CreateAdminUser(tx *gorm.DB, companyID, roleID uint, name, email, passwordHash string) (*core.OnboardingUser, error)
+	WithTx(ctx context.Context, fn func(tx Repository) error) error
+	EnsureCompanySlugAvailable(slug string) error
+	EnsureDomainAvailable(domain string, duplicateErr error) error
+	EnsureEmailAvailable(email string) error
+	CreateCompany(name, slug string) (*core.OnboardingCompany, error)
+	CreateCompanyDomain(companyID uint, domain, kind string) error
+	CreateRole(companyID uint, name, slug, description string) (*core.OnboardingRole, error)
+	ListSystemPermissions() ([]core.OnboardingPermission, error)
+	AssignPermissionToRole(roleID, permissionID uint) error
+	CreateAdminUser(companyID, roleID uint, name, email, passwordHash string) (*core.OnboardingUser, error)
 }
 
-type repository struct{}
-
-func NewRepository() Repository {
-	return &repository{}
+type repository struct {
+	db *gorm.DB
 }
 
-func (r *repository) EnsureCompanySlugAvailable(tx *gorm.DB, slug string) error {
-	return queries.CheckSlugAvailable(tx, slug)
+// NewRepository creates a new onboarding repository backed by db.
+func NewRepository(db *gorm.DB) Repository {
+	return &repository{db: db}
 }
 
-func (r *repository) EnsureDomainAvailable(tx *gorm.DB, domain string, duplicateErr error) error {
-	return queries.CheckDomainAvailable(tx, domain, duplicateErr)
+// WithTx runs fn inside a GORM transaction. The repository passed to fn is
+// bound to the transaction so every operation participates in the same unit.
+func (r *repository) WithTx(ctx context.Context, fn func(tx Repository) error) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		return fn(&repository{db: tx})
+	})
 }
 
-func (r *repository) EnsureEmailAvailable(tx *gorm.DB, email string) error {
-	return queries.CheckEmailAvailable(tx, email)
+func (r *repository) EnsureCompanySlugAvailable(slug string) error {
+	return queries.CheckSlugAvailable(r.db, slug)
 }
 
-func (r *repository) CreateCompany(tx *gorm.DB, name, slug string) (*core.OnboardingCompany, error) {
+func (r *repository) EnsureDomainAvailable(domain string, duplicateErr error) error {
+	return queries.CheckDomainAvailable(r.db, domain, duplicateErr)
+}
+
+func (r *repository) EnsureEmailAvailable(email string) error {
+	return queries.CheckEmailAvailable(r.db, email)
+}
+
+func (r *repository) CreateCompany(name, slug string) (*core.OnboardingCompany, error) {
 	publicID, err := identity.Generate()
 	if err != nil {
 		return nil, err
@@ -51,20 +67,23 @@ func (r *repository) CreateCompany(tx *gorm.DB, name, slug string) (*core.Onboar
 		Status:    core.CompanyStatusActive,
 	}
 
-	if err := tx.Create(company).Error; err != nil {
+	if err := r.db.Create(company).Error; err != nil {
+		if gormutil.IsUniqueConstraintError(err) {
+			return nil, core.ErrDuplicateCompanySlug
+		}
 		return nil, err
 	}
 
 	return company, nil
 }
 
-func (r *repository) CreateCompanyDomain(tx *gorm.DB, companyID uint, domain, kind string) error {
+func (r *repository) CreateCompanyDomain(companyID uint, domain, kind string) error {
 	publicID, err := identity.Generate()
 	if err != nil {
 		return err
 	}
 
-	return tx.Create(&core.OnboardingCompanyDomain{
+	err = r.db.Create(&core.OnboardingCompanyDomain{
 		BaseModel:         shared.BaseModel{PublicID: publicID},
 		CompanyID:         companyID,
 		Domain:            domain,
@@ -72,9 +91,20 @@ func (r *repository) CreateCompanyDomain(tx *gorm.DB, companyID uint, domain, ki
 		Status:            core.DomainStatusActive,
 		RedirectToPrimary: false,
 	}).Error
+	if err == nil {
+		return nil
+	}
+
+	if gormutil.IsUniqueConstraintError(err) {
+		if kind == core.DomainKindTechnical {
+			return core.ErrDuplicateTechnicalDomain
+		}
+		return core.ErrDuplicateCompanyDomain
+	}
+	return err
 }
 
-func (r *repository) CreateRole(tx *gorm.DB, companyID uint, name, slug, description string) (*core.OnboardingRole, error) {
+func (r *repository) CreateRole(companyID uint, name, slug, description string) (*core.OnboardingRole, error) {
 	publicID, err := identity.Generate()
 	if err != nil {
 		return nil, err
@@ -89,22 +119,22 @@ func (r *repository) CreateRole(tx *gorm.DB, companyID uint, name, slug, descrip
 		IsSystem:    true,
 	}
 
-	if err := tx.Create(role).Error; err != nil {
+	if err := r.db.Create(role).Error; err != nil {
 		return nil, err
 	}
 
 	return role, nil
 }
 
-func (r *repository) ListSystemPermissions(tx *gorm.DB) ([]core.OnboardingPermission, error) {
-	return queries.ListSystemPermissions(tx)
+func (r *repository) ListSystemPermissions() ([]core.OnboardingPermission, error) {
+	return queries.ListSystemPermissions(r.db)
 }
 
-func (r *repository) AssignPermissionToRole(tx *gorm.DB, roleID, permissionID uint) error {
-	return queries.AssignPermissionToRole(tx, roleID, permissionID)
+func (r *repository) AssignPermissionToRole(roleID, permissionID uint) error {
+	return queries.AssignPermissionToRole(r.db, roleID, permissionID)
 }
 
-func (r *repository) CreateAdminUser(tx *gorm.DB, companyID, roleID uint, name, email, passwordHash string) (*core.OnboardingUser, error) {
+func (r *repository) CreateAdminUser(companyID, roleID uint, name, email, passwordHash string) (*core.OnboardingUser, error) {
 	publicID, err := identity.Generate()
 	if err != nil {
 		return nil, err
@@ -120,7 +150,10 @@ func (r *repository) CreateAdminUser(tx *gorm.DB, companyID, roleID uint, name, 
 		IsActive:     true,
 	}
 
-	if err := tx.Create(adminUser).Error; err != nil {
+	if err := r.db.Create(adminUser).Error; err != nil {
+		if gormutil.IsUniqueConstraintError(err) {
+			return nil, core.ErrDuplicateAdminEmail
+		}
 		return nil, err
 	}
 

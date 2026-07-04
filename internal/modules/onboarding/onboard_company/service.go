@@ -2,45 +2,49 @@ package onboard_company
 
 import (
 	"context"
-	"strings"
+	"fmt"
 
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
-	"gorm.io/gorm"
+	"github.com/enviniom/nexokit/internal/platform/shared/string"
 )
 
+// Service coordinates the company onboarding workflow.
 type Service interface {
 	Onboard(ctx context.Context, req core.OnboardCompanyRequest) (*core.OnboardCompanyResponse, error)
 }
 
 type service struct {
-	db             *gorm.DB
 	repo           Repository
 	hasher         core.PasswordHasher
 	platformDomain string
 }
 
-func NewService(db *gorm.DB, repo Repository, hasher core.PasswordHasher, platformDomain string) Service {
-	return &service{db: db, repo: repo, hasher: hasher, platformDomain: normalizeDomain(platformDomain)}
+// NewService creates a new onboard_company service.
+func NewService(repo Repository, hasher core.PasswordHasher, platformDomain string) Service {
+	return &service{
+		repo:           repo,
+		hasher:         hasher,
+		platformDomain: str.NormalizeDomain(platformDomain),
+	}
 }
 
 func (s *service) Onboard(ctx context.Context, req core.OnboardCompanyRequest) (*core.OnboardCompanyResponse, error) {
 	if errs := req.Validate(); len(errs) > 0 {
-		return nil, apperror.ErrValidation
+		return nil, fmt.Errorf("validation failed: %v", errs)
 	}
 
 	var res core.OnboardCompanyResponse
 
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		normalizedSlug := strings.ToLower(strings.TrimSpace(req.Slug))
-		if err := s.repo.EnsureCompanySlugAvailable(tx, normalizedSlug); err != nil {
+	err := s.repo.WithTx(ctx, func(tx Repository) error {
+		normalizedSlug := str.NormalizeSlug(req.Slug)
+		if err := tx.EnsureCompanySlugAvailable(normalizedSlug); err != nil {
 			return err
 		}
 
 		var normalizedDomain string
-		if req.Domain != nil && strings.TrimSpace(*req.Domain) != "" {
-			normalizedDomain = normalizeDomain(*req.Domain)
-			if err := s.repo.EnsureDomainAvailable(tx, normalizedDomain, core.ErrDuplicateCompanyDomain); err != nil {
+		if req.Domain != nil && str.NormalizeDomain(*req.Domain) != "" {
+			normalizedDomain = str.NormalizeDomain(*req.Domain)
+			if err := tx.EnsureDomainAvailable(normalizedDomain, core.ErrDuplicateCompanyDomain); err != nil {
 				return err
 			}
 		}
@@ -54,56 +58,56 @@ func (s *service) Onboard(ctx context.Context, req core.OnboardCompanyRequest) (
 			if normalizedDomain != "" && normalizedDomain == technicalDomain {
 				return core.ErrDuplicateTechnicalDomain
 			}
-			if err := s.repo.EnsureDomainAvailable(tx, technicalDomain, core.ErrDuplicateTechnicalDomain); err != nil {
+			if err := tx.EnsureDomainAvailable(technicalDomain, core.ErrDuplicateTechnicalDomain); err != nil {
 				return err
 			}
 		}
 
-		normalizedEmail := strings.ToLower(strings.TrimSpace(req.AdminEmail))
-		if err := s.repo.EnsureEmailAvailable(tx, normalizedEmail); err != nil {
+		normalizedEmail := str.NormalizeEmail(req.AdminEmail)
+		if err := tx.EnsureEmailAvailable(normalizedEmail); err != nil {
 			return err
 		}
 
-		company, err := s.repo.CreateCompany(tx, req.Name, normalizedSlug)
+		company, err := tx.CreateCompany(req.Name, normalizedSlug)
 		if err != nil {
 			return err
 		}
 
 		if normalizedDomain != "" {
-			if err := s.repo.CreateCompanyDomain(tx, company.ID, normalizedDomain, core.DomainKindPrimary); err != nil {
+			if err := tx.CreateCompanyDomain(company.ID, normalizedDomain, core.DomainKindPrimary); err != nil {
 				return err
 			}
 		}
 		if technicalDomain != "" {
-			if err := s.repo.CreateCompanyDomain(tx, company.ID, technicalDomain, core.DomainKindTechnical); err != nil {
+			if err := tx.CreateCompanyDomain(company.ID, technicalDomain, core.DomainKindTechnical); err != nil {
 				return err
 			}
 		}
 
-		adminRole, err := s.repo.CreateRole(tx, company.ID, "Admin", core.RoleSlugAdmin, "Tenant administrator with full capabilities")
+		adminRole, err := tx.CreateRole(company.ID, "Admin", core.RoleSlugAdmin, "Tenant administrator with full capabilities")
 		if err != nil {
 			return err
 		}
 
-		userRole, err := s.repo.CreateRole(tx, company.ID, "User", core.RoleSlugUser, "Standard tenant user")
+		userRole, err := tx.CreateRole(company.ID, "User", core.RoleSlugUser, "Standard tenant user")
 		if err != nil {
 			return err
 		}
 
-		systemPermissions, err := s.repo.ListSystemPermissions(tx)
+		systemPermissions, err := tx.ListSystemPermissions()
 		if err != nil {
 			return err
 		}
 
 		for _, perm := range systemPermissions {
-			if err := s.repo.AssignPermissionToRole(tx, adminRole.ID, perm.ID); err != nil {
+			if err := tx.AssignPermissionToRole(adminRole.ID, perm.ID); err != nil {
 				return err
 			}
 		}
 
 		for _, perm := range systemPermissions {
 			if perm.Slug == "users.view" || perm.Slug == "roles.view" {
-				if err := s.repo.AssignPermissionToRole(tx, userRole.ID, perm.ID); err != nil {
+				if err := tx.AssignPermissionToRole(userRole.ID, perm.ID); err != nil {
 					return err
 				}
 			}
@@ -114,7 +118,7 @@ func (s *service) Onboard(ctx context.Context, req core.OnboardCompanyRequest) (
 			return err
 		}
 
-		adminUser, err := s.repo.CreateAdminUser(tx, company.ID, adminRole.ID, req.AdminName, normalizedEmail, passwordHash)
+		adminUser, err := tx.CreateAdminUser(company.ID, adminRole.ID, req.AdminName, normalizedEmail, passwordHash)
 		if err != nil {
 			return err
 		}
@@ -131,8 +135,4 @@ func (s *service) Onboard(ctx context.Context, req core.OnboardCompanyRequest) (
 	}
 
 	return &res, nil
-}
-
-func normalizeDomain(domain string) string {
-	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(domain)), ".")
 }
