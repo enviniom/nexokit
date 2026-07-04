@@ -1,12 +1,9 @@
 package revoke_token
 
 import (
-	"errors"
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
-	"gorm.io/gorm"
 )
 
 type RefreshTokenManager interface {
@@ -30,13 +27,10 @@ func (s *service) Revoke(req core.RefreshRequest) error {
 	hash := s.refreshTokens.HashRefreshToken(req.RefreshToken)
 	stored, err := s.repo.GetByHash(hash)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return apperror.ErrUnauthorized
-		}
 		return err
 	}
 	if stored.RevokedAt != nil || time.Now().After(stored.ExpiresAt) {
-		return apperror.ErrUnauthorized
+		return core.ErrInvalidRefreshToken
 	}
 	return s.repo.Revoke(hash)
 }

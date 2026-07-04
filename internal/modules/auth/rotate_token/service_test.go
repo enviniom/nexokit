@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/shared"
 )
 
@@ -19,7 +18,7 @@ type fakeRepo struct {
 
 func (f *fakeRepo) GetByHash(hash string) (*core.RefreshToken, error) {
 	if f.stored == nil || f.stored.TokenHash != hash {
-		return nil, errors.New("not found")
+		return nil, core.ErrInvalidRefreshToken
 	}
 	return f.stored, nil
 }
@@ -69,8 +68,8 @@ func TestService_Rotate(t *testing.T) {
 		svc := NewService(repo, fakeManager{}, time.Hour)
 
 		_, err := svc.Rotate(core.RefreshRequest{RefreshToken: "old-refresh"})
-		if !errors.Is(err, apperror.ErrUnauthorized) {
-			t.Fatalf("expected unauthorized, got %v", err)
+		if !errors.Is(err, core.ErrInvalidRefreshToken) {
+			t.Fatalf("expected ErrInvalidRefreshToken, got %v", err)
 		}
 	})
 
@@ -79,8 +78,8 @@ func TestService_Rotate(t *testing.T) {
 		svc := NewService(repo, fakeManager{}, time.Hour)
 
 		_, err := svc.Rotate(core.RefreshRequest{RefreshToken: "old-refresh"})
-		if !errors.Is(err, apperror.ErrUnauthorized) {
-			t.Fatalf("expected unauthorized, got %v", err)
+		if !errors.Is(err, core.ErrInvalidRefreshToken) {
+			t.Fatalf("expected ErrInvalidRefreshToken, got %v", err)
 		}
 	})
 }

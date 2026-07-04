@@ -1,6 +1,7 @@
 package rotate_token
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -55,4 +56,11 @@ func TestRepository_GetByHashCreateAndRevoke(t *testing.T) {
 	if stored.RevokedAt == nil || stored.ReplacedByHash == nil || *stored.ReplacedByHash != "hash:new" {
 		t.Fatalf("expected revoked token with replacement hash, got %#v", stored)
 	}
+
+	t.Run("maps missing token to invalid refresh token sentinel", func(t *testing.T) {
+		_, err := repo.GetByHash("hash:missing")
+		if !errors.Is(err, core.ErrInvalidRefreshToken) {
+			t.Fatalf("expected ErrInvalidRefreshToken, got %v", err)
+		}
+	})
 }

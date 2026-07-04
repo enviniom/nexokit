@@ -1,13 +1,10 @@
 package rotate_token
 
 import (
-	"errors"
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
-	"gorm.io/gorm"
 )
 
 type Service interface {
@@ -28,13 +25,10 @@ func (s *service) Rotate(req core.RefreshRequest) (*core.TokenPairResponse, erro
 	hash := s.tokenManager.HashRefreshToken(req.RefreshToken)
 	stored, err := s.repo.GetByHash(hash)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperror.ErrUnauthorized
-		}
 		return nil, err
 	}
 	if stored.RevokedAt != nil || time.Now().After(stored.ExpiresAt) || !stored.User.IsActive {
-		return nil, apperror.ErrUnauthorized
+		return nil, core.ErrInvalidRefreshToken
 	}
 
 	access, err := s.tokenManager.IssueAccess(stored.User.PublicID, stored.User.Role.Name, stored.User.CompanyID)

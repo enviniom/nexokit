@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
-	"gorm.io/gorm"
 )
 
 type fakeRepo struct {
@@ -21,7 +19,7 @@ func (f *fakeRepo) GetByHash(hash string) (*core.RefreshToken, error) {
 		return nil, f.err
 	}
 	if f.stored == nil || f.stored.TokenHash != hash {
-		return nil, gorm.ErrRecordNotFound
+		return nil, core.ErrInvalidRefreshToken
 	}
 	return f.stored, nil
 }
@@ -32,6 +30,7 @@ func (f *fakeRepo) Revoke(hash string) error {
 }
 
 type fakeRefreshManager struct{}
+
 func (fakeRefreshManager) HashRefreshToken(refreshToken string) string { return "hash:" + refreshToken }
 
 func TestService_Revoke(t *testing.T) {
@@ -53,8 +52,8 @@ func TestService_Revoke(t *testing.T) {
 		svc := NewService(repo, fakeRefreshManager{})
 
 		err := svc.Revoke(core.RefreshRequest{RefreshToken: "refresh"})
-		if !errors.Is(err, apperror.ErrUnauthorized) {
-			t.Fatalf("expected unauthorized, got %v", err)
+		if !errors.Is(err, core.ErrInvalidRefreshToken) {
+			t.Fatalf("expected ErrInvalidRefreshToken, got %v", err)
 		}
 	})
 
@@ -62,8 +61,8 @@ func TestService_Revoke(t *testing.T) {
 		svc := NewService(&fakeRepo{}, fakeRefreshManager{})
 
 		err := svc.Revoke(core.RefreshRequest{RefreshToken: "missing"})
-		if !errors.Is(err, apperror.ErrUnauthorized) {
-			t.Fatalf("expected unauthorized, got %v", err)
+		if !errors.Is(err, core.ErrInvalidRefreshToken) {
+			t.Fatalf("expected ErrInvalidRefreshToken, got %v", err)
 		}
 	})
 }

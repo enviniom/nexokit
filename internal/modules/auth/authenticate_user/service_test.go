@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/shared"
-	"gorm.io/gorm"
 )
 
 type fakeRepository struct {
@@ -22,7 +20,7 @@ func (f *fakeRepository) GetByEmail(email string) (*core.AuthUser, error) {
 		return nil, f.err
 	}
 	if f.user == nil {
-		return nil, gorm.ErrRecordNotFound
+		return nil, core.ErrInvalidCredentials
 	}
 	return f.user, nil
 }
@@ -93,8 +91,8 @@ func TestService_Login(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				svc := NewService(tt.repo, tt.verifier, fakeManager{access: "access-token", token: "refresh-token"}, time.Hour)
 				_, err := svc.Login(core.LoginRequest{Email: "alice@example.com", Password: "Secret1!"})
-				if !errors.Is(err, apperror.ErrUnauthorized) {
-					t.Fatalf("expected ErrUnauthorized, got %v", err)
+				if !errors.Is(err, core.ErrInvalidCredentials) {
+					t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 				}
 			})
 		}
@@ -105,8 +103,8 @@ func TestService_Login(t *testing.T) {
 		user.IsActive = false
 		svc := NewService(&fakeRepository{user: user}, fakePasswordVerifier{}, fakeManager{access: "access-token", token: "refresh-token"}, time.Hour)
 		_, err := svc.Login(core.LoginRequest{Email: "alice@example.com", Password: "Secret1!"})
-		if !errors.Is(err, apperror.ErrUnauthorized) {
-			t.Fatalf("expected ErrUnauthorized, got %v", err)
+		if !errors.Is(err, core.ErrInvalidCredentials) {
+			t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 		}
 	})
 }

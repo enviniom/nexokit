@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
 )
@@ -76,7 +76,7 @@ func TestHandler_Handle(t *testing.T) {
 	})
 
 	t.Run("returns generic unauthorized for invalid credentials", func(t *testing.T) {
-		h := NewHandler(fakeService{err: apperror.ErrUnauthorized})
+		h := NewHandler(fakeService{err: core.ErrInvalidCredentials})
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request = authJSONRequest(http.MethodPost, "/auth/login", core.LoginRequest{Email: "user@example.com", Password: "Secret1!"})
@@ -86,5 +86,32 @@ func TestHandler_Handle(t *testing.T) {
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("expected status 401, got %d", w.Code)
 		}
+
+		assertUnauthorizedEnvelope(t, w)
 	})
+}
+
+func assertUnauthorizedEnvelope(t *testing.T, w *httptest.ResponseRecorder) {
+	t.Helper()
+
+	var resp response.ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode error response: %v", err)
+	}
+
+	if resp.Success != false {
+		t.Errorf("Success = %v, want false", resp.Success)
+	}
+	if resp.Message != messages.MsgUnauthorized {
+		t.Errorf("Message = %q, want %q", resp.Message, messages.MsgUnauthorized)
+	}
+	if resp.Data != nil {
+		t.Errorf("Data = %v, want nil", resp.Data)
+	}
+	if resp.Errors != nil {
+		t.Errorf("Errors = %v, want nil", resp.Errors)
+	}
+	if resp.Debug != "" {
+		t.Errorf("Debug = %q, want empty", resp.Debug)
+	}
 }

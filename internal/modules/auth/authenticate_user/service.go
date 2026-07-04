@@ -1,13 +1,10 @@
 package authenticate_user
 
 import (
-	"errors"
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
-	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/platform/identity"
-	"gorm.io/gorm"
 )
 
 type PasswordVerifier interface {
@@ -32,16 +29,13 @@ func NewService(repo Repository, verifier PasswordVerifier, manager core.TokenMa
 func (s *service) Login(req core.LoginRequest) (*core.LoginResponse, error) {
 	user, err := s.repo.GetByEmail(req.Email)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, apperror.ErrUnauthorized
-		}
 		return nil, err
 	}
 	if !user.IsActive {
-		return nil, apperror.ErrUnauthorized
+		return nil, core.ErrInvalidCredentials
 	}
 	if err := s.verifier.VerifyPassword(req.Password, user.PasswordHash); err != nil {
-		return nil, apperror.ErrUnauthorized
+		return nil, core.ErrInvalidCredentials
 	}
 
 	access, err := s.manager.IssueAccess(user.PublicID, user.Role.Name, user.CompanyID)

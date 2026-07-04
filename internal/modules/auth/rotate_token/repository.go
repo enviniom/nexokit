@@ -1,6 +1,7 @@
 package rotate_token
 
 import (
+	"errors"
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
@@ -19,7 +20,14 @@ type GormRepository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
 func (r *GormRepository) GetByHash(hash string) (*core.RefreshToken, error) {
-	return queries.FindRefreshTokenByHashWithUser(r.db, hash)
+	refresh, err := queries.FindRefreshTokenByHashWithUser(r.db, hash)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, core.ErrInvalidRefreshToken
+		}
+		return nil, err
+	}
+	return refresh, nil
 }
 
 func (r *GormRepository) CreateRefreshToken(refresh *core.RefreshToken) error {

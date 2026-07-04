@@ -1,6 +1,7 @@
 package revoke_token
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -51,4 +52,11 @@ func TestRepository_GetByHashAndRevoke(t *testing.T) {
 	if updated.RevokedAt == nil {
 		t.Fatalf("expected revoked_at to be set")
 	}
+
+	t.Run("maps missing token to invalid refresh token sentinel", func(t *testing.T) {
+		_, err := repo.GetByHash("hash:missing")
+		if !errors.Is(err, core.ErrInvalidRefreshToken) {
+			t.Fatalf("expected ErrInvalidRefreshToken, got %v", err)
+		}
+	})
 }

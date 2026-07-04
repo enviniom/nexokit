@@ -1,6 +1,7 @@
 package authenticate_user
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -50,4 +51,11 @@ func TestRepository_GetByEmailAndCreateRefreshToken(t *testing.T) {
 	if stored.UserID != found.ID {
 		t.Fatalf("expected user id %d, got %d", found.ID, stored.UserID)
 	}
+
+	t.Run("maps missing user to invalid credentials sentinel", func(t *testing.T) {
+		_, err := repo.GetByEmail("missing@example.com")
+		if !errors.Is(err, core.ErrInvalidCredentials) {
+			t.Fatalf("expected ErrInvalidCredentials, got %v", err)
+		}
+	})
 }
