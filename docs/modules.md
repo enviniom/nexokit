@@ -2,7 +2,7 @@
 
 This is the practical guide for how backend modules in Nexokit are organized. The rule that defines the vertical-slice shape is owned by OpenSpec; this guide is the navigation entry point for the per-concern tutorials.
 
-> **The vertical-slice rule is owned by OpenSpec.** See [`openspec/core_context.md` §2.2](../../openspec/core_context.md) for the canonical rule (heuristic, `core/` files, slice shape, container, routes) and [`openspec/specs/backend/vertical-slice-modules/spec.md`](../../openspec/specs/backend/vertical-slice-modules/spec.md) for the formal contract. The per-concern tutorials below stay aligned with that rule; if a tutorial ever disagrees with the spec, the spec wins.
+> **The vertical-slice rule is owned by OpenSpec.** See [`openspec/specs/vertical-slice-modules/spec.md`](../openspec/specs/vertical-slice-modules/spec.md) for the canonical rule (heuristic, `core/` files, slice shape, container, routes) and [`openspec/specs/platform-boundary-rules/spec.md`](../openspec/specs/platform-boundary-rules/spec.md) for the platform boundary contract. The per-concern tutorials below stay aligned with those specs; if a tutorial ever disagrees with the spec, the spec wins.
 
 The goal is reviewability: a subagent should be able to load only the document it needs and still apply the same rules the rest of the team uses.
 

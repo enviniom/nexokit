@@ -1,135 +1,107 @@
 # NexoKit
 
-NexoKit is a modular Go starter framework for building SaaS APIs.
+NexoKit is an opinionated modular Go starter for SaaS APIs. It ships with authentication, RBAC, multitenancy, migrations, a developer CLI, and a vertical-slice module structure so you can fork it and start building domain logic instead of boilerplate.
 
-## Prerequisites
+## Stack
 
-- Go 1.26+
-- Docker & Docker Compose (for local PostgreSQL)
-- Make
-- [Goose](https://github.com/pressly/goose) for migrations:
-  ```bash
-  go install github.com/pressly/goose/v3/cmd/goose@latest
-  ```
+| Layer | Choice |
+|-------|--------|
+| Language | Go 1.26+ |
+| HTTP framework | Gin |
+| ORM | GORM (runtime queries only) |
+| Database | PostgreSQL |
+| Migrations | Goose (`migrations/`) |
+| Auth | PASETO v4.local access tokens + opaque refresh tokens |
+| Passwords | argon2id |
+| Cache | Redis/Valkey, optional with `CACHE_DRIVER=none` |
+| Logging | `slog` + lumberjack rotation |
+| Testing | Standard Go testing + httptest + testify |
 
-## Quick Start
+## Architecture in one paragraph
 
-Follow these steps to set up the application with a local PostgreSQL instance:
+The codebase is organized as a modular monolith: `cmd/` entrypoints wire `internal/app/`, which composes business modules under `internal/modules/`. Each module owns its vertical slices (`handler`/`service`/`repository`), shared `core/` types, and reusable `queries/`. Business modules do not import each other directly; collaboration is expressed through small interfaces owned by the module that needs or exposes the capability, then wired in `internal/app/container.go`. The database schema is the source of truth in `migrations/`, not Go models.
 
-### 1. Environment Configuration
-Copy the example environment template to create your active `.env` file:
+## Quick start
+
 ```bash
 cp .env.example .env
-```
-*(Optionally open `.env` and verify your Postgres credentials match your running local container or docker-compose setup).*
-
-### 2. Launch Local Database
-Start the pre-configured PostgreSQL container in the background:
-```bash
 docker compose up -d
-```
-
-### 3. Initialize Schema & Database Seeders
-Apply database migrations to structure the schema and seed the initial system permissions:
-```bash
-# Run GORM schema migrations
 make migrate-up
-
-# Seed base system permissions required for RBAC
 make seed
-```
-
-### 4. Create Initial Global Root User
-Provision your initial super-administrator user (`root`). This account will read the values configured under `ROOT_USER_NAME`, `ROOT_USER_EMAIL`, and `ROOT_USER_PASSWORD` inside your `.env`:
-```bash
 make create-root
-```
-
-### 5. Fire Up the Server 🚀
-Start the API server in active development mode:
-```bash
 make dev
 ```
-The server will boot on port `8080` (or the one defined under `APP_PORT` in your `.env`).
 
-## Commands
+The API boots on `http://localhost:8080` (or `APP_PORT` from `.env`).
 
-| Command | Description |
-|---------|-------------|
-| `make build` | Build the API and CLI binaries |
+## Everyday commands
+
+| Command | Purpose |
+|---------|---------|
 | `make dev` | Run the API server in development mode |
+| `make build` | Build `bin/api` and `bin/nexokit` |
 | `make test` | Run all tests |
-| `make test-unit` | Run fast unit tests only |
-| `make test-integration` | Run database integration tests |
-| `make migrate-up` | Apply pending database migrations |
-| `make migrate-down` | Revert the last applied database migration |
-| `make migrate-create` | Create a new SQL migration template |
-| `make migrate-status` | Display the status of database migrations |
-| `make migrate-reset` | Rollback all database migrations |
-| `make seed` | Load system permission catalog seeds into DB |
-| `make create-root` | Provision the initial global root user from .env credentials |
-| `make fmt` | Format all Go source files |
-| `make vet` | Run go vet analysis |
-| `make install-hooks` | Install local Git pre-commit hooks |
-| `make uninstall-hooks` | Remove Git pre-commit hooks |
-| `make check-env` | Check `.env` and `.env.example` key alignment |
+| `make migrate-up` | Apply pending migrations |
+| `make migrate-down` | Rollback the last migration batch |
+| `make migrate-create` | Create a new migration file |
+| `make seed` | Run seed files from `seeds/` |
+| `make create-root` | Create the initial root user |
+| `make fmt` | Format all Go files |
+| `make lint` | Run `go vet` + module boundary checks |
 
-## Pre-commit Hooks
+For direct `nexokit` CLI usage, see [`docs/cli.md`](docs/cli.md).
 
-Install the local Git hook:
+## Project map
+
+```
+cmd/api/              API server entrypoint
+cmd/nexokit/          Internal developer CLI
+internal/app/         Bootstrap and dependency graph
+internal/config/      Typed configuration from .env
+internal/infra/       DB, cache, logger adapters
+internal/server/      HTTP server and router
+internal/middleware/  Auth, tenant, rate limit, logging
+internal/platform/    Cross-cutting contracts and helpers
+internal/modules/     Business modules (auth, companies, iam, onboarding)
+internal/shared/      BaseModel types
+migrations/           Goose SQL migrations
+seeds/                Go seed files
+scripts/              Hooks and helper scripts
+tests/                Integration tests and helpers
+```
+
+## Using NexoKit as a starter
+
+NexoKit is designed to be cloned or forked as a project starting point:
+
+1. Fork the repo and rename the Go module.
+2. Keep the modules you need; delete or evolve the rest.
+3. Add your own migrations, seeds, and vertical slices.
+4. Deploy the binary with your environment variables.
+
+See [`docs/starter-template.md`](docs/starter-template.md) for the full adoption guide.
+
+## Production path
 
 ```bash
-make install-hooks
+make build
+# copy binaries, .env, migrations/, seeds/ to the host
+./bin/nexokit migrate up
+./bin/nexokit seed
+./bin/nexokit create-root
+./bin/api
 ```
 
-The hook performs the following checks on staged files:
+> **Seeding requires Go on the host today.** `nexokit seed` discovers Go files in `seeds/` and runs them with a temporary `go run` runner, so the host that performs seeding must have the Go toolchain available. The safe alternatives are to run `nexokit seed` from a build/admin environment that has Go and database access, or to keep Go installed on the production host that performs the one-time seed step. See [`docs/deployment.md`](docs/deployment.md) for details.
 
-| Check | Behavior |
-|-------|----------|
-| Binary files | Blocks the commit |
-| File size > 1MB | Warns but allows the commit |
-| `.env` / `.env.example` key drift | Warns but allows the commit |
-| `go vet ./...` | Blocks the commit on errors |
-| Unformatted Go files | Blocks the commit; run `make fmt` to fix |
+For environment variables, TLS, reverse proxy, logging, and operational checklists, see [`docs/deployment.md`](docs/deployment.md).
 
-Bypass the hook when necessary:
+## Documentation
 
-```bash
-git commit --no-verify
-```
-
-## Log Files
-
-The application writes to three separate log files under `logs/`:
-
-| File | Purpose |
-|------|---------|
-| `gin.log` | HTTP access logs written by Gin's built-in logger |
-| `app.log` | Structured application logs (all levels) from slog |
-| `error.log` | Structured error logs (ERROR level and above only) from slog |
-
-Configure paths via `LOG_GIN_FILE`, `LOG_FILE`, and `LOG_ERROR_FILE` in your `.env`.
-
-## Project Structure
-
-```
-cmd/api/              - API entrypoint
-cmd/nexokit/          - CLI entrypoint
-internal/app/         - Application bootstrap and container
-internal/config/      - Typed configuration
-internal/infra/       - Database, cache, logger adapters
-internal/server/      - HTTP server and router
-internal/middleware/  - HTTP middleware chain
-internal/platform/    - Cross-cutting concerns (response, errors, validator)
-internal/modules/     - Business modules (stubs in change-01)
-internal/shared/      - BaseModel types
-migrations/           - Goose SQL migrations
-tests/                - Integration tests and helpers
-```
-
-## Conventions
-
-- All API responses use the standard envelope (`success`, `message`, `data`, `meta`, `errors`).
-- No `gin.H` inline in handlers; use `platform/response` helpers.
-- Modules register routes via a `Register` function.
-- GORM is for runtime queries only; Goose handles schema migrations.
+- [`docs/README.md`](docs/README.md) — documentation index
+- [`docs/architecture.md`](docs/architecture.md) — canonical architecture guide
+- [`docs/deployment.md`](docs/deployment.md) — production guide
+- [`docs/cli.md`](docs/cli.md) — direct CLI reference
+- [`docs/starter-template.md`](docs/starter-template.md) — adopt as a starter
+- [`docs/request-flow.md`](docs/request-flow.md) — request/auth/tenant flow
+- [`docs/modules.md`](docs/modules.md) — module and vertical-slice guide

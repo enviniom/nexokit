@@ -276,7 +276,7 @@ El Change 7 se divide en dos para evitar que una decisión sobre el logger bloqu
 
 # Change 1: Base del proyecto, configuración, GORM, migraciones y respuesta estándar
 
-> Prompt de implementación: [docs/prompts/change_01_base.md](prompts/change_01_base.md)
+> Prompt de implementación: `prompts/change_01_base.md`
 
 ## Objetivo
 
@@ -1024,7 +1024,7 @@ Este change se considera completo cuando:
 
 # Change 2: CLI interno y developer experience para nuevos módulos
 
-> Prompt de implementación: [docs/prompts/change_02_cli.md](prompts/change_02_cli.md)
+> Prompt de implementación: `prompts/change_02_cli.md`
 
 ## Objetivo
 
@@ -1210,7 +1210,7 @@ Este change se considera completo cuando:
 
 # Change 3: Auth con PASETO, usuario root inicial, usuarios, roles y refresh tokens
 
-> Prompt de implementación: [docs/prompts/change_03_auth.md](prompts/change_03_auth.md)
+> Prompt de implementación: `prompts/change_03_auth.md`
 
 ## Objetivo
 
@@ -1391,7 +1391,7 @@ Inicialmente los roles pueden ser de solo lectura desde API para evitar que se d
 ```json
 {
   "email": "admin@example.com",
-  "password": "secret"
+  "password": "<example-password>"
 }
 ```
 
@@ -1402,8 +1402,8 @@ Inicialmente los roles pueden ser de solo lectura desde API para evitar que se d
   "success": true,
   "message": "Login exitoso",
   "data": {
-    "access_token": "paseto",
-    "refresh_token": "opaque-refresh-token",
+    "access_token": "<access-token>",
+    "refresh_token": "<refresh-token>",
     "user": {
       "id": "01HY7V8J3F8WQ9F6K2H4D1M5NP",
       "name": "Root User",
@@ -1492,7 +1492,7 @@ Este change se considera completo cuando:
 
 # Change 4: RBAC, permisos y autorización
 
-> Prompt de implementación: [docs/prompts/change_04_rbac.md](prompts/change_04_rbac.md)
+> Prompt de implementación: `prompts/change_04_rbac.md`
 
 ## Objetivo
 
@@ -1644,7 +1644,7 @@ Este change se considera completo cuando:
 
 # Change 5: Multitenancy por company_id
 
-> Prompt de implementación: [docs/prompts/change_05_multitenancy.md](prompts/change_05_multitenancy.md)
+> Prompt de implementación: `prompts/change_05_multitenancy.md`
 
 ## Objetivo
 
@@ -1786,7 +1786,7 @@ Este change se considera completo cuando:
 
 # Change 6: Utilidades API: DTOs, validaciones, paginación, filtros y documentación de convenciones
 
-> Prompt de implementación: [docs/prompts/change_06_utilities.md](prompts/change_06_utilities.md)
+> Prompt de implementación: `prompts/change_06_utilities.md`
 
 ## Objetivo
 
@@ -1969,7 +1969,7 @@ Este change se considera completo cuando:
 
 # Change 7a: Infraestructura de observabilidad: logger, log rotator, health checks y graceful shutdown
 
-> Prompt de implementación: [docs/prompts/change_07a_observability.md](prompts/change_07a_observability.md)
+> Prompt de implementación: `prompts/change_07a_observability.md`
 
 ## Objetivo
 
@@ -2066,7 +2066,7 @@ Este change se considera completo cuando:
 
 # Change 7b: Infraestructura de resiliencia: cache y rate limit
 
-> Prompt de implementación: [docs/prompts/change_07b_resilience.md](prompts/change_07b_resilience.md)
+> Prompt de implementación: `prompts/change_07b_resilience.md`
 
 ## Objetivo
 
@@ -2163,7 +2163,7 @@ Este change se considera completo cuando:
 
 # Change 8: Testing, calidad y CI básico
 
-> Prompt de implementación: [docs/prompts/change_08_testing.md](prompts/change_08_testing.md)
+> Prompt de implementación: `prompts/change_08_testing.md`
 
 ## Objetivo
 
