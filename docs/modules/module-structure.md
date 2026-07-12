@@ -32,7 +32,7 @@ The root is the only place these file and folder names appear. Reviewers can loc
 | `container.go` | Module composition root: instantiates services, repositories, handlers, and the slice `Queries` used by the module. | HTTP route definitions, request binding, business rules, persistence queries. |
 | `routes.go` | A `Register(v1 *gin.RouterGroup, ...)` function that mounts the module's HTTP routes and applies permission / role guards. | Business logic, repository wiring, `container.go` style composition. |
 | `core/` | Shared cross-slice domain language: models, DTOs, contracts, constants, `core/errors.go` with module-level `apperror` values, small pure domain helpers. | Persistence, response helpers, GORM, handler logic, complex orchestration, HTTP mapping. |
-| `queries/` | Reusable persistence queries, one file per query, used by more than one slice. | Single-use queries (those stay in the slice repository), business policy, response mappers, HTTP mapping. |
+| `queries/` | Mandatory for persistence modules. Centralizes GORM/database to domain error mapping (`map_errors.go`) and houses reusable persistence queries (one file per query). | Single-use queries (those stay in the slice repository), business policy, response mappers, HTTP mapping. |
 | `slices/` | Business use-case slices. Each slice has `handler.go`, `service.go`, `repository.go` and tests. Multi-entity modules may group slices by entity under `slices/<entity>/`. | Module-wide wiring, top-level composition, route registration. |
 
 ## What each root file looks like
@@ -67,14 +67,16 @@ The root is the only place these file and folder names appear. Reviewers can loc
 
 ### `queries/`
 
-- Reusable persistence queries.
+- Mandatory for any module that communicates with database persistence.
+- Hosts `map_errors.go` to centralize translation of GORM / database exceptions to domain-level errors via entity-specific helper functions (e.g. `MapCategoryError(err)`).
+- Reusable persistence queries (used by more than one slice).
 - One file per query, named after the query (e.g. `find_user_by_email.go`).
-- Each file has dedicated tests in the same package.
+- Each query file has dedicated tests in the same package.
 - MUST NOT contain:
-  - Response mappers.
+  - Response mappers (API/HTTP envelopes).
   - Business policy.
   - Non-persistence helpers.
-  - Single-use queries used by only one slice.
+  - Single-use queries used by only one slice (error mapping helpers are the exception).
 
 ### `slices/`
 
@@ -120,7 +122,7 @@ The root is the only place these file and folder names appear. Reviewers can loc
 - [ ] `container.go` only does composition and wiring.
 - [ ] `routes.go` only registers routes via a `Register` function.
 - [ ] `core/` only holds shared cross-slice domain language and `core/errors.go`.
-- [ ] `queries/` only holds reusable persistence queries.
+- [ ] `queries/` holds `map_errors.go` for DB-to-domain mapping, plus any reusable queries.
 - [ ] `slices/` only holds slices (flat or grouped by entity).
 - [ ] No slice files live at the module root.
 - [ ] No direct imports of other modules. See [`boundaries-and-dependencies.md`](boundaries-and-dependencies.md).

@@ -4,7 +4,7 @@ Validation and error mapping are the contract between the module and the HTTP la
 
 ## Quick path
 
-1. DTOs own their own `Validate()` and return `response.ValidationErrors` keyed by field.
+1. DTOs own their own `Validate()` and return `validator.ValidationErrors` keyed by field.
 2. Binding / invalid JSON = 400; DTO validation = 422; `AppError` is for business / app outcomes.
 3. Reusable module errors live in `core/errors.go` and use `platform/apperror` helpers.
 4. Services and repositories MUST NOT construct ad-hoc `apperror` values inline.
@@ -27,11 +27,11 @@ See [`api-conventions.md`](../api-conventions.md) for the full envelope and DTO 
 
 ## DTO validation contract
 
-Request DTOs that need validation MUST expose a `Validate()` method that returns `response.ValidationErrors`:
+Request DTOs that need validation MUST expose a `Validate()` method that returns `validator.ValidationErrors`:
 
 ```go
-func (r CreateProductRequest) Validate() response.ValidationErrors {
-    errs := make(response.ValidationErrors)
+func (r CreateProductRequest) Validate() validator.ValidationErrors {
+    errs := make(validator.ValidationErrors)
     validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
     validator.Field(errs, "slug", r.Slug).Required().Apply(validator.ValidSlug())
     validator.Field(errs, "status", r.Status).Optional().Apply(validator.InList("active", "inactive"))
@@ -54,7 +54,7 @@ Handlers call `response.RespondIfInvalid(c, req.Validate())` immediately after b
 | Rule | Why |
 |---|---|
 | Each request DTO owns its own `Validate()`. | Validation is part of the DTO contract, not the handler. |
-| `Validate()` returns `response.ValidationErrors` keyed by field name. | The envelope is uniform across modules. |
+| `Validate()` returns `validator.ValidationErrors` keyed by field name. | The envelope is uniform across modules. |
 | Handlers MUST call `RespondIfInvalid` right after binding. | The handler stays thin; the DTO owns the contract. |
 | Do not surface validation as `AppError`. | `AppError` is for business / app outcomes, not field-level rules. |
 
@@ -63,7 +63,7 @@ Handlers call `response.RespondIfInvalid(c, req.Validate())` immediately after b
 | Outcome | Status | Mechanism |
 |---|---|---|
 | Request binding / invalid JSON. | 400 Bad Request. | Gin binding error. |
-| DTO `Validate()` failure. | 422 Unprocessable Entity. | `response.RespondIfInvalid` with `response.ValidationErrors`. |
+| DTO `Validate()` failure. | 422 Unprocessable Entity. | `response.RespondIfInvalid` with `validator.ValidationErrors`. |
 | Business / app outcome (not found, forbidden, conflict, insufficient stock, etc.). | `AppError`-based status (404, 403, 409, ...). | `response.HandleError(c, err)` reads the `AppError` code. |
 | Unexpected internal error. | 500. | `response.HandleError` redacts the message to `messages.MsgInternalError`; the original error is logged by `ErrorLogger`. A `debug` field is added only when `Config.ExposeDebugErrors()` is true (local/development/test). |
 
@@ -122,7 +122,7 @@ See [`docs/module-error-conventions.md`](../module-error-conventions.md) for the
 | Layer | Rule |
 |---|---|
 | Service | Returns reusable errors from `core/errors.go` or wraps internal errors with `fmt.Errorf("...: %w", err)`. MUST NOT construct ad-hoc `apperror` values. |
-| Repository | Maps DB / GORM errors to domain errors before returning. MUST NOT construct ad-hoc `apperror` values. |
+| Repository | Maps DB / GORM errors to domain errors before returning using the mandatory entity-specific helpers in `queries/map_errors.go`. MUST NOT write inline GORM error checks or construct ad-hoc `apperror` values. |
 | Handler | Calls `response.HandleError(c, err)` for business / app errors. MUST NOT inspect `apperror` codes manually. |
 
 ## Error mapping path
@@ -136,10 +136,10 @@ DB / GORM error → repository → core / domain error → service → handler �
 | Case | Layer returns | Handler response |
 |---|---|---|
 | Missing row | Module error from `core/errors.go`, built with `apperror.NotFound(...)`. | 404 via `response.HandleError`. |
-| Field-level duplicate caught during DTO / form validation. | `response.ValidationErrors{"email": []string{"already exists"}}` from `dto.Validate()` or handler validation. | 422 with `errors.email`. |
+| Field-level duplicate caught during DTO / form validation. | `validator.ValidationErrors{"email": []string{"already exists"}}` from `dto.Validate()` or handler validation. | 422 with `errors.email`. |
 | Business conflict. | Module error from `core/errors.go`, built with `apperror.Conflict(...)`. | 409 via `response.HandleError`. |
 | Protected resource. | Module error from `core/errors.go`, built with `apperror.Forbidden(...)`. | 403 via `response.HandleError`. |
-| Invalid DTO. | `response.ValidationErrors{"email": []string{"invalid"}}` from `dto.Validate()`. | 422 with field-keyed error map. |
+| Invalid DTO. | `validator.ValidationErrors{"email": []string{"invalid"}}` from `dto.Validate()`. | 422 with field-keyed error map. |
 | Malformed JSON body. | Binding error from Gin. | 400 Bad Request. |
 | Unexpected DB failure. | Wrapped technical error. | 500 via `response.HandleError`; internal error logged by middleware. |
 | Expected "not present" (idempotent). | `(*Customer, bool, error)` with the bool as the existence signal. | Branch on bool, no error mapping. |
@@ -166,11 +166,11 @@ GetCustomerByEmail(ctx context.Context, email string) (*core.Customer, bool, err
 
 ## Validation and errors checklist
 
-- [ ] Each request DTO has its own `Validate()` returning `response.ValidationErrors`.
+- [ ] Each request DTO has its own `Validate()` returning `validator.ValidationErrors`.
 - [ ] Handlers call `response.RespondIfInvalid` right after binding.
 - [ ] Binding / invalid JSON returns 400; DTO validation returns 422.
 - [ ] No `AppError` is constructed inline in services or repositories.
 - [ ] Reusable module errors live in `core/errors.go` and use `apperror` helpers.
 - [ ] Handlers route business / app errors through `response.HandleError`.
 - [ ] Expected control flow uses `(*T, bool, error)` or a typed result, not `AppError`.
-- [ ] Repository maps `gorm.ErrRecordNotFound` to a module error when missing data is exceptional.
+- [ ] Repository maps database and GORM errors (like not found or duplicate constraint errors) to domain errors using the mandatory `queries/map_errors.go` helpers.

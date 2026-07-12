@@ -36,9 +36,13 @@
 | Rule | Why |
 |---|---|
 | Repository wraps reusable queries and owns slice-specific persistence. | The repository is the only place that knows both the query and the slice's needs. |
-| Repository maps DB / GORM / persistence errors into domain errors before returning. | Services stay free of GORM error inspection. |
+| Repository MUST map DB / GORM / persistence errors into domain errors before returning using the helpers in `queries/map_errors.go`. | Services and controllers stay free of GORM error inspection and logic. |
+| Every module with persistence MUST have a `queries/` package, even if it has no shared query files. | It serves as the single source of truth for the database-to-domain error translation via `map_errors.go`. |
+| `queries/map_errors.go` MUST define entity-specific mapping helpers (e.g., `MapCategoryError(err error) error`) taking only the GORM error as a parameter. | Firm signatures stay clean and translation logic is centralized per entity. |
+| Repositories MUST NOT do ad-hoc DB/GORM error string checking or direct error comparisons inline. | Eliminates variance in how constraints, unique keys, and "not found" outcomes are mapped across slices. |
 | Services MUST NOT import GORM. | Services are pure business rules; persistence is the repository's job. |
 | When a slice does not need a reusable query, the repository contains the query inline. | `queries/` is for reuse, not for storage of every query. |
+
 
 ## GORM partial model `TableName()` rule
 
@@ -90,9 +94,11 @@ func (IAMUser) TableName() string { return "users" }
 
 ## Persistence checklist
 
-- [ ] `queries/` contains only reusable persistence queries, one file per query.
+- [ ] Every module with persistence contains a `queries/` package and `queries/map_errors.go` file.
+- [ ] `queries/map_errors.go` exposes entity-specific error mappers taking only the GORM error as a parameter.
+- [ ] `queries/` contains reusable persistence queries, one file per query (if reused).
 - [ ] Each `queries/` file has dedicated tests.
-- [ ] Slice repository wraps reusable queries and translates persistence errors to domain errors.
+- [ ] Slice repository wraps reusable queries and translates persistence errors to domain errors using the helpers in `queries/map_errors.go`.
 - [ ] No GORM imports in services.
 - [ ] Partial GORM models for non-owned tables implement `TableName()` when names differ.
 - [ ] Table names match the real Goose migration tables and have direct unit tests.
