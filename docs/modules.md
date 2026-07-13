@@ -53,6 +53,9 @@ These rules apply everywhere and are restated in detail in the dedicated documen
 | Services and repositories MUST NOT create ad-hoc `apperror` values inline. | [`validation-and-errors.md`](modules/validation-and-errors.md) |
 | Handlers route business / app errors through `response.HandleError`. | [`validation-and-errors.md`](modules/validation-and-errors.md) |
 | Expected control flow uses explicit contracts like `(*Customer, bool, error)`, not `AppError`. | [`validation-and-errors.md`](modules/validation-and-errors.md) |
+| Repository interfaces remain idiomatic `error` contracts and MUST NOT import or expose `platform/apperror`. | [`queries-and-persistence.md`](modules/queries-and-persistence.md) |
+| Every non-nil persistence error crossing a repository boundary MUST be a module-owned `*apperror.AppError`; raw GORM, SQL, and driver errors MUST NOT escape. | [`queries-and-persistence.md`](modules/queries-and-persistence.md) |
+| Every GORM `.Error` and domain-significant zero-row result MUST pass through the entity-specific persistence mapper. | [`queries-and-persistence.md`](modules/queries-and-persistence.md) |
 | `queries/` holds reusable persistence queries used by more than one slice; single-use persistence stays in the slice repository. | [`queries-and-persistence.md`](modules/queries-and-persistence.md) |
 | Partial GORM models for tables the module does not own MUST implement `TableName()` when the struct name differs from the migration table name. | [`queries-and-persistence.md`](modules/queries-and-persistence.md) |
 | Tests cover handler / service / repository behavior for non-trivial slices. | [`testing.md`](modules/testing.md) |
@@ -69,6 +72,7 @@ Use this for a brand new module. Each item links to the document with the full r
 - [ ] For each slice, add `handler.go`, `service.go`, `repository.go` and tests. ([`vertical-slices.md`](modules/vertical-slices.md), [`testing.md`](modules/testing.md))
 - [ ] Promote repeated queries to `queries/<query_name>.go` with their own tests. ([`queries-and-persistence.md`](modules/queries-and-persistence.md))
 - [ ] Add a `TableName()` test for every partial GORM model that targets a non-owned table. ([`queries-and-persistence.md`](modules/queries-and-persistence.md))
+- [ ] Keep repository signatures typed as `error`, map every persistence failure to a module-owned `AppError`, preserve unknown causes, and review `RowsAffected`. ([`queries-and-persistence.md`](modules/queries-and-persistence.md), [`validation-and-errors.md`](modules/validation-and-errors.md))
 
 ## Related cross-cutting docs
 

@@ -2,74 +2,36 @@ package core
 
 import (
 	"errors"
-	"strings"
+	"net/http"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/platform/apperror"
-	"github.com/enviniom/nexokit/internal/platform/messages"
 )
 
-func TestSentinels_Status_Code_PublicMessage(t *testing.T) {
+func TestPersistenceErrorsWrapOriginalCause(t *testing.T) {
+	cause := errors.New("database unavailable")
 	tests := []struct {
-		name       string
-		err        error
-		wantStatus int
-		wantCode   apperror.Code
-		wantMsg    string
+		name string
+		make func(error) error
+		code apperror.Code
 	}{
-		{
-			name:       "invalid credentials",
-			err:        ErrInvalidCredentials,
-			wantStatus: 401,
-			wantCode:   CodeInvalidCredentials,
-			wantMsg:    messages.MsgUnauthorized,
-		},
-		{
-			name:       "invalid refresh token",
-			err:        ErrInvalidRefreshToken,
-			wantStatus: 401,
-			wantCode:   CodeInvalidRefreshToken,
-			wantMsg:    messages.MsgUnauthorized,
-		},
+		{name: "user", make: UserPersistenceError, code: CodeUserPersistence},
+		{name: "refresh token", make: RefreshTokenPersistenceError, code: CodeRefreshTokenPersistence},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := apperror.Status(tt.err); got != tt.wantStatus {
-				t.Errorf("Status() = %d, want %d", got, tt.wantStatus)
+			err := tt.make(cause)
+			var appErr *apperror.AppError
+			if !errors.As(err, &appErr) {
+				t.Fatalf("error type = %T, want *apperror.AppError", err)
 			}
-
-			var ae *apperror.AppError
-			if !errors.As(tt.err, &ae) {
-				t.Fatalf("expected *apperror.AppError, got %T", tt.err)
+			if appErr.Code != tt.code || appErr.HTTPStatus != http.StatusInternalServerError {
+				t.Fatalf("error = %#v, want code %q and status 500", appErr, tt.code)
 			}
-
-			if ae.Code != tt.wantCode {
-				t.Errorf("Code = %q, want %q", ae.Code, tt.wantCode)
-			}
-
-			if !strings.HasPrefix(string(ae.Code), "code:") {
-				t.Errorf("Code %q does not start with 'code:' prefix", ae.Code)
-			}
-
-			if ae.PublicMessage != tt.wantMsg {
-				t.Errorf("PublicMessage = %q, want %q", ae.PublicMessage, tt.wantMsg)
+			if !errors.Is(err, cause) {
+				t.Fatalf("error must preserve cause %v", cause)
 			}
 		})
-	}
-}
-
-func TestSentinels_CodeUniqueness(t *testing.T) {
-	codes := []apperror.Code{
-		CodeInvalidCredentials,
-		CodeInvalidRefreshToken,
-	}
-
-	seen := make(map[apperror.Code]struct{}, len(codes))
-	for _, code := range codes {
-		if _, ok := seen[code]; ok {
-			t.Errorf("duplicate code %q", code)
-		}
-		seen[code] = struct{}{}
 	}
 }

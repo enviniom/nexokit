@@ -7,8 +7,10 @@ import (
 
 // Module-owned business codes for the auth module.
 const (
-	CodeInvalidCredentials  apperror.Code = "code:invalid_credentials"
-	CodeInvalidRefreshToken apperror.Code = "code:invalid_refresh_token"
+	CodeInvalidCredentials      apperror.Code = "code:invalid_credentials"
+	CodeInvalidRefreshToken     apperror.Code = "code:invalid_refresh_token"
+	CodeUserPersistence         apperror.Code = "code:user_persistence_error"
+	CodeRefreshTokenPersistence apperror.Code = "code:refresh_token_persistence_error"
 )
 
 // Sentinel errors for the auth module.
@@ -23,3 +25,15 @@ var (
 	ErrInvalidCredentials  = apperror.Unauthorized(CodeInvalidCredentials, messages.MsgUnauthorized, nil)
 	ErrInvalidRefreshToken = apperror.Unauthorized(CodeInvalidRefreshToken, messages.MsgUnauthorized, nil)
 )
+
+// UserPersistenceError reports an unexpected user persistence failure while
+// retaining its original cause for logging.
+func UserPersistenceError(cause error) error {
+	return apperror.Internal(CodeUserPersistence, messages.MsgInternalError, cause)
+}
+
+// RefreshTokenPersistenceError reports an unexpected refresh-token persistence
+// failure while retaining its original cause for logging.
+func RefreshTokenPersistenceError(cause error) error {
+	return apperror.Internal(CodeRefreshTokenPersistence, messages.MsgInternalError, cause)
+}

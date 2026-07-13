@@ -2,10 +2,12 @@ package revoke_token
 
 import (
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -59,4 +61,25 @@ func TestRepository_GetByHashAndRevoke(t *testing.T) {
 			t.Fatalf("expected ErrInvalidRefreshToken, got %v", err)
 		}
 	})
+
+	t.Run("maps zero-row revoke to invalid refresh token", func(t *testing.T) {
+		err := repo.Revoke("missing")
+		if !errors.Is(err, core.ErrInvalidRefreshToken) {
+			t.Fatalf("Revoke() = %v, want invalid refresh token", err)
+		}
+	})
+
+	sqlDB, err := db.DB()
+	if err != nil || sqlDB.Close() != nil {
+		t.Fatalf("close db: %v", err)
+	}
+	assertRefreshPersistenceBoundary(t, repo.Revoke("closed"))
+}
+
+func assertRefreshPersistenceBoundary(t *testing.T, err error) {
+	t.Helper()
+	var appErr *apperror.AppError
+	if !errors.As(err, &appErr) || appErr.Code != core.CodeRefreshTokenPersistence || appErr.HTTPStatus != http.StatusInternalServerError || appErr.Internal == nil || !errors.Is(err, appErr.Internal) || err == appErr.Internal {
+		t.Fatalf("error = %#v, want wrapped refresh-token persistence AppError", err)
+	}
 }

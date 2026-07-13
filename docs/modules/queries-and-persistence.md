@@ -6,8 +6,10 @@
 
 1. A query belongs in `queries/` only when more than one slice uses it.
 2. Slice repositories wrap `queries/` files and translate persistence errors to domain errors.
-3. Partial GORM models for non-owned tables MUST implement `TableName()` when the struct name differs from the migration table name.
-4. Mappers and helpers have explicit placement rules; do not put them in the wrong place.
+3. Repository interfaces return idiomatic `error`; every non-nil persistence error that crosses that boundary is a module-owned `*apperror.AppError` returned through `error`.
+4. Pass every GORM `.Error` and meaningful zero-row outcome through the entity-specific mapper; never leak raw persistence errors.
+5. Partial GORM models for non-owned tables MUST implement `TableName()` when the struct name differs from the migration table name.
+6. Mappers and helpers have explicit placement rules; do not put them in the wrong place.
 
 ## Query extraction rules
 
@@ -37,12 +39,87 @@
 |---|---|
 | Repository wraps reusable queries and owns slice-specific persistence. | The repository is the only place that knows both the query and the slice's needs. |
 | Repository MUST map DB / GORM / persistence errors into domain errors before returning using the helpers in `queries/map_errors.go`. | Services and controllers stay free of GORM error inspection and logic. |
+| Repository interfaces MUST use `error` and MUST NOT import, expose, or return `platform/apperror` as a concrete signature type. | The interface remains idiomatic and independent of the error implementation. |
+| Every non-nil persistence failure returned by a repository MUST be a module-owned `*apperror.AppError` returned through `error`. Raw GORM, SQL, and driver errors MUST NOT cross the boundary. | Callers receive a stable module contract while logging retains technical context. |
 | Every module with persistence MUST have a `queries/` package, even if it has no shared query files. | It serves as the single source of truth for the database-to-domain error translation via `map_errors.go`. |
 | `queries/map_errors.go` MUST define entity-specific mapping helpers (e.g., `MapCategoryError(err error) error`) taking only the GORM error as a parameter. | Firm signatures stay clean and translation logic is centralized per entity. |
 | Repositories MUST NOT do ad-hoc DB/GORM error string checking or direct error comparisons inline. | Eliminates variance in how constraints, unique keys, and "not found" outcomes are mapped across slices. |
 | Services MUST NOT import GORM. | Services are pure business rules; persistence is the repository's job. |
 | When a slice does not need a reusable query, the repository contains the query inline. | `queries/` is for reuse, not for storage of every query. |
+| Repositories MUST pass every GORM operation's `.Error` through the correct entity mapper, including reads, creates, updates, deletes, and transaction operations. | Error translation is universal, not limited to lookup failures. |
+| Repositories MUST inspect `RowsAffected` when zero rows has domain meaning and map that outcome through the entity mapper or a dedicated entity outcome. | A successful SQL execution can still mean the target did not exist. |
 
+### Entity-specific mapper contract
+
+- An entity-specific mapper MUST take exactly one parameter: the persistence / GORM `error` (for example, `MapUserError(err error) error`).
+- A repository MUST NOT pass a domain sentinel, error code, HTTP status, or any other mapping selector. The mapper owns the mapping decision.
+- The mapper MUST return `error`: `nil` remains `nil`, recognized outcomes return specific module-owned domain `AppError` values, and unknown failures return a module-owned internal `AppError` whose `Internal`/`Unwrap()` chain preserves the original cause.
+- The mapper return type MUST NOT be narrowed to `*apperror.AppError`; callers verify the concrete value with `errors.As` while repository signatures remain `error`.
+- Unknown persistence errors MUST NOT be returned unchanged. Preserving the cause means wrapping it in the module-owned internal `AppError`, not leaking it as the boundary value.
+
+Auth-style mappers use `errors.Is` so wrapped not-found errors are recognized:
+
+```go
+func MapUserError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return core.ErrInvalidCredentials
+	}
+	return core.UserPersistenceError(err)
+}
+
+func MapRefreshTokenError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return core.ErrInvalidRefreshToken
+	}
+	return core.RefreshTokenPersistenceError(err)
+}
+```
+
+Repository usage:
+
+```go
+result := r.db.Create(refresh)
+return queries.MapRefreshTokenError(result.Error)
+```
+
+Forbidden because the caller selects the domain outcome:
+
+```go
+return nil, queries.MapNotFound(err, core.ErrInvalidCredentials)
+```
+
+Also forbidden because a raw persistence error escapes:
+
+```go
+return r.db.Create(refresh).Error
+```
+
+For updates where no matching row means an invalid refresh token, inspect both channels:
+
+```go
+result := r.db.Model(&core.RefreshToken{}).Where("token_hash = ?", hash).Updates(updates)
+if result.Error != nil {
+	return queries.MapRefreshTokenError(result.Error)
+}
+if result.RowsAffected == 0 {
+	return queries.MapRefreshTokenError(gorm.ErrRecordNotFound)
+}
+return nil
+```
+
+### Persistence error test contract
+
+- Mapper and repository tests MUST use `errors.As(err, *apperror.AppError)` for every non-nil persistence result.
+- Tests MUST assert the expected HTTP status and module-owned code for known and unknown outcomes.
+- Unknown-failure tests MUST assert `errors.Is(mapped, original)` so logging retains the cause through `Internal`/`Unwrap()`.
+- Repository tests MUST assert the returned boundary value is not the original raw GORM, SQL, or driver error.
+- Structural guards MUST discover and scan all auth `slices/**/repository.go` files and every repository method; they MUST NOT hard-code only selected methods or files.
 
 ## GORM partial model `TableName()` rule
 
@@ -96,6 +173,14 @@ func (IAMUser) TableName() string { return "users" }
 
 - [ ] Every module with persistence contains a `queries/` package and `queries/map_errors.go` file.
 - [ ] `queries/map_errors.go` exposes entity-specific error mappers taking only the GORM error as a parameter.
+- [ ] No persistence error mapper accepts a caller-selected domain error, sentinel, code, HTTP status, or mapping selector.
+- [ ] Repository interfaces return `error` and do not import or expose `platform/apperror`.
+- [ ] Every non-nil persistence error returned by a repository is a module-owned `*apperror.AppError` through `error`.
+- [ ] Unknown persistence failures become module-owned internal `AppError` values and preserve their original cause.
+- [ ] Every GORM `.Error`, including writes and updates, passes through the correct entity mapper.
+- [ ] `RowsAffected` is reviewed and zero rows is mapped wherever it has domain meaning.
+- [ ] Tests assert `errors.As`, status/code, cause preservation, and no raw persistence leak.
+- [ ] Structural guards scan all repository files and methods dynamically rather than naming a subset.
 - [ ] `queries/` contains reusable persistence queries, one file per query (if reused).
 - [ ] Each `queries/` file has dedicated tests.
 - [ ] Slice repository wraps reusable queries and translates persistence errors to domain errors using the helpers in `queries/map_errors.go`.

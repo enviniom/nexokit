@@ -10,6 +10,7 @@ Validation and error mapping are the contract between the module and the HTTP la
 4. Services and repositories MUST NOT construct ad-hoc `apperror` values inline.
 5. Handlers funnel business / app errors through `response.HandleError`.
 6. Expected control flow uses explicit contracts like `(*Customer, bool, error)`, not `AppError`.
+7. Repository interfaces stay typed as `error`; every non-nil persistence error they return is a module-owned `*apperror.AppError` with unknown causes preserved internally.
 
 ## API response envelope reminder
 
@@ -123,6 +124,7 @@ See [`docs/module-error-conventions.md`](../module-error-conventions.md) for the
 |---|---|
 | Service | Returns reusable errors from `core/errors.go` or wraps internal errors with `fmt.Errorf("...: %w", err)`. MUST NOT construct ad-hoc `apperror` values. |
 | Repository | Maps DB / GORM errors to domain errors before returning using the mandatory entity-specific helpers in `queries/map_errors.go`. MUST NOT write inline GORM error checks or construct ad-hoc `apperror` values. |
+| Repository interface | Returns idiomatic `error` and MUST NOT import or expose `platform/apperror`; concrete persistence failures are module-owned `*apperror.AppError` values carried through `error`. |
 | Handler | Calls `response.HandleError(c, err)` for business / app errors. MUST NOT inspect `apperror` codes manually. |
 
 ## Error mapping path
@@ -141,7 +143,7 @@ DB / GORM error → repository → core / domain error → service → handler �
 | Protected resource. | Module error from `core/errors.go`, built with `apperror.Forbidden(...)`. | 403 via `response.HandleError`. |
 | Invalid DTO. | `validator.ValidationErrors{"email": []string{"invalid"}}` from `dto.Validate()`. | 422 with field-keyed error map. |
 | Malformed JSON body. | Binding error from Gin. | 400 Bad Request. |
-| Unexpected DB failure. | Wrapped technical error. | 500 via `response.HandleError`; internal error logged by middleware. |
+| Unexpected DB failure. | Module-owned internal `AppError` with the technical cause in `Internal`/`Unwrap()`. | 500 via `response.HandleError`; preserved cause logged by middleware. |
 | Expected "not present" (idempotent). | `(*Customer, bool, error)` with the bool as the existence signal. | Branch on bool, no error mapping. |
 
 ## Expected control flow
@@ -174,3 +176,6 @@ GetCustomerByEmail(ctx context.Context, email string) (*core.Customer, bool, err
 - [ ] Handlers route business / app errors through `response.HandleError`.
 - [ ] Expected control flow uses `(*T, bool, error)` or a typed result, not `AppError`.
 - [ ] Repository maps database and GORM errors (like not found or duplicate constraint errors) to domain errors using the mandatory `queries/map_errors.go` helpers.
+- [ ] Repository interfaces remain `error`-based and do not expose or import `platform/apperror`.
+- [ ] Every non-nil repository persistence error supports `errors.As(..., *apperror.AppError)`; unknown failures preserve the original cause with `errors.Is` and never leak raw.
+- [ ] Every GORM `.Error` and meaningful zero-row result is translated by the correct entity-specific mapper.

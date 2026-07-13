@@ -3,11 +3,11 @@ package auth
 import (
 	"time"
 
-	"github.com/enviniom/nexokit/internal/modules/auth/authenticate_user"
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
-	"github.com/enviniom/nexokit/internal/modules/auth/revoke_token"
-	"github.com/enviniom/nexokit/internal/modules/auth/rotate_token"
-	"github.com/enviniom/nexokit/internal/modules/auth/view_session"
+	"github.com/enviniom/nexokit/internal/modules/auth/slices/authenticate_user"
+	"github.com/enviniom/nexokit/internal/modules/auth/slices/revoke_token"
+	"github.com/enviniom/nexokit/internal/modules/auth/slices/rotate_token"
+	"github.com/enviniom/nexokit/internal/modules/auth/slices/view_session"
 	"gorm.io/gorm"
 )
 
