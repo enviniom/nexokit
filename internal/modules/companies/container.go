@@ -2,13 +2,13 @@ package companies
 
 import (
 	"github.com/enviniom/nexokit/internal/middleware"
-	"github.com/enviniom/nexokit/internal/modules/companies/create_company_domain"
-	"github.com/enviniom/nexokit/internal/modules/companies/delete_company"
-	"github.com/enviniom/nexokit/internal/modules/companies/list_companies"
-	"github.com/enviniom/nexokit/internal/modules/companies/list_company_domains"
-	"github.com/enviniom/nexokit/internal/modules/companies/update_company"
-	"github.com/enviniom/nexokit/internal/modules/companies/update_company_domain"
-	"github.com/enviniom/nexokit/internal/modules/companies/view_company"
+	"github.com/enviniom/nexokit/internal/modules/companies/slices/create_company_domain"
+	"github.com/enviniom/nexokit/internal/modules/companies/slices/delete_company"
+	"github.com/enviniom/nexokit/internal/modules/companies/slices/list_companies"
+	"github.com/enviniom/nexokit/internal/modules/companies/slices/list_company_domains"
+	"github.com/enviniom/nexokit/internal/modules/companies/slices/update_company"
+	"github.com/enviniom/nexokit/internal/modules/companies/slices/update_company_domain"
+	"github.com/enviniom/nexokit/internal/modules/companies/slices/view_company"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )

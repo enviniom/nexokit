@@ -47,3 +47,12 @@ func TestGormRepository_Update_UniqueViolation(t *testing.T) {
 		t.Fatalf("expected ErrDuplicateCompanySlug, got %v", err)
 	}
 }
+
+func TestGormRepository_Update_ZeroRowsIsNotFound(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	_ = db.AutoMigrate(&core.Company{})
+	err := NewRepository(db).Update(&core.Company{BaseModel: shared.BaseModel{PublicID: "missing"}, Name: "Missing", Slug: "missing", Status: core.CompanyStatusActive})
+	if !errors.Is(err, core.ErrCompanyNotFound) {
+		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
+	}
+}

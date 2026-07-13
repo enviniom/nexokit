@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -81,6 +82,29 @@ func TestSentinels_Status_Code_PublicMessage(t *testing.T) {
 
 			if ae.PublicMessage != tt.wantMsg {
 				t.Errorf("PublicMessage = %q, want %q", ae.PublicMessage, tt.wantMsg)
+			}
+		})
+	}
+}
+
+func TestPersistenceErrorsWrapOriginalCause(t *testing.T) {
+	cause := errors.New("database unavailable")
+	for _, tt := range []struct {
+		name string
+		make func(error) error
+		code apperror.Code
+	}{
+		{name: "company", make: CompanyPersistenceError, code: CodeCompanyPersistence},
+		{name: "company domain", make: CompanyDomainPersistenceError, code: CodeCompanyDomainPersistence},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.make(cause)
+			var appErr *apperror.AppError
+			if !errors.As(err, &appErr) || appErr.Code != tt.code || appErr.HTTPStatus != http.StatusInternalServerError {
+				t.Fatalf("expected 500 AppError with %q, got %#v", tt.code, appErr)
+			}
+			if !errors.Is(err, cause) {
+				t.Fatalf("error must preserve cause %v", cause)
 			}
 		})
 	}

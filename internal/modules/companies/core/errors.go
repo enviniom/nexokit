@@ -1,6 +1,9 @@
 package core
 
-import "github.com/enviniom/nexokit/internal/platform/apperror"
+import (
+	"github.com/enviniom/nexokit/internal/platform/apperror"
+	"github.com/enviniom/nexokit/internal/platform/messages"
+)
 
 // Module-owned business codes for the companies module.
 const (
@@ -10,7 +13,21 @@ const (
 	CodePrimaryDomainExists        apperror.Code = "code:primary_domain_exists"
 	CodeCompanyDomainDoesNotBelong apperror.Code = "code:company_domain_does_not_belong"
 	CodeCompanySlugDuplicate       apperror.Code = "code:company_slug_duplicate"
+	CodeCompanyPersistence         apperror.Code = "code:company_persistence_error"
+	CodeCompanyDomainPersistence   apperror.Code = "code:company_domain_persistence_error"
 )
+
+// CompanyPersistenceError reports an unexpected company persistence failure
+// while retaining its original cause for logging.
+func CompanyPersistenceError(cause error) error {
+	return apperror.Internal(CodeCompanyPersistence, messages.MsgInternalError, cause)
+}
+
+// CompanyDomainPersistenceError reports an unexpected company-domain
+// persistence failure while retaining its original cause for logging.
+func CompanyDomainPersistenceError(cause error) error {
+	return apperror.Internal(CodeCompanyDomainPersistence, messages.MsgInternalError, cause)
+}
 
 // Sentinel errors for the companies module.
 //

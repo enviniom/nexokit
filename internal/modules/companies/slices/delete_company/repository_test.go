@@ -42,3 +42,12 @@ func TestGormRepository_GetByPublicID_NotFound(t *testing.T) {
 		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
 	}
 }
+
+func TestGormRepository_Delete_ZeroRowsIsNotFound(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	_ = db.AutoMigrate(&core.Company{})
+	err := NewRepository(db).Delete("missing")
+	if !errors.Is(err, core.ErrCompanyNotFound) {
+		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
+	}
+}

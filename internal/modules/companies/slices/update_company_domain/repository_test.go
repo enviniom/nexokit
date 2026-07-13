@@ -55,3 +55,12 @@ func TestGormRepository_UpdateDomain_UniqueViolation(t *testing.T) {
 		t.Fatalf("expected ErrDuplicateCompanyDomain, got %v", err)
 	}
 }
+
+func TestGormRepository_UpdateDomain_ZeroRowsIsNotFound(t *testing.T) {
+	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	_ = db.AutoMigrate(&core.Company{}, &core.CompanyDomain{})
+	err := NewRepository(db).UpdateDomain(&core.CompanyDomain{BaseModel: shared.BaseModel{PublicID: "missing"}, Domain: "missing.example", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindAlias})
+	if !errors.Is(err, core.ErrCompanyDomainNotFound) {
+		t.Fatalf("expected ErrCompanyDomainNotFound, got %v", err)
+	}
+}

@@ -2,6 +2,7 @@ package list_companies
 
 import (
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
+	"github.com/enviniom/nexokit/internal/modules/companies/queries"
 	"github.com/enviniom/nexokit/internal/platform/gormutil"
 	"gorm.io/gorm"
 )
@@ -25,7 +26,7 @@ func (r *GormRepository) List(req core.ListCompaniesRequest) ([]core.Company, in
 	db = gormutil.ApplyDateRange(db, req.ListParams.Filters, "created_at")
 	db = gormutil.ApplySearch(db, req.ListParams.Search, "name", "slug")
 	if err := db.Count(&total).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, queries.MapCompanyError(err)
 	}
 	sort := req.ListParams.Sort
 	if sort.Sort == "" {
@@ -37,7 +38,7 @@ func (r *GormRepository) List(req core.ListCompaniesRequest) ([]core.Company, in
 	db = gormutil.ApplySorting(db, sort, "created_at", "name", "slug", "status")
 	db = gormutil.ApplyPagination(db, req.ListParams.Pagination.Page, req.ListParams.Pagination.PerPage)
 	if err := db.Find(&rows).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, queries.MapCompanyError(err)
 	}
 	return rows, total, nil
 }

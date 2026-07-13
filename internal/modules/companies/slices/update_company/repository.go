@@ -1,11 +1,8 @@
 package update_company
 
 import (
-	"errors"
-
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
 	"github.com/enviniom/nexokit/internal/modules/companies/queries"
-	"github.com/enviniom/nexokit/internal/platform/gormutil"
 	"gorm.io/gorm"
 )
 
@@ -20,29 +17,24 @@ func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db}
 func (r *GormRepository) GetByPublicID(id string) (*core.Company, error) {
 	c, err := queries.GetCompanyByPublicID(r.db, id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, core.ErrCompanyNotFound
-		}
-		return nil, err
+		return nil, queries.MapCompanyError(err)
 	}
 	return c, nil
 }
 func (r *GormRepository) GetBySlugIncludingDeleted(slug string) (*core.Company, error) {
 	var c core.Company
 	if err := r.db.Unscoped().Where("slug = ?", slug).First(&c).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, core.ErrCompanyNotFound
-		}
-		return nil, err
+		return nil, queries.MapCompanyError(err)
 	}
 	return &c, nil
 }
 func (r *GormRepository) Update(c *core.Company) error {
-	if err := r.db.Save(c).Error; err != nil {
-		if gormutil.IsUniqueConstraintError(err) {
-			return core.ErrDuplicateCompanySlug
-		}
-		return err
+	result := r.db.Model(&core.Company{}).Where("public_id = ?", c.PublicID).Updates(map[string]any{"name": c.Name, "slug": c.Slug, "status": c.Status})
+	if result.Error != nil {
+		return queries.MapCompanyError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return queries.MapCompanyError(gorm.ErrRecordNotFound)
 	}
 	return nil
 }
