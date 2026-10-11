@@ -13,15 +13,61 @@ import (
 )
 
 type fakeService struct {
-	item *core.PermissionResponse
-	err  error
+	item  *core.PermissionResponse
+	err   error
+	calls *int
 }
 
 func (f fakeService) Update(_ string, _ core.UpdatePermissionRequest) (*core.PermissionResponse, error) {
+	if f.calls != nil {
+		*f.calls++
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.item, nil
+}
+
+func TestHandlerRejectsInvalidRequests(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tt := range []struct {
+		name   string
+		body   string
+		status int
+	}{
+		{name: "malformed JSON", body: `{"name":`, status: http.StatusBadRequest},
+		{name: "wrong field type", body: `{"name":123}`, status: http.StatusBadRequest},
+		{name: "invalid fields", body: `{}`, status: http.StatusUnprocessableEntity},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			h := NewHandler(fakeService{calls: &calls})
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPut, "/iam/permissions/perm-1", bytes.NewBufferString(tt.body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			h.Handle(c)
+			if calls != 0 {
+				t.Errorf("service calls = %d, want 0", calls)
+			}
+			if w.Code != tt.status {
+				t.Fatalf("status = %d, want %d", w.Code, tt.status)
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("decode response: %v", err)
+			}
+			if payload["success"] != false {
+				t.Errorf("success = %v, want false", payload["success"])
+			}
+			if tt.status == http.StatusUnprocessableEntity {
+				fields, ok := payload["errors"].(map[string]any)
+				if !ok || len(fields) == 0 {
+					t.Errorf("expected field validation errors, got %v", payload["errors"])
+				}
+			}
+		})
+	}
 }
 
 func TestHandlerHandle(t *testing.T) {

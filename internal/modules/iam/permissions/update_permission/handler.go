@@ -14,7 +14,7 @@ func NewHandler(service Service) *Handler { return &Handler{service: service} }
 func (h *Handler) Handle(c *gin.Context) {
 	var req core.UpdatePermissionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.ValidationError(c, err)
+		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
 	if response.RespondIfInvalid(c, req.Validate()) {

@@ -24,8 +24,8 @@ Audit current implementation against repository documentation, correct demonstra
 - [x] T1 (done): Complete source compliance inventory and report demonstrated findings with explicit coverage. Audit all production persistence, routes/handlers, imports and remaining documentation/runtime surfaces; distinguish current rules, legacy conventions and future guidance.
 - [x] T2 (done): Scope role-permission mutations to trusted tenant context, with regression tests for same/cross tenant, root-global, selected-root and transaction failures as applicable. Verify focused IAM tests.
 - [x] T5 (done): Reject absent tenant context in IAM handlers; assert no service calls and preserve explicit root/global/scoped contexts. Update affected HTTP integration wiring only when required.
-- [ ] T6 (in_progress): Return 400 for malformed permission-update JSON and retain 422 for valid JSON with invalid fields; prove with handler regression tests.
-- [ ] T3 (pending): Make generated modules conform to new-code layout, safe DTO mapping and normalization, trusted tenant scope and safe errors. Generate normal/tenant fixtures in temporary directories and prove compiled behavior with regression tests; update affected scaffold documentation accurately. Keep generator compatibility where safe; no unrelated module migration.
+- [x] T6 (done): Return 400 for malformed permission-update JSON and retain 422 for valid JSON with invalid fields; prove with handler regression tests.
+- [ ] T3 (in_progress): Make generated modules conform to new-code layout, safe DTO mapping and normalization, trusted tenant scope and safe errors. Generate normal/tenant fixtures in temporary directories and prove compiled behavior with regression tests; update affected scaffold documentation accurately. Keep generator compatibility where safe; no unrelated module migration.
 - [ ] T4 (pending): Run final independent checks, reconcile every finding and publish audit evidence/limitations for human validation. Full tests, vet, module guards, format, diff checks; record work-unit commits.
 
 ## Acceptance
@@ -54,7 +54,10 @@ Verifier: `go test -timeout 180s ./...`, `go test -short ./...`, `go vet ./...`,
 - T2 work-unit commit: `e0c0f4c`.
 - T2: observed RED for foreign/deleted/missing/selected-root foreign mutations; GREEN for own/global/selected scopes, scoped cache deletion and duplicate-insert rollback. Writer and independent verifier passed focused assignment/integration and full IAM tests; verifier results cached. No blocker. SQLite does not certify PostgreSQL locking/Redis behavior.
 
+- T5 work-unit commit: `f848eb2`.
 - T5: all 15 handler fallbacks removed (7 roles, 8 users). Observed RED using unreachable-service sentinel, GREEN for missing400 and explicit root/scoped contexts. Formatted30 files; independent fresh role/user/integration tests and diff checks PASS. 872 changed lines largely preserve and expand existing test tables; coherent single policy unit.
 
+- T6: RED for malformed JSON/wrong field types returning422; GREEN400 binding,422 invalid fields, zero service calls. Fresh writer+independent permission suite, format and diff checks PASS.
+
 ## Progress and next step
-T1/T2/T5 complete. T6 active next; generator T3 and final T4 pending.
+T1/T2/T5/T6 complete. Generator T3 active next; final T4 pending.
