@@ -1,15 +1,14 @@
 package revoke_token
 
 import (
-	"time"
-
-	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
 	"github.com/enviniom/nexokit/internal/modules/auth/queries"
 	"gorm.io/gorm"
+	"time"
 )
 
 type Repository interface {
-	GetByHash(hash string) (*core.RefreshToken, error)
+	GetByHash(hash string) (*refresh_token.RefreshToken, error)
 	Revoke(hash string) error
 }
 
@@ -17,7 +16,7 @@ type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
-func (r *GormRepository) GetByHash(hash string) (*core.RefreshToken, error) {
+func (r *GormRepository) GetByHash(hash string) (*refresh_token.RefreshToken, error) {
 	refresh, err := queries.FindRefreshTokenByHashWithUser(r.db, hash)
 	if err != nil {
 		return nil, queries.MapRefreshTokenError(err)
@@ -26,7 +25,7 @@ func (r *GormRepository) GetByHash(hash string) (*core.RefreshToken, error) {
 }
 
 func (r *GormRepository) Revoke(hash string) error {
-	result := r.db.Model(&core.RefreshToken{}).Where("token_hash = ?", hash).Updates(map[string]any{"revoked_at": time.Now()})
+	result := r.db.Model(&refresh_token.RefreshToken{}).Where("token_hash = ?", hash).Updates(map[string]any{"revoked_at": time.Now()})
 	if result.Error != nil {
 		return queries.MapRefreshTokenError(result.Error)
 	}

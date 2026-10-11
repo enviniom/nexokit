@@ -1,4 +1,4 @@
-package core
+package user
 
 import (
 	"time"
@@ -12,21 +12,10 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-func (r LoginRequest) Validate() validator.ValidationErrors {
+func (r *LoginRequest) Validate() validator.ValidationErrors {
 	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "email", r.Email).Required().Apply(validator.ValidEmail())
 	validator.Field(errs, "password", r.Password).Required()
-	return errs
-}
-
-// RefreshRequest is the DTO for refresh and logout requests.
-type RefreshRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
-
-func (r RefreshRequest) Validate() validator.ValidationErrors {
-	errs := make(validator.ValidationErrors)
-	validator.Field(errs, "refresh_token", r.RefreshToken).Required()
 	return errs
 }
 
@@ -45,10 +34,13 @@ type AuthUserResponse struct {
 	UpdatedBy *uint     `json:"updated_by,omitempty"`
 }
 
-// TokenPairResponse returns a rotated token pair.
-type TokenPairResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+func (r *AuthUserResponse) FromModel(model AuthUser) {
+	*r = AuthUserResponse{
+		PublicID: model.PublicID, Name: model.Name, Email: model.Email,
+		IsActive: model.IsActive, RoleID: model.RoleID, RoleName: model.Role.Name,
+		CompanyID: model.CompanyID, CreatedAt: model.CreatedAt, UpdatedAt: model.UpdatedAt,
+		CreatedBy: model.CreatedBy, UpdatedBy: model.UpdatedBy,
+	}
 }
 
 // LoginResponse returns tokens and a sanitized user DTO.
@@ -63,4 +55,16 @@ type MeResponse struct {
 	AuthUserResponse
 	RoleSlug    string   `json:"role_slug"`
 	Permissions []string `json:"permissions"`
+}
+
+// FromSession maps the sanitized auth-context projection, preserving /me's zero audit timestamps.
+func (r *MeResponse) FromSession(view SessionView) {
+	*r = MeResponse{
+		AuthUserResponse: AuthUserResponse{
+			PublicID: view.PublicID, Name: view.Name, Email: view.Email,
+			IsActive: view.IsActive, RoleID: view.RoleID, RoleName: view.RoleName,
+			CompanyID: view.CompanyID,
+		},
+		RoleSlug: view.RoleSlug, Permissions: view.Permissions,
+	}
 }

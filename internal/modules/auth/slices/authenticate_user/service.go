@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
+	userdto "github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 )
 
@@ -12,7 +14,7 @@ type PasswordVerifier interface {
 }
 
 type Service interface {
-	Login(req core.LoginRequest) (*core.LoginResponse, error)
+	Login(req userdto.LoginRequest) (*userdto.LoginResponse, error)
 }
 
 type service struct {
@@ -26,7 +28,7 @@ func NewService(repo Repository, verifier PasswordVerifier, manager core.TokenMa
 	return &service{repo: repo, verifier: verifier, manager: manager, refreshTTL: refreshTTL}
 }
 
-func (s *service) Login(req core.LoginRequest) (*core.LoginResponse, error) {
+func (s *service) Login(req userdto.LoginRequest) (*userdto.LoginResponse, error) {
 	user, err := s.repo.GetByEmail(req.Email)
 	if err != nil {
 		return nil, err
@@ -50,7 +52,7 @@ func (s *service) Login(req core.LoginRequest) (*core.LoginResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := s.repo.CreateRefreshToken(&core.RefreshToken{
+	if err := s.repo.CreateRefreshToken(&refresh_token.RefreshToken{
 		PublicID:  publicID,
 		UserID:    user.ID,
 		TokenHash: s.manager.HashRefreshToken(refresh),
@@ -59,21 +61,7 @@ func (s *service) Login(req core.LoginRequest) (*core.LoginResponse, error) {
 		return nil, err
 	}
 
-	return &core.LoginResponse{AccessToken: access, RefreshToken: refresh, User: toUserResponse(user)}, nil
-}
-
-func toUserResponse(user *core.AuthUser) core.AuthUserResponse {
-	return core.AuthUserResponse{
-		PublicID:  user.PublicID,
-		Name:      user.Name,
-		Email:     user.Email,
-		IsActive:  user.IsActive,
-		RoleID:    user.RoleID,
-		RoleName:  user.Role.Name,
-		CompanyID: user.CompanyID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		CreatedBy: user.CreatedBy,
-		UpdatedBy: user.UpdatedBy,
-	}
+	result := &userdto.LoginResponse{AccessToken: access, RefreshToken: refresh}
+	result.User.FromModel(*user)
+	return result, nil
 }

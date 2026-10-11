@@ -1,6 +1,7 @@
 package view_session
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/platform/authctx"
@@ -8,8 +9,8 @@ import (
 
 type fakeServiceRepository struct{}
 
-func (fakeServiceRepository) BuildSession(current *authctx.User) (*SessionView, error) {
-	return &SessionView{RoleSlug: current.RoleSlug, Permissions: current.Permissions}, nil
+func (fakeServiceRepository) BuildSession(current *authctx.User) (*user.SessionView, error) {
+	return &user.SessionView{RoleSlug: current.RoleSlug, Permissions: current.Permissions}, nil
 }
 
 func TestService_View(t *testing.T) {

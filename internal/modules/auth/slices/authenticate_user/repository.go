@@ -1,21 +1,22 @@
 package authenticate_user
 
 import (
-	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"github.com/enviniom/nexokit/internal/modules/auth/queries"
 	"gorm.io/gorm"
 )
 
 type Repository interface {
-	GetByEmail(email string) (*core.AuthUser, error)
-	CreateRefreshToken(refresh *core.RefreshToken) error
+	GetByEmail(email string) (*user.AuthUser, error)
+	CreateRefreshToken(refresh *refresh_token.RefreshToken) error
 }
 
 type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
-func (r *GormRepository) GetByEmail(email string) (*core.AuthUser, error) {
+func (r *GormRepository) GetByEmail(email string) (*user.AuthUser, error) {
 	user, err := queries.FindUserByEmail(r.db, email)
 	if err != nil {
 		return nil, queries.MapUserError(err)
@@ -26,6 +27,6 @@ func (r *GormRepository) GetByEmail(email string) (*core.AuthUser, error) {
 	return user, nil
 }
 
-func (r *GormRepository) CreateRefreshToken(refresh *core.RefreshToken) error {
+func (r *GormRepository) CreateRefreshToken(refresh *refresh_token.RefreshToken) error {
 	return queries.MapRefreshTokenError(r.db.Create(refresh).Error)
 }

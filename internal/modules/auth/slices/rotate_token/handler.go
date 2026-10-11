@@ -1,7 +1,7 @@
 package rotate_token
 
 import (
-	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
@@ -12,7 +12,7 @@ type Handler struct{ service Service }
 func NewHandler(service Service) *Handler { return &Handler{service: service} }
 
 func (h *Handler) Handle(c *gin.Context) {
-	var req core.RefreshRequest
+	var req refresh_token.RefreshRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return

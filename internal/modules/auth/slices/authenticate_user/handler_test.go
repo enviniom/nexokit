@@ -9,17 +9,22 @@ import (
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
 )
 
 type fakeService struct {
-	result *core.LoginResponse
+	result *user.LoginResponse
 	err    error
+	calls  *int
 }
 
-func (f fakeService) Login(req core.LoginRequest) (*core.LoginResponse, error) {
+func (f fakeService) Login(req user.LoginRequest) (*user.LoginResponse, error) {
+	if f.calls != nil {
+		*f.calls++
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -40,10 +45,10 @@ func TestHandler_Handle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("returns tokens and sanitized user", func(t *testing.T) {
-		h := NewHandler(fakeService{result: &core.LoginResponse{AccessToken: "access", RefreshToken: "refresh", User: core.AuthUserResponse{PublicID: "user1", Email: "user@example.com", RoleName: "admin"}}})
+		h := NewHandler(fakeService{result: &user.LoginResponse{AccessToken: "access", RefreshToken: "refresh", User: user.AuthUserResponse{PublicID: "user1", Email: "user@example.com", RoleName: "admin"}}})
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request = authJSONRequest(http.MethodPost, "/auth/login", core.LoginRequest{Email: "user@example.com", Password: "Secret1!"})
+		c.Request = authJSONRequest(http.MethodPost, "/auth/login", user.LoginRequest{Email: "user@example.com", Password: "Secret1!"})
 
 		h.Handle(c)
 
@@ -53,7 +58,7 @@ func TestHandler_Handle(t *testing.T) {
 		if strings.Contains(w.Body.String(), "password") || strings.Contains(w.Body.String(), "password_hash") {
 			t.Fatalf("response leaked password fields: %s", w.Body.String())
 		}
-		var resp response.APIResponse[core.LoginResponse]
+		var resp response.APIResponse[user.LoginResponse]
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to decode response: %v", err)
 		}
@@ -63,23 +68,25 @@ func TestHandler_Handle(t *testing.T) {
 	})
 
 	t.Run("returns validation errors before service call", func(t *testing.T) {
-		h := NewHandler(fakeService{})
+		calls := 0
+		h := NewHandler(fakeService{calls: &calls})
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request = authJSONRequest(http.MethodPost, "/auth/login", core.LoginRequest{Email: "bad"})
+		c.Request = authJSONRequest(http.MethodPost, "/auth/login", user.LoginRequest{Email: "bad"})
 
 		h.Handle(c)
 
 		if w.Code != http.StatusUnprocessableEntity {
 			t.Fatalf("expected status 422, got %d", w.Code)
 		}
+		assertRejectedRequest(t, w, calls, []string{"email", "password"})
 	})
 
 	t.Run("returns generic unauthorized for invalid credentials", func(t *testing.T) {
 		h := NewHandler(fakeService{err: core.ErrInvalidCredentials})
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
-		c.Request = authJSONRequest(http.MethodPost, "/auth/login", core.LoginRequest{Email: "user@example.com", Password: "Secret1!"})
+		c.Request = authJSONRequest(http.MethodPost, "/auth/login", user.LoginRequest{Email: "user@example.com", Password: "Secret1!"})
 
 		h.Handle(c)
 
@@ -89,6 +96,102 @@ func TestHandler_Handle(t *testing.T) {
 
 		assertUnauthorizedEnvelope(t, w)
 	})
+}
+
+func assertRejectedRequest(t *testing.T, w *httptest.ResponseRecorder, calls int, keys []string) {
+	t.Helper()
+	var envelope response.ValidationErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	_ = json.Unmarshal(w.Body.Bytes(), &fields)
+	if calls != 0 || len(fields) != 5 || envelope.Success || envelope.Data != nil || envelope.Meta != nil {
+		t.Fatalf("calls=%d envelope=%s", calls, w.Body.String())
+	}
+	if keys == nil {
+		if envelope.Message != messages.MsgBadRequest || string(fields["errors"]) != "null" {
+			t.Fatalf("unexpected bad request: %s", w.Body.String())
+		}
+		return
+	}
+	if envelope.Message != messages.MsgValidationError || len(envelope.Errors) != len(keys) {
+		t.Fatalf("unexpected validation: %s", w.Body.String())
+	}
+	for _, key := range keys {
+		if len(envelope.Errors[key]) == 0 {
+			t.Fatalf("missing error %q", key)
+		}
+	}
+}
+
+func TestHandlerRejectedBodies(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tc := range []struct {
+		name, body string
+		status     int
+		keys       []string
+	}{
+		{"malformed JSON", `{"email":`, http.StatusBadRequest, nil},
+		{"missing fields", `{}`, http.StatusUnprocessableEntity, []string{"email", "password"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			h := NewHandler(fakeService{calls: &calls})
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewBufferString(tc.body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			h.Handle(c)
+			if w.Code != tc.status {
+				t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+			}
+			assertRejectedRequest(t, w, calls, tc.keys)
+		})
+	}
+}
+
+func TestHandlerOptionalUserFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	id := uint(7)
+	for _, tc := range []struct {
+		name     string
+		optional *uint
+	}{
+		{name: "absent"}, {name: "present", optional: &id},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := NewHandler(fakeService{result: &user.LoginResponse{User: user.AuthUserResponse{CompanyID: tc.optional, CreatedBy: tc.optional, UpdatedBy: tc.optional}}})
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = authJSONRequest(http.MethodPost, "/auth/login", user.LoginRequest{Email: "user@example.com", Password: "secret"})
+			h.Handle(c)
+			if w.Code != http.StatusOK {
+				t.Fatalf("status = %d", w.Code)
+			}
+			var envelope struct {
+				Data struct {
+					User map[string]json.RawMessage `json:"user"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
+				t.Fatal(err)
+			}
+			wantCount := 8
+			if tc.optional != nil {
+				wantCount += 3
+			}
+			if len(envelope.Data.User) != wantCount {
+				t.Fatalf("unexpected user fields: %s", w.Body.String())
+			}
+			for _, key := range []string{"company_id", "created_by", "updated_by"} {
+				value, present := envelope.Data.User[key]
+				if present != (tc.optional != nil) || (present && string(value) != "7") {
+					t.Errorf("%s = %s, present=%v", key, value, present)
+				}
+			}
+		})
+	}
 }
 
 func assertUnauthorizedEnvelope(t *testing.T, w *httptest.ResponseRecorder) {

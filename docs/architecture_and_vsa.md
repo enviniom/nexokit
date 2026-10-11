@@ -23,7 +23,8 @@ internal/modules/<name>/
 
 Do not put new slice implementation files in the module root or import that root from a slice. Extract reused persistence queries into `queries/`, preferably one operation per file; non-persistence helpers, DTO mapping and business policy belong elsewhere.
 
-This is a **new-code convention**, not an assertion of uniform existing directories. Current application models and DTOs remain in flat `core/model.go` and `core/dto.go`; they have not been migrated. New generator output follows the entity core and use-case layout above, with root `container.go`/`routes.go`, module contracts/errors and handler + repository slices. It creates `get_<name>`/`list_<name>` by default; `--crud` also creates `create_<name>`/`update_<name>`/`delete_<name>`. It does not create an empty `queries/` directory or automatically mount routes. Auth and companies have flat `slices/<use_case>/`; IAM groups use cases under `users/`, `roles/`, `permissions/` and non-HTTP `internal/`; onboarding currently uses `onboard_company/` directly. Extend nearby conventions deliberately; do not restructure unrelated code to satisfy a diagram.
+
+Auth uses `core/user` and `core/refresh_token` directly, without flat core model/DTO aliases or slice aliases. `SessionView` belongs to the user entity; the core root retains module contracts and errors. Other existing modules may still use flat core layouts.
 
 ## 2. Choose the smallest useful layering
 
@@ -74,8 +75,6 @@ for i, model := range models {
 Adapt the illustrative model field types and response helper arguments to the actual API. Mapping exposes only public IDs and safe fields, never passwords, hashes or internal fields. DTOs perform no database calls or business orchestration. Request validation/sanitization uses pointer receivers; request-to-model conversion may live in `dtos.go` when applicable, but requests need not map from persistence models and bidirectional mapping is not required. [API validation and errors](api_validation_and_errors.md#4-dto-sanitization-and-validation) owns validation details.
 
 For now, declare contracts centrally in module `core/contracts.go`, not entity or slice packages. Keep signatures small and consumer-defined, with constructor injection. Parent `core` contracts may import entity types; entity packages must not import parent `core`, so dependencies stay one-way. If an entity DTO needs a shared error, use an appropriate platform error type or return validation results for the caller to translate into module errors; do not introduce a parent import cycle.
-
-Current flat `core/dto.go` and `core/model.go` contain persistence records and validation DTOs; they are not universally infrastructure-free domain models and have not been migrated by this guide. Keep executable queries out of core. Module errors may depend on `platform/apperror`; transport mapping stays in `platform/response`. Existing payloads include legacy numeric relationship/audit fields: the safe public-ID mapping rule is the target convention, not a claim that all current payloads conform.
 
 ## 5. Tenant-owned use cases
 

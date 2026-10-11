@@ -5,7 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
@@ -13,17 +14,17 @@ import (
 func TestFindRefreshTokenByHashWithUser(t *testing.T) {
 	db := newAuthQueriesDB(t)
 
-	role := core.AuthRole{BaseModel: shared.BaseModel{PublicID: "role_admin"}, Name: "Admin", Slug: "admin"}
+	role := user.AuthRole{BaseModel: shared.BaseModel{PublicID: "role_admin"}, Name: "Admin", Slug: "admin"}
 	if err := db.Create(&role).Error; err != nil {
 		t.Fatalf("seed role: %v", err)
 	}
 
-	user := core.AuthUser{BaseModel: shared.BaseModel{PublicID: "usr_03"}, Name: "Carla", Email: "carla@example.com", PasswordHash: "hash", RoleID: role.ID, IsActive: true}
+	user := user.AuthUser{BaseModel: shared.BaseModel{PublicID: "usr_03"}, Name: "Carla", Email: "carla@example.com", PasswordHash: "hash", RoleID: role.ID, IsActive: true}
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
 
-	refresh := core.RefreshToken{PublicID: "rt_03", UserID: user.ID, TokenHash: "hash:refresh", ExpiresAt: time.Now().Add(time.Hour)}
+	refresh := refresh_token.RefreshToken{PublicID: "rt_03", UserID: user.ID, TokenHash: "hash:refresh", ExpiresAt: time.Now().Add(time.Hour)}
 	if err := db.Create(&refresh).Error; err != nil {
 		t.Fatalf("seed refresh: %v", err)
 	}

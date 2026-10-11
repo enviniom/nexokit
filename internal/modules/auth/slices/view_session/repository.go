@@ -1,29 +1,20 @@
 package view_session
 
-import "github.com/enviniom/nexokit/internal/platform/authctx"
-
-type SessionView struct {
-	PublicID    string
-	Name        string
-	Email       string
-	IsActive    bool
-	RoleID      uint
-	RoleName    string
-	RoleSlug    string
-	CompanyID   *uint
-	Permissions []string
-}
+import (
+	"github.com/enviniom/nexokit/internal/modules/auth/core/user"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
+)
 
 type Repository interface {
-	BuildSession(current *authctx.User) (*SessionView, error)
+	BuildSession(current *authctx.User) (*user.SessionView, error)
 }
 
 type repository struct{}
 
 func NewRepository() Repository { return repository{} }
 
-func (repository) BuildSession(current *authctx.User) (*SessionView, error) {
-	return &SessionView{
+func (repository) BuildSession(current *authctx.User) (*user.SessionView, error) {
+	return &user.SessionView{
 		PublicID:    current.PublicID,
 		Name:        current.Name,
 		Email:       current.Email,

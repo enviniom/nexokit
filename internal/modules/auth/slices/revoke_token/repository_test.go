@@ -2,6 +2,8 @@ package revoke_token
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
+	userentity "github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"net/http"
 	"testing"
 	"time"
@@ -18,20 +20,20 @@ func TestRepository_GetByHashAndRevoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&core.AuthRole{}, &core.AuthUser{}, &core.RefreshToken{}); err != nil {
+	if err := db.AutoMigrate(&userentity.AuthRole{}, &userentity.AuthUser{}, &refresh_token.RefreshToken{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	repo := NewRepository(db)
 
-	role := core.AuthRole{BaseModel: shared.BaseModel{PublicID: "role-1"}, Name: "Admin", Slug: "admin"}
+	role := userentity.AuthRole{BaseModel: shared.BaseModel{PublicID: "role-1"}, Name: "Admin", Slug: "admin"}
 	if err := db.Create(&role).Error; err != nil {
 		t.Fatalf("seed role: %v", err)
 	}
-	user := core.AuthUser{BaseModel: shared.BaseModel{PublicID: "user-1"}, Name: "Alice", Email: "alice@example.com", PasswordHash: "hash", RoleID: role.ID, IsActive: true}
+	user := userentity.AuthUser{BaseModel: shared.BaseModel{PublicID: "user-1"}, Name: "Alice", Email: "alice@example.com", PasswordHash: "hash", RoleID: role.ID, IsActive: true}
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
-	if err := db.Create(&core.RefreshToken{PublicID: "rt-1", UserID: user.ID, TokenHash: "hash:refresh", ExpiresAt: time.Now().Add(time.Hour)}).Error; err != nil {
+	if err := db.Create(&refresh_token.RefreshToken{PublicID: "rt-1", UserID: user.ID, TokenHash: "hash:refresh", ExpiresAt: time.Now().Add(time.Hour)}).Error; err != nil {
 		t.Fatalf("seed refresh: %v", err)
 	}
 

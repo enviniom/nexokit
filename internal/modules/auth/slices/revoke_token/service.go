@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
 )
 
 type RefreshTokenManager interface {
@@ -11,7 +12,7 @@ type RefreshTokenManager interface {
 }
 
 type Service interface {
-	Revoke(req core.RefreshRequest) error
+	Revoke(req refresh_token.RefreshRequest) error
 }
 
 type service struct {
@@ -23,7 +24,7 @@ func NewService(repo Repository, refreshTokens RefreshTokenManager) Service {
 	return &service{repo: repo, refreshTokens: refreshTokens}
 }
 
-func (s *service) Revoke(req core.RefreshRequest) error {
+func (s *service) Revoke(req refresh_token.RefreshRequest) error {
 	hash := s.refreshTokens.HashRefreshToken(req.RefreshToken)
 	stored, err := s.repo.GetByHash(hash)
 	if err != nil {

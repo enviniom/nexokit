@@ -6,16 +6,18 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
+	userentity "github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"github.com/enviniom/nexokit/internal/shared"
 )
 
 type fakeRepository struct {
-	user   *core.AuthUser
+	user   *userentity.AuthUser
 	err    error
-	stored []*core.RefreshToken
+	stored []*refresh_token.RefreshToken
 }
 
-func (f *fakeRepository) GetByEmail(email string) (*core.AuthUser, error) {
+func (f *fakeRepository) GetByEmail(email string) (*userentity.AuthUser, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -24,7 +26,7 @@ func (f *fakeRepository) GetByEmail(email string) (*core.AuthUser, error) {
 	}
 	return f.user, nil
 }
-func (f *fakeRepository) CreateRefreshToken(refresh *core.RefreshToken) error {
+func (f *fakeRepository) CreateRefreshToken(refresh *refresh_token.RefreshToken) error {
 	f.stored = append(f.stored, refresh)
 	return nil
 }
@@ -46,14 +48,14 @@ func (f fakeManager) IssueAccess(sub, role string, companyID *uint) (string, err
 func (f fakeManager) GenerateRefreshToken() (string, error) { return f.token, nil }
 func (f fakeManager) HashRefreshToken(token string) string  { return "hash:" + token }
 
-func activeUser() *core.AuthUser {
-	return &core.AuthUser{
+func activeUser() *userentity.AuthUser {
+	return &userentity.AuthUser{
 		BaseModel:    shared.BaseModel{ID: 7, PublicID: "user-public-id"},
 		Name:         "Alice",
 		Email:        "alice@example.com",
 		PasswordHash: "hashed",
 		RoleID:       3,
-		Role:         core.AuthRole{Name: "admin"},
+		Role:         userentity.AuthRole{Name: "admin"},
 		IsActive:     true,
 	}
 }
@@ -63,7 +65,7 @@ func TestService_Login(t *testing.T) {
 		repo := &fakeRepository{user: activeUser()}
 		svc := NewService(repo, fakePasswordVerifier{}, fakeManager{access: "access-token", token: "refresh-token"}, 7*24*time.Hour)
 
-		result, err := svc.Login(core.LoginRequest{Email: "alice@example.com", Password: "Secret1!"})
+		result, err := svc.Login(userentity.LoginRequest{Email: "alice@example.com", Password: "Secret1!"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -90,7 +92,7 @@ func TestService_Login(t *testing.T) {
 		for _, tt := range cases {
 			t.Run(tt.name, func(t *testing.T) {
 				svc := NewService(tt.repo, tt.verifier, fakeManager{access: "access-token", token: "refresh-token"}, time.Hour)
-				_, err := svc.Login(core.LoginRequest{Email: "alice@example.com", Password: "Secret1!"})
+				_, err := svc.Login(userentity.LoginRequest{Email: "alice@example.com", Password: "Secret1!"})
 				if !errors.Is(err, core.ErrInvalidCredentials) {
 					t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 				}
@@ -102,7 +104,7 @@ func TestService_Login(t *testing.T) {
 		user := activeUser()
 		user.IsActive = false
 		svc := NewService(&fakeRepository{user: user}, fakePasswordVerifier{}, fakeManager{access: "access-token", token: "refresh-token"}, time.Hour)
-		_, err := svc.Login(core.LoginRequest{Email: "alice@example.com", Password: "Secret1!"})
+		_, err := svc.Login(userentity.LoginRequest{Email: "alice@example.com", Password: "Secret1!"})
 		if !errors.Is(err, core.ErrInvalidCredentials) {
 			t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 		}

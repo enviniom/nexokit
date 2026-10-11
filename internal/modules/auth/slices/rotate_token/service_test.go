@@ -2,6 +2,8 @@ package rotate_token
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
+	userentity "github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"testing"
 	"time"
 
@@ -10,19 +12,19 @@ import (
 )
 
 type fakeRepo struct {
-	stored  *core.RefreshToken
-	created []*core.RefreshToken
+	stored  *refresh_token.RefreshToken
+	created []*refresh_token.RefreshToken
 	revoked []string
 	lastRep *string
 }
 
-func (f *fakeRepo) GetByHash(hash string) (*core.RefreshToken, error) {
+func (f *fakeRepo) GetByHash(hash string) (*refresh_token.RefreshToken, error) {
 	if f.stored == nil || f.stored.TokenHash != hash {
 		return nil, core.ErrInvalidRefreshToken
 	}
 	return f.stored, nil
 }
-func (f *fakeRepo) CreateRefreshToken(refresh *core.RefreshToken) error {
+func (f *fakeRepo) CreateRefreshToken(refresh *refresh_token.RefreshToken) error {
 	f.created = append(f.created, refresh)
 	return nil
 }
@@ -44,13 +46,13 @@ func (fakeManager) GenerateRefreshToken() (string, error)       { return "new-re
 func (fakeManager) HashRefreshToken(refreshToken string) string { return "hash:" + refreshToken }
 
 func TestService_Rotate(t *testing.T) {
-	active := core.AuthUser{BaseModel: shared.BaseModel{ID: 7, PublicID: "usr_7"}, Role: core.AuthRole{Name: "admin"}, IsActive: true}
+	active := userentity.AuthUser{BaseModel: shared.BaseModel{ID: 7, PublicID: "usr_7"}, Role: userentity.AuthRole{Name: "admin"}, IsActive: true}
 
 	t.Run("rotates valid token pair", func(t *testing.T) {
-		repo := &fakeRepo{stored: &core.RefreshToken{UserID: 7, TokenHash: "hash:old-refresh", ExpiresAt: time.Now().Add(time.Hour), User: active}}
+		repo := &fakeRepo{stored: &refresh_token.RefreshToken{UserID: 7, TokenHash: "hash:old-refresh", ExpiresAt: time.Now().Add(time.Hour), User: active}}
 		svc := NewService(repo, fakeManager{access: "new-access"}, time.Hour)
 
-		result, err := svc.Rotate(core.RefreshRequest{RefreshToken: "old-refresh"})
+		result, err := svc.Rotate(refresh_token.RefreshRequest{RefreshToken: "old-refresh"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -64,20 +66,20 @@ func TestService_Rotate(t *testing.T) {
 
 	t.Run("rejects revoked token", func(t *testing.T) {
 		now := time.Now()
-		repo := &fakeRepo{stored: &core.RefreshToken{TokenHash: "hash:old-refresh", ExpiresAt: time.Now().Add(time.Hour), RevokedAt: &now, User: active}}
+		repo := &fakeRepo{stored: &refresh_token.RefreshToken{TokenHash: "hash:old-refresh", ExpiresAt: time.Now().Add(time.Hour), RevokedAt: &now, User: active}}
 		svc := NewService(repo, fakeManager{}, time.Hour)
 
-		_, err := svc.Rotate(core.RefreshRequest{RefreshToken: "old-refresh"})
+		_, err := svc.Rotate(refresh_token.RefreshRequest{RefreshToken: "old-refresh"})
 		if !errors.Is(err, core.ErrInvalidRefreshToken) {
 			t.Fatalf("expected ErrInvalidRefreshToken, got %v", err)
 		}
 	})
 
 	t.Run("rejects expired token", func(t *testing.T) {
-		repo := &fakeRepo{stored: &core.RefreshToken{TokenHash: "hash:old-refresh", ExpiresAt: time.Now().Add(-time.Minute), User: active}}
+		repo := &fakeRepo{stored: &refresh_token.RefreshToken{TokenHash: "hash:old-refresh", ExpiresAt: time.Now().Add(-time.Minute), User: active}}
 		svc := NewService(repo, fakeManager{}, time.Hour)
 
-		_, err := svc.Rotate(core.RefreshRequest{RefreshToken: "old-refresh"})
+		_, err := svc.Rotate(refresh_token.RefreshRequest{RefreshToken: "old-refresh"})
 		if !errors.Is(err, core.ErrInvalidRefreshToken) {
 			t.Fatalf("expected ErrInvalidRefreshToken, got %v", err)
 		}

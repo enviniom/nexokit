@@ -4,7 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -13,7 +14,7 @@ import (
 func TestFindUserByEmail(t *testing.T) {
 	db := newAuthQueriesDB(t)
 
-	seed := core.AuthUser{
+	seed := user.AuthUser{
 		BaseModel:    shared.BaseModel{PublicID: "usr_01"},
 		Name:         "Alice",
 		Email:        "alice@example.com",
@@ -49,7 +50,7 @@ func newAuthQueriesDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite db: %v", err)
 	}
-	if err := db.AutoMigrate(&core.AuthRole{}, &core.AuthUser{}, &core.RefreshToken{}); err != nil {
+	if err := db.AutoMigrate(&user.AuthRole{}, &user.AuthUser{}, &refresh_token.RefreshToken{}); err != nil {
 		t.Fatalf("migrate sqlite db: %v", err)
 	}
 	return db

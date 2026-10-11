@@ -4,11 +4,12 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 )
 
 type Service interface {
-	Rotate(req core.RefreshRequest) (*core.TokenPairResponse, error)
+	Rotate(req refresh_token.RefreshRequest) (*refresh_token.TokenPairResponse, error)
 }
 
 type service struct {
@@ -21,7 +22,7 @@ func NewService(repo Repository, tokenManager core.TokenManager, refreshTTL time
 	return &service{repo: repo, tokenManager: tokenManager, refreshTTL: refreshTTL}
 }
 
-func (s *service) Rotate(req core.RefreshRequest) (*core.TokenPairResponse, error) {
+func (s *service) Rotate(req refresh_token.RefreshRequest) (*refresh_token.TokenPairResponse, error) {
 	hash := s.tokenManager.HashRefreshToken(req.RefreshToken)
 	stored, err := s.repo.GetByHash(hash)
 	if err != nil {
@@ -43,7 +44,7 @@ func (s *service) Rotate(req core.RefreshRequest) (*core.TokenPairResponse, erro
 	if err != nil {
 		return nil, err
 	}
-	if err := s.repo.CreateRefreshToken(&core.RefreshToken{PublicID: publicID, UserID: stored.UserID, TokenHash: s.tokenManager.HashRefreshToken(refresh), ExpiresAt: time.Now().Add(s.refreshTTL)}); err != nil {
+	if err := s.repo.CreateRefreshToken(&refresh_token.RefreshToken{PublicID: publicID, UserID: stored.UserID, TokenHash: s.tokenManager.HashRefreshToken(refresh), ExpiresAt: time.Now().Add(s.refreshTTL)}); err != nil {
 		return nil, err
 	}
 	replacement := s.tokenManager.HashRefreshToken(refresh)
@@ -51,5 +52,5 @@ func (s *service) Rotate(req core.RefreshRequest) (*core.TokenPairResponse, erro
 		return nil, err
 	}
 
-	return &core.TokenPairResponse{AccessToken: access, RefreshToken: refresh}, nil
+	return &refresh_token.TokenPairResponse{AccessToken: access, RefreshToken: refresh}, nil
 }

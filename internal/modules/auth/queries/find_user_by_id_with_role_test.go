@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
@@ -12,7 +12,7 @@ import (
 func TestFindUserByIDWithRole(t *testing.T) {
 	db := newAuthQueriesDB(t)
 
-	role := core.AuthRole{
+	role := user.AuthRole{
 		BaseModel: shared.BaseModel{PublicID: "role_admin"},
 		Name:      "Admin",
 		Slug:      "admin",
@@ -21,7 +21,7 @@ func TestFindUserByIDWithRole(t *testing.T) {
 		t.Fatalf("seed role: %v", err)
 	}
 
-	user := core.AuthUser{
+	user := user.AuthUser{
 		BaseModel:    shared.BaseModel{PublicID: "usr_02"},
 		Name:         "Bob",
 		Email:        "bob@example.com",

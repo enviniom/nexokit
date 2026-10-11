@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/auth/core"
+	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
+	userentity "github.com/enviniom/nexokit/internal/modules/auth/core/user"
 	"github.com/enviniom/nexokit/internal/platform/apperror"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/driver/sqlite"
@@ -18,16 +20,16 @@ func TestRepository_GetByEmailAndCreateRefreshToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&core.AuthRole{}, &core.AuthUser{}, &core.RefreshToken{}); err != nil {
+	if err := db.AutoMigrate(&userentity.AuthRole{}, &userentity.AuthUser{}, &refresh_token.RefreshToken{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	repo := NewRepository(db)
 
-	role := core.AuthRole{BaseModel: shared.BaseModel{PublicID: "role-1"}, Name: "Admin", Slug: "admin"}
+	role := userentity.AuthRole{BaseModel: shared.BaseModel{PublicID: "role-1"}, Name: "Admin", Slug: "admin"}
 	if err := db.Create(&role).Error; err != nil {
 		t.Fatalf("seed role: %v", err)
 	}
-	user := core.AuthUser{BaseModel: shared.BaseModel{PublicID: "user-1"}, Name: "Alice", Email: "alice@example.com", PasswordHash: "hash", RoleID: role.ID, IsActive: true}
+	user := userentity.AuthUser{BaseModel: shared.BaseModel{PublicID: "user-1"}, Name: "Alice", Email: "alice@example.com", PasswordHash: "hash", RoleID: role.ID, IsActive: true}
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
@@ -41,12 +43,12 @@ func TestRepository_GetByEmailAndCreateRefreshToken(t *testing.T) {
 	}
 
 	expires := time.Now().Add(time.Hour)
-	err = repo.CreateRefreshToken(&core.RefreshToken{PublicID: "rt-1", UserID: found.ID, TokenHash: "hash:refresh", ExpiresAt: expires})
+	err = repo.CreateRefreshToken(&refresh_token.RefreshToken{PublicID: "rt-1", UserID: found.ID, TokenHash: "hash:refresh", ExpiresAt: expires})
 	if err != nil {
 		t.Fatalf("create refresh token: %v", err)
 	}
 
-	var stored core.RefreshToken
+	var stored refresh_token.RefreshToken
 	if err := db.Where("token_hash = ?", "hash:refresh").First(&stored).Error; err != nil {
 		t.Fatalf("load refresh token: %v", err)
 	}
@@ -62,7 +64,7 @@ func TestRepository_GetByEmailAndCreateRefreshToken(t *testing.T) {
 	})
 
 	t.Run("maps missing role to invalid credentials sentinel", func(t *testing.T) {
-		userWithoutRole := core.AuthUser{BaseModel: shared.BaseModel{PublicID: "user-without-role"}, Name: "No Role", Email: "no-role@example.com", PasswordHash: "hash", RoleID: role.ID + 1, IsActive: true}
+		userWithoutRole := userentity.AuthUser{BaseModel: shared.BaseModel{PublicID: "user-without-role"}, Name: "No Role", Email: "no-role@example.com", PasswordHash: "hash", RoleID: role.ID + 1, IsActive: true}
 		if err := db.Create(&userWithoutRole).Error; err != nil {
 			t.Fatalf("seed user without role: %v", err)
 		}
@@ -90,7 +92,7 @@ func TestRepository_PersistenceFailuresAreModuleOwned(t *testing.T) {
 
 	_, lookupErr := repo.GetByEmail("alice@example.com")
 	assertUserPersistenceError(t, lookupErr)
-	createErr := repo.CreateRefreshToken(&core.RefreshToken{TokenHash: "refresh"})
+	createErr := repo.CreateRefreshToken(&refresh_token.RefreshToken{TokenHash: "refresh"})
 	assertRefreshPersistenceError(t, createErr)
 }
 
