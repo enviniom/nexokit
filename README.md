@@ -49,7 +49,7 @@ The API boots on `http://localhost:8080` (or `APP_PORT` from `.env`).
 | `make fmt` | Format all Go files |
 | `make lint` | Run `go vet` + module boundary checks |
 
-For direct `nexokit` CLI usage, see [`docs/cli.md`](docs/cli.md).
+For direct `nexokit` CLI usage, see [`docs/references/runtime/cli.md`](docs/references/runtime/cli.md).
 
 ## Project map
 
@@ -99,9 +99,9 @@ For environment variables, TLS, reverse proxy, logging, and operational checklis
 ## Documentation
 
 - [`docs/README.md`](docs/README.md) — documentation index
-- [`docs/architecture.md`](docs/architecture.md) — canonical architecture guide
+- [`docs/architecture_and_vsa.md`](docs/architecture_and_vsa.md) — canonical architecture guide
 - [`docs/deployment.md`](docs/deployment.md) — production guide
-- [`docs/cli.md`](docs/cli.md) — direct CLI reference
+- [`docs/references/runtime/cli.md`](docs/references/runtime/cli.md) — direct CLI reference
 - [`docs/starter-template.md`](docs/starter-template.md) — adopt as a starter
-- [`docs/request-flow.md`](docs/request-flow.md) — request/auth/tenant flow
-- [`docs/modules.md`](docs/modules.md) — module and vertical-slice guide
+- [`docs/references/runtime/request-flow.md`](docs/references/runtime/request-flow.md) — request/auth/tenant flow
+- [`docs/system-map.md`](docs/system-map.md) — mounted modules and capabilities

@@ -1,31 +1,39 @@
-# NexoKit Documentation
+# NexoKit documentation
 
-This is the documentation index for NexoKit. Start with the root [`README.md`](../README.md) for the 30-second overview, then use the guides below for depth.
+NexoKit is a reusable Go API base with auth, companies, IAM and onboarding modules. Examples describe guidance unless explicitly identified as current behavior.
 
-## Quick paths
+## Start here
 
-1. **New to the codebase?** Read [`architecture.md`](architecture.md) first.
-2. **Deploying?** Follow [`deployment.md`](deployment.md).
-3. **Using as a starter template?** See [`starter-template.md`](starter-template.md).
-4. **Running commands?** Use [`../Makefile`](../Makefile) for daily tasks; [`cli.md`](cli.md) is the source of truth for direct `nexokit` usage.
-5. **Adding a module or slice?** Read [`modules.md`](modules.md) and [`request-flow.md`](request-flow.md).
+| Goal | Reading path |
+|---|---|
+| Adopt the starter | [Starter quick path](starter-template.md) → [Application map](system-map.md) |
+| Deploy or recover | [Deployment runbook](deployment.md) → [CLI](references/runtime/cli.md) |
+| Add or fix a use case | [Architecture](architecture_and_vsa.md) → [API contracts](api_validation_and_errors.md) → [Testing](testing_and_quality.md) |
+| Integrate capabilities | [Boundaries and CQRS](boundaries_and_cqrs.md) → [Multitenancy](references/infrastructure/multitenancy.md) |
+| Review a design | [ADR guide](adr_guide_and_template.md) → [Coverage ledger](normative_traceability_matrix.md) |
+| Work on security | [Request flow](references/runtime/request-flow.md) → [Tokens](references/security/auth-tokens.md) → [RBAC](references/security/permissions-and-rbac.md) |
 
-## Documentation map
+## Four daily guides
 
-| Document | What it covers |
-|----------|----------------|
-| [`architecture.md`](architecture.md) | Canonical architecture: entrypoints, layers, module structure, request flow, boundaries |
-| [`deployment.md`](deployment.md) | Build, environment, database, migrations, seed/root, logging, reverse proxy/TLS, ops checklist |
-| [`cli.md`](cli.md) | Direct `nexokit` CLI usage: `serve`, `config`, `status`, migrations, `seed`, `create-root`, generation commands |
-| [`starter-template.md`](starter-template.md) | How to clone/fork, rename, configure, and adopt NexoKit as a project starter |
-| [`request-flow.md`](request-flow.md) | End-to-end HTTP path through auth, tenant, permissions, and modules |
-| [`modules.md`](modules.md) | Module layout, vertical-slice rules, and links to per-concern tutorials |
-| [`api-conventions.md`](api-conventions.md) | DTO naming, list queries, soft delete, tenant scope, response envelopes |
-| [`error-handling.md`](error-handling.md) | Error classification, `apperror`, `response.HandleError`, debug exposure |
-| [`module-error-conventions.md`](module-error-conventions.md) | Per-module error vocabulary and conventions |
-| [`multitenancy.md`](multitenancy.md) | Tenant scope rules for repositories and handlers |
-| [`testing.md`](testing.md) | Test commands, integration setup, CI reproduction |
+1. [Architecture and VSA](architecture_and_vsa.md): layout, layer responsibilities, containers, route registration and DTO placement.
+2. [Boundaries and CQRS](boundaries_and_cqrs.md): consumer ports, persistence helpers, transaction guidance and local read projections.
+3. [API validation and errors](api_validation_and_errors.md): envelopes, list inputs, sanitization, domain errors and safe logging.
+4. [Testing and quality](testing_and_quality.md): fakes, database tests, isolation and verification targets.
 
-## Archived documentation and internal material
+[Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping) is the single owner of entity DTO placement/mapping and the temporary centralized contract convention; it distinguishes the target from current flat core files. These guides own the cross-cutting rules. References link back instead of redefining those rules; present source and future design guidance must not be confused.
 
-Old architecture versions and the historical SDD changelog live in [`archive/README.md`](archive/README.md). Root-level `prompts/` contains internal SDD authoring material and is excluded from this public index.
+## Specialized references
+
+| Area | Reference | Unique detail |
+|---|---|---|
+| Runtime | [Request flow](references/runtime/request-flow.md) | Middleware order and actual private route scopes |
+| Runtime | [CLI](references/runtime/cli.md) | Commands, flags, root creation and seed execution |
+| Security | [Auth tokens](references/security/auth-tokens.md) | Claims, refresh lifecycle and current safety limits |
+| Security | [Permissions and RBAC](references/security/permissions-and-rbac.md) | Guards and permission identities |
+| Security | [Permission sync](references/security/permissions-sync.md) | Startup discovery, persistence and admin assignment |
+| Infrastructure | [Multitenancy](references/infrastructure/multitenancy.md) | Context fields, root selection and repository isolation |
+| Infrastructure | [Domains](references/infrastructure/domains.md) | Host resolution and optional public middleware |
+| Infrastructure | [Cache](references/infrastructure/cache.md) | Redis/no-op behavior and readiness limitations |
+| Infrastructure | [Rate limiting](references/infrastructure/rate-limiting.md) | Keys, drivers, fallback and effective quota limitations |
+
+Keep these references separate: their runtime and security details are not daily architectural rules. Significant future decisions belong in `docs/adr/`; the [ADR guide](adr_guide_and_template.md) defines the process without claiming records already exist.
