@@ -53,7 +53,7 @@ func TestRepositoryAssignFlow(t *testing.T) {
 		if !selected[permissions[0].Slug] || !selected[permissions[1].Slug] {
 			t.Fatalf("expected selected map to contain both permissions")
 		}
-		if err := repo.ReplacePermissions(role.ID, ids); err != nil {
+		if err := repo.ReplacePermissions(tc, role.ID, ids); err != nil {
 			t.Fatalf("replace: %v", err)
 		}
 
@@ -68,7 +68,7 @@ func TestRepositoryAssignFlow(t *testing.T) {
 
 	t.Run("invalidates member cache keys", func(t *testing.T) {
 		cache := &fakeCache{}
-		if err := repo.InvalidateRoleMemberPermissionCache(role.ID, cache); err != nil {
+		if err := repo.InvalidateRoleMemberPermissionCache(tc, role.ID, cache); err != nil {
 			t.Fatalf("invalidate cache: %v", err)
 		}
 		if len(cache.deleted) != 2 {
@@ -109,8 +109,8 @@ func seedAssignData(t *testing.T, db *gorm.DB) (core.IAMCompany, core.IAMRole, [
 		t.Fatalf("role: %v", err)
 	}
 	users := []core.IAMUser{
-		{BaseModel: shared.BaseModel{PublicID: "user-1"}, Name: "A", Email: "a@test.dev", PasswordHash: "hash", RoleID: role.ID, IsActive: true},
-		{BaseModel: shared.BaseModel{PublicID: "user-2"}, Name: "B", Email: "b@test.dev", PasswordHash: "hash", RoleID: role.ID, IsActive: true},
+		{BaseModel: shared.BaseModel{PublicID: "user-1"}, CompanyID: &company.ID, Name: "A", Email: "a@test.dev", PasswordHash: "hash", RoleID: role.ID, IsActive: true},
+		{BaseModel: shared.BaseModel{PublicID: "user-2"}, CompanyID: &company.ID, Name: "B", Email: "b@test.dev", PasswordHash: "hash", RoleID: role.ID, IsActive: true},
 	}
 	for i := range users {
 		if err := db.Create(&users[i]).Error; err != nil {

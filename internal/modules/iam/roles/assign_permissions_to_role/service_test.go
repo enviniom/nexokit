@@ -11,19 +11,21 @@ import (
 )
 
 type fakeRepository struct {
-	role            *core.IAMRole
-	roleErr         error
-	catalog         []core.IAMPermission
-	catalogErr      error
-	selected        map[string]bool
-	normalized      []string
-	ids             []uint
-	selectionErr    error
-	removeSystem    bool
-	replaceErr      error
-	invalidateErr   error
-	replacedRoleID  uint
-	replacedPermIDs []uint
+	role              *core.IAMRole
+	roleErr           error
+	catalog           []core.IAMPermission
+	catalogErr        error
+	selected          map[string]bool
+	normalized        []string
+	ids               []uint
+	selectionErr      error
+	removeSystem      bool
+	replaceErr        error
+	invalidateErr     error
+	replacedTenant    tenant.TenantContext
+	invalidatedTenant tenant.TenantContext
+	replacedRoleID    uint
+	replacedPermIDs   []uint
 }
 
 func (f *fakeRepository) GetByPublicID(tenant.TenantContext, string) (*core.IAMRole, error) {
@@ -38,12 +40,14 @@ func (f *fakeRepository) ListAllPermissions() ([]core.IAMPermission, error) {
 	}
 	return f.catalog, nil
 }
-func (f *fakeRepository) ReplacePermissions(roleID uint, permissionIDs []uint) error {
+func (f *fakeRepository) ReplacePermissions(tc tenant.TenantContext, roleID uint, permissionIDs []uint) error {
+	f.replacedTenant = tc
 	f.replacedRoleID = roleID
 	f.replacedPermIDs = permissionIDs
 	return f.replaceErr
 }
-func (f *fakeRepository) InvalidateRoleMemberPermissionCache(roleID uint, _ cache.Cache) error {
+func (f *fakeRepository) InvalidateRoleMemberPermissionCache(tc tenant.TenantContext, roleID uint, _ cache.Cache) error {
+	f.invalidatedTenant = tc
 	return f.invalidateErr
 }
 func (f *fakeRepository) ResolvePermissionSelection([]core.IAMPermission, []string) ([]string, map[string]bool, []uint, error) {
@@ -97,7 +101,11 @@ func TestServiceAssign(t *testing.T) {
 		}
 		svc := NewService(repo, nil)
 
-		res, err := svc.Assign(tenant.NewRoot(), "role-11", core.AssignRolePermissionsRequest{Permissions: []string{"roles.read"}}, []string{"roles.assign_permissions"})
+		tc := tenant.NewScoped(7, "selected-company")
+		res, err := svc.Assign(tc, "role-11", core.AssignRolePermissionsRequest{Permissions: []string{"roles.read"}}, []string{"roles.assign_permissions"})
+		if repo.replacedTenant != tc || repo.invalidatedTenant != tc {
+			t.Fatal("trusted tenant context was not forwarded to persistence and cache")
+		}
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

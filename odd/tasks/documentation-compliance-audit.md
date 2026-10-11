@@ -22,8 +22,8 @@ Audit current implementation against repository documentation, correct demonstra
 
 ## Tasks
 - [x] T1 (done): Complete source compliance inventory and report demonstrated findings with explicit coverage. Audit all production persistence, routes/handlers, imports and remaining documentation/runtime surfaces; distinguish current rules, legacy conventions and future guidance.
-- [ ] T2 (in_progress): Scope role-permission mutations to trusted tenant context, with regression tests for same/cross tenant, root-global, selected-root and transaction failures as applicable. Verify focused IAM tests.
-- [ ] T5 (pending): Reject absent tenant context in IAM handlers; assert no service calls and preserve explicit root/global/scoped contexts. Update affected HTTP integration wiring only when required.
+- [x] T2 (done): Scope role-permission mutations to trusted tenant context, with regression tests for same/cross tenant, root-global, selected-root and transaction failures as applicable. Verify focused IAM tests.
+- [ ] T5 (in_progress): Reject absent tenant context in IAM handlers; assert no service calls and preserve explicit root/global/scoped contexts. Update affected HTTP integration wiring only when required.
 - [ ] T6 (pending): Return 400 for malformed permission-update JSON and retain 422 for valid JSON with invalid fields; prove with handler regression tests.
 - [ ] T3 (pending): Make generated modules conform to new-code layout, safe DTO mapping and normalization, trusted tenant scope and safe errors. Generate normal/tenant fixtures in temporary directories and prove compiled behavior with regression tests; update affected scaffold documentation accurately. Keep generator compatibility where safe; no unrelated module migration.
 - [ ] T4 (pending): Run final independent checks, reconcile every finding and publish audit evidence/limitations for human validation. Full tests, vet, module guards, format, diff checks; record work-unit commits.
@@ -38,5 +38,20 @@ Audit current implementation against repository documentation, correct demonstra
 ## Baseline evidence
 Verifier: `go test -timeout 180s ./...`, `go test -short ./...`, `go vet ./...`, `make check-module-errors`, tracked Go `gofmt -l`, `git diff --check`: all pass. Integration uses SQLite; real PostgreSQL/migrations and Redis unverified. Working tree remained clean.
 
+## Audit evidence and project decisions
+- T1 work-unit commit: `f08da92` — `docs(odd): record compliance audit and remediation plan`.
+- Coverage: all 36 repositories, 23 queries, 32 handlers, 7 route files and 21 module core files read; all 164 production module Go files scanned for sibling imports (none).
+- Scope is source-level compliance review, not formal security certification; PostgreSQL/Goose and Redis runtime remain unverified.
+- D1: Preserve documented legacy layouts and payload conventions; enforce entity DTO/new-code conventions on generated modules instead of broad unrelated migration.
+- D2: Require explicit trusted tenant context at handler and mutation boundaries. Missing handler context returns existing 400 contract; global scope remains explicit middleware policy.
+- Middleware spot-check correction: AllowRootGlobalScope DOES establish NewRoot/NewScoped context on successful requests (`internal/middleware/tenant.go`). Thus IAM fallback defects are fail-open defense gaps, not evidence that current mounted requests bypass tenant middleware.
+- D3: Preserve intentional root-only global company operations; do not expose them to non-root routes.
+- D4: Keep manual CI trigger, future CQRS guidance and documented operator production policies unchanged; no unsupported feature expansion.
+- D5: Binding failures return 400 and field validation 422; preserve response helpers and safe public messages.
+- D6: Do not enable RDD (currently off), publish branches or mutate real services for validation.
+
+## Verification evidence
+- T2: observed RED for foreign/deleted/missing/selected-root foreign mutations; GREEN for own/global/selected scopes, scoped cache deletion and duplicate-insert rollback. Writer and independent verifier passed focused assignment/integration and full IAM tests; verifier results cached. No blocker. SQLite does not certify PostgreSQL locking/Redis behavior.
+
 ## Progress and next step
-T2 in progress; remaining T1 source inventory runs read-only concurrently. T2 edits are restricted to the role-assignment slice and affected integration fixture. T1 complete; T2 writer active on fix/documentation-compliance. Additional confirmed defects added as T5/T6; generator is T3.
+T1/T2 complete. T5 begins next; T6 and generator T3 remain pending. Commit only verified work units on fix/documentation-compliance.

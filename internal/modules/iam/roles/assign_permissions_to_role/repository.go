@@ -10,13 +10,14 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/iam/queries"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Repository interface {
 	GetByPublicID(tc tenant.TenantContext, publicID string) (*core.IAMRole, error)
 	ListAllPermissions() ([]core.IAMPermission, error)
-	ReplacePermissions(roleID uint, permissionIDs []uint) error
-	InvalidateRoleMemberPermissionCache(roleID uint, c cache.Cache) error
+	ReplacePermissions(tc tenant.TenantContext, roleID uint, permissionIDs []uint) error
+	InvalidateRoleMemberPermissionCache(tc tenant.TenantContext, roleID uint, c cache.Cache) error
 	ResolvePermissionSelection(catalog []core.IAMPermission, slugs []string) ([]string, map[string]bool, []uint, error)
 	RemovesSystemPermission(existing []core.IAMPermission, selected map[string]bool) bool
 	BuildRolePermissionCatalog(catalog []core.IAMPermission, granted map[string]bool) []core.RolePermissionGroupResponse
@@ -45,8 +46,18 @@ func (r *GormRepository) ListAllPermissions() ([]core.IAMPermission, error) {
 	return items, nil
 }
 
-func (r *GormRepository) ReplacePermissions(roleID uint, permissionIDs []uint) error {
+func (r *GormRepository) ReplacePermissions(tc tenant.TenantContext, roleID uint, permissionIDs []uint) error {
+	if !tc.IsRootScope && tc.CompanyID == 0 {
+		return core.ErrNotFound
+	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		var role core.IAMRole
+		if err := tenant.ApplyTenantScope(tx, tc).Clauses(clause.Locking{Strength: "UPDATE"}).First(&role, roleID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return core.ErrNotFound
+			}
+			return err
+		}
 		if err := tx.Exec("DELETE FROM role_permissions WHERE role_id = ?", roleID).Error; err != nil {
 			return err
 		}
@@ -59,11 +70,11 @@ func (r *GormRepository) ReplacePermissions(roleID uint, permissionIDs []uint) e
 	})
 }
 
-func (r *GormRepository) InvalidateRoleMemberPermissionCache(roleID uint, c cache.Cache) error {
+func (r *GormRepository) InvalidateRoleMemberPermissionCache(tc tenant.TenantContext, roleID uint, c cache.Cache) error {
 	if c == nil {
 		return nil
 	}
-	ids, err := r.ListRoleMemberPublicIDs(roleID)
+	ids, err := r.ListRoleMemberPublicIDs(tc, roleID)
 	if err != nil {
 		return err
 	}
@@ -75,9 +86,12 @@ func (r *GormRepository) InvalidateRoleMemberPermissionCache(roleID uint, c cach
 	return nil
 }
 
-func (r *GormRepository) ListRoleMemberPublicIDs(roleID uint) ([]string, error) {
+func (r *GormRepository) ListRoleMemberPublicIDs(tc tenant.TenantContext, roleID uint) ([]string, error) {
+	if !tc.IsRootScope && tc.CompanyID == 0 {
+		return nil, core.ErrNotFound
+	}
 	var ids []string
-	if err := r.db.Model(&core.IAMUser{}).Where("role_id = ?", roleID).Pluck("public_id", &ids).Error; err != nil {
+	if err := tenant.ApplyTenantScope(r.db.Model(&core.IAMUser{}), tc).Where("role_id = ?", roleID).Pluck("public_id", &ids).Error; err != nil {
 		return nil, err
 	}
 	return ids, nil

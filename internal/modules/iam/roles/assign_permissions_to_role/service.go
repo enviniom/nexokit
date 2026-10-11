@@ -39,10 +39,10 @@ func (s *service) Assign(tc tenant.TenantContext, publicID string, req core.Assi
 	if role.IsSystem && s.repo.RemovesSystemPermission(role.Permissions, selected) {
 		return nil, core.ErrSystemImmutable
 	}
-	if err := s.repo.ReplacePermissions(role.ID, ids); err != nil {
+	if err := s.repo.ReplacePermissions(tc, role.ID, ids); err != nil {
 		return nil, err
 	}
-	if err := s.repo.InvalidateRoleMemberPermissionCache(role.ID, s.cache); err != nil {
+	if err := s.repo.InvalidateRoleMemberPermissionCache(tc, role.ID, s.cache); err != nil {
 		return nil, err
 	}
 	return &core.RolePermissionAssignmentResponse{RoleID: role.PublicID, Permissions: normalized, Catalog: s.repo.BuildRolePermissionCatalog(catalog, selected)}, nil
