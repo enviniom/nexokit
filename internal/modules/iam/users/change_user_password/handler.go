@@ -27,7 +27,8 @@ func (h *Handler) Handle(c *gin.Context) {
 	}
 	tc, ok := tenant.FromGin(c)
 	if !ok {
-		tc = tenant.NewRoot()
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
 	}
 	if err := h.service.Change(tc, c.Param("id"), authctx.PublicIDFromGin(c), req); err != nil {
 		response.HandleError(c, err)

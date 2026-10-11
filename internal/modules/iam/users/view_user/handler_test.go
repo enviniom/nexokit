@@ -24,6 +24,21 @@ func (f fakeHandlerService) GetByPublicID(tenant.TenantContext, string) (*core.U
 	return f.item, nil
 }
 
+func TestHandlerMissingTenant(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	defer func() {
+		if p := recover(); p != nil {
+			t.Errorf("service invoked without context: %v", p)
+		}
+	}()
+	NewHandler(nil).Handle(c)
+	if w.Code != 400 {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
 func TestHandlerHandle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -39,29 +54,32 @@ func TestHandlerHandle(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler(tt.service)
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Params = gin.Params{{Key: "id", Value: "user-1"}}
-			c.Request = httptest.NewRequest(http.MethodGet, "/iam/users/user-1", nil)
+		for _, scope := range []tenant.TenantContext{tenant.NewRoot(), tenant.NewScoped(7, "selected")} {
+			t.Run(tt.name+scope.CompanySlug, func(t *testing.T) {
+				h := NewHandler(tt.service)
+				w := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(w)
+				c.Params = gin.Params{{Key: "id", Value: "user-1"}}
+				c.Request = httptest.NewRequest(http.MethodGet, "/iam/users/user-1", nil)
 
-			h.Handle(c)
+				tenant.SetGin(c, scope)
+				h.Handle(c)
 
-			if w.Code != tt.statusCode {
-				t.Fatalf("expected status %d, got %d", tt.statusCode, w.Code)
-			}
+				if w.Code != tt.statusCode {
+					t.Fatalf("expected status %d, got %d", tt.statusCode, w.Code)
+				}
 
-			if tt.wantMessage == "" {
-				return
-			}
-			var payload map[string]any
-			if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
-				t.Fatalf("decode response body: %v", err)
-			}
-			if got := payload["message"]; got != tt.wantMessage {
-				t.Errorf("message = %q, want %q", got, tt.wantMessage)
-			}
-		})
+				if tt.wantMessage == "" {
+					return
+				}
+				var payload map[string]any
+				if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+					t.Fatalf("decode response body: %v", err)
+				}
+				if got := payload["message"]; got != tt.wantMessage {
+					t.Errorf("message = %q, want %q", got, tt.wantMessage)
+				}
+			})
+		}
 	}
 }

@@ -22,6 +22,22 @@ func (f fakeHandlerService) ChangeRole(tenant.TenantContext, string, string, cor
 	return f.resp, f.err
 }
 
+func TestHandlerMissingTenant(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPatch, "/", bytes.NewBufferString(`{"role_id":"role-admin"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	defer func() {
+		if p := recover(); p != nil {
+			t.Errorf("service invoked without context: %v", p)
+		}
+	}()
+	NewHandler(nil).Handle(c)
+	if w.Code != 400 {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
 func TestHandlerHandle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -87,38 +103,41 @@ func TestHandlerHandle(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler(tt.service)
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Params = gin.Params{{Key: "id", Value: "user-1"}}
+		for _, scope := range []tenant.TenantContext{tenant.NewRoot(), tenant.NewScoped(7, "selected")} {
+			t.Run(tt.name+scope.CompanySlug, func(t *testing.T) {
+				h := NewHandler(tt.service)
+				w := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(w)
+				c.Params = gin.Params{{Key: "id", Value: "user-1"}}
 
-			var bodyBytes []byte
-			switch v := tt.body.(type) {
-			case string:
-				bodyBytes = []byte(v)
-			default:
-				bodyBytes, _ = json.Marshal(v)
-			}
-			c.Request = httptest.NewRequest(http.MethodPatch, "/iam/users/user-1/role", bytes.NewReader(bodyBytes))
-			c.Request.Header.Set("Content-Type", "application/json")
+				var bodyBytes []byte
+				switch v := tt.body.(type) {
+				case string:
+					bodyBytes = []byte(v)
+				default:
+					bodyBytes, _ = json.Marshal(v)
+				}
+				c.Request = httptest.NewRequest(http.MethodPatch, "/iam/users/user-1/role", bytes.NewReader(bodyBytes))
+				c.Request.Header.Set("Content-Type", "application/json")
 
-			h.Handle(c)
+				tenant.SetGin(c, scope)
+				h.Handle(c)
 
-			if w.Code != tt.statusCode {
-				t.Fatalf("expected status %d, got %d", tt.statusCode, w.Code)
-			}
+				if w.Code != tt.statusCode {
+					t.Fatalf("expected status %d, got %d", tt.statusCode, w.Code)
+				}
 
-			if tt.wantMessage == "" {
-				return
-			}
-			var payload map[string]any
-			if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
-				t.Fatalf("decode response body: %v", err)
-			}
-			if got := payload["message"]; got != tt.wantMessage {
-				t.Errorf("message = %q, want %q", got, tt.wantMessage)
-			}
-		})
+				if tt.wantMessage == "" {
+					return
+				}
+				var payload map[string]any
+				if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+					t.Fatalf("decode response body: %v", err)
+				}
+				if got := payload["message"]; got != tt.wantMessage {
+					t.Errorf("message = %q, want %q", got, tt.wantMessage)
+				}
+			})
+		}
 	}
 }

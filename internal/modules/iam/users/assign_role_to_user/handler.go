@@ -28,7 +28,8 @@ func (h *Handler) Handle(c *gin.Context) {
 
 	tc, ok := tenant.FromGin(c)
 	if !ok {
-		tc = tenant.NewRoot()
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
 	}
 
 	data, err := h.service.ChangeRole(tc, c.Param("id"), authctx.PublicIDFromGin(c), req)

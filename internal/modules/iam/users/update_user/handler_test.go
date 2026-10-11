@@ -29,6 +29,22 @@ func validUpdateBody() []byte {
 	return []byte(`{"name":"Alice","email":"alice@example.com"}`)
 }
 
+func TestHandlerMissingTenant(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPut, "/", bytes.NewBufferString(`{"name":"Alice","email":"alice@example.com"}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	defer func() {
+		if p := recover(); p != nil {
+			t.Errorf("service invoked without context: %v", p)
+		}
+	}()
+	NewHandler(nil).Handle(c)
+	if w.Code != 400 {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
 func TestHandlerHandle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -105,27 +121,30 @@ func TestHandlerHandle(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler(tt.service)
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest(http.MethodPut, "/iam/users/user-1", bytes.NewReader(tt.body))
-			c.Request.Header.Set("Content-Type", "application/json")
-			c.Params = gin.Params{{Key: "id", Value: "user-1"}}
+		for _, scope := range []tenant.TenantContext{tenant.NewRoot(), tenant.NewScoped(7, "selected")} {
+			t.Run(tt.name+scope.CompanySlug, func(t *testing.T) {
+				h := NewHandler(tt.service)
+				w := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(w)
+				c.Request = httptest.NewRequest(http.MethodPut, "/iam/users/user-1", bytes.NewReader(tt.body))
+				c.Request.Header.Set("Content-Type", "application/json")
+				c.Params = gin.Params{{Key: "id", Value: "user-1"}}
 
-			h.Handle(c)
+				tenant.SetGin(c, scope)
+				h.Handle(c)
 
-			if w.Code != tt.statusCode {
-				t.Fatalf("expected status %d, got %d", tt.statusCode, w.Code)
-			}
-
-			if tt.assertBody != nil {
-				var payload map[string]any
-				if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
-					t.Fatalf("decode body: %v", err)
+				if w.Code != tt.statusCode {
+					t.Fatalf("expected status %d, got %d", tt.statusCode, w.Code)
 				}
-				tt.assertBody(t, payload)
-			}
-		})
+
+				if tt.assertBody != nil {
+					var payload map[string]any
+					if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+						t.Fatalf("decode body: %v", err)
+					}
+					tt.assertBody(t, payload)
+				}
+			})
+		}
 	}
 }

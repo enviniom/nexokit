@@ -24,6 +24,22 @@ func validChangePasswordBody() []byte {
 	return []byte(`{"current_password":"oldpass123","new_password":"newpass123"}`)
 }
 
+func TestHandlerMissingTenant(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPut, "/", bytes.NewReader(validChangePasswordBody()))
+	c.Request.Header.Set("Content-Type", "application/json")
+	defer func() {
+		if p := recover(); p != nil {
+			t.Errorf("service invoked without context: %v", p)
+		}
+	}()
+	NewHandler(nil).Handle(c)
+	if w.Code != 400 {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
 func TestHandlerHandle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -79,24 +95,27 @@ func TestHandlerHandle(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := NewHandler(tt.service)
-			w := httptest.NewRecorder()
-			c, _ := gin.CreateTestContext(w)
-			c.Request = httptest.NewRequest(http.MethodPut, "/iam/users/user-1/change-password", bytes.NewReader(tt.body))
-			c.Request.Header.Set("Content-Type", "application/json")
-			c.Params = gin.Params{{Key: "id", Value: "user-1"}}
+		for _, scope := range []tenant.TenantContext{tenant.NewRoot(), tenant.NewScoped(7, "selected")} {
+			t.Run(tt.name+scope.CompanySlug, func(t *testing.T) {
+				h := NewHandler(tt.service)
+				w := httptest.NewRecorder()
+				c, _ := gin.CreateTestContext(w)
+				c.Request = httptest.NewRequest(http.MethodPut, "/iam/users/user-1/change-password", bytes.NewReader(tt.body))
+				c.Request.Header.Set("Content-Type", "application/json")
+				c.Params = gin.Params{{Key: "id", Value: "user-1"}}
 
-			if tt.authUser != nil {
-				authctx.SetGin(c, tt.authUser)
-			}
+				if tt.authUser != nil {
+					authctx.SetGin(c, tt.authUser)
+				}
 
-			h.Handle(c)
+				tenant.SetGin(c, scope)
+				h.Handle(c)
 
-			if w.Code != tt.statusCode {
-				t.Fatalf("expected status %d, got %d", tt.statusCode, w.Code)
-			}
-		})
+				if w.Code != tt.statusCode {
+					t.Fatalf("expected status %d, got %d", tt.statusCode, w.Code)
+				}
+			})
+		}
 	}
 }
 

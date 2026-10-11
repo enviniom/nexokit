@@ -13,7 +13,8 @@ func NewHandler(service Service) *Handler { return &Handler{service: service} }
 func (h *Handler) Handle(c *gin.Context) {
 	tc, ok := tenant.FromGin(c)
 	if !ok {
-		tc = tenant.NewRoot()
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
 	}
 	data, err := h.service.List(tc)
 	if err != nil {

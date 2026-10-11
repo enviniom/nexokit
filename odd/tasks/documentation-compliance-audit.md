@@ -23,8 +23,8 @@ Audit current implementation against repository documentation, correct demonstra
 ## Tasks
 - [x] T1 (done): Complete source compliance inventory and report demonstrated findings with explicit coverage. Audit all production persistence, routes/handlers, imports and remaining documentation/runtime surfaces; distinguish current rules, legacy conventions and future guidance.
 - [x] T2 (done): Scope role-permission mutations to trusted tenant context, with regression tests for same/cross tenant, root-global, selected-root and transaction failures as applicable. Verify focused IAM tests.
-- [ ] T5 (in_progress): Reject absent tenant context in IAM handlers; assert no service calls and preserve explicit root/global/scoped contexts. Update affected HTTP integration wiring only when required.
-- [ ] T6 (pending): Return 400 for malformed permission-update JSON and retain 422 for valid JSON with invalid fields; prove with handler regression tests.
+- [x] T5 (done): Reject absent tenant context in IAM handlers; assert no service calls and preserve explicit root/global/scoped contexts. Update affected HTTP integration wiring only when required.
+- [ ] T6 (in_progress): Return 400 for malformed permission-update JSON and retain 422 for valid JSON with invalid fields; prove with handler regression tests.
 - [ ] T3 (pending): Make generated modules conform to new-code layout, safe DTO mapping and normalization, trusted tenant scope and safe errors. Generate normal/tenant fixtures in temporary directories and prove compiled behavior with regression tests; update affected scaffold documentation accurately. Keep generator compatibility where safe; no unrelated module migration.
 - [ ] T4 (pending): Run final independent checks, reconcile every finding and publish audit evidence/limitations for human validation. Full tests, vet, module guards, format, diff checks; record work-unit commits.
 
@@ -51,7 +51,10 @@ Verifier: `go test -timeout 180s ./...`, `go test -short ./...`, `go vet ./...`,
 - D6: Do not enable RDD (currently off), publish branches or mutate real services for validation.
 
 ## Verification evidence
+- T2 work-unit commit: `e0c0f4c`.
 - T2: observed RED for foreign/deleted/missing/selected-root foreign mutations; GREEN for own/global/selected scopes, scoped cache deletion and duplicate-insert rollback. Writer and independent verifier passed focused assignment/integration and full IAM tests; verifier results cached. No blocker. SQLite does not certify PostgreSQL locking/Redis behavior.
 
+- T5: all 15 handler fallbacks removed (7 roles, 8 users). Observed RED using unreachable-service sentinel, GREEN for missing400 and explicit root/scoped contexts. Formatted30 files; independent fresh role/user/integration tests and diff checks PASS. 872 changed lines largely preserve and expand existing test tables; coherent single policy unit.
+
 ## Progress and next step
-T1/T2 complete. T5 begins next; T6 and generator T3 remain pending. Commit only verified work units on fix/documentation-compliance.
+T1/T2/T5 complete. T6 active next; generator T3 and final T4 pending.

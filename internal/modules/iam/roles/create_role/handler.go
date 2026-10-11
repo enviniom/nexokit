@@ -25,7 +25,8 @@ func (h *Handler) Handle(c *gin.Context) {
 	}
 	tc, ok := tenant.FromGin(c)
 	if !ok {
-		tc = tenant.NewRoot()
+		response.BadRequest(c, messages.MsgBadRequest)
+		return
 	}
 	item, err := h.service.Create(tc, req)
 	if err != nil {
