@@ -1,10 +1,16 @@
-package {{.Package}}
+package {{.UseCase}}
 
 import (
-	"net/http"
-	"strconv"
-
+	"github.com/enviniom/nexokit/internal/modules/{{.Name}}/core"
+	{{- if ne .Action "delete" }}
+	entity "github.com/enviniom/nexokit/internal/modules/{{.Name}}/core/{{.Package}}"
+	{{- end }}
+	{{- if or (eq .Action "create") (eq .Action "update") }}
 	"github.com/enviniom/nexokit/internal/platform/messages"
+	{{- end }}
+	{{- if eq .Action "list" }}
+	"github.com/enviniom/nexokit/internal/platform/query"
+	{{- end }}
 	"github.com/enviniom/nexokit/internal/platform/response"
 	{{- if .Tenant }}
 	"github.com/enviniom/nexokit/internal/platform/tenant"
@@ -12,138 +18,72 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// {{.Struct}}Handler holds HTTP handlers for {{.Struct}}.
-type {{.Struct}}Handler struct {
-	service *{{.Struct}}Service
-}
+{{if eq .Action "create"}}type Handler struct { repo core.CreateRepository }
+func NewHandler(repo core.CreateRepository) *Handler { return &Handler{repo: repo} }
+{{else if eq .Action "get"}}type Handler struct { repo core.GetRepository }
+func NewHandler(repo core.GetRepository) *Handler { return &Handler{repo: repo} }
+{{else if eq .Action "list"}}type Handler struct { repo core.ListRepository }
+func NewHandler(repo core.ListRepository) *Handler { return &Handler{repo: repo} }
+{{else if eq .Action "update"}}type Handler struct { repo core.UpdateRepository }
+func NewHandler(repo core.UpdateRepository) *Handler { return &Handler{repo: repo} }
+{{else if eq .Action "delete"}}type Handler struct { repo core.DeleteRepository }
+func NewHandler(repo core.DeleteRepository) *Handler { return &Handler{repo: repo} }
+{{end}}
 
-// New{{.Struct}}Handler creates a new handler instance.
-func New{{.Struct}}Handler(service *{{.Struct}}Service) *{{.Struct}}Handler {
-	return &{{.Struct}}Handler{service: service}
-}
-
-// Create handles POST /{{.Table}}.
-func (h *{{.Struct}}Handler) Create(c *gin.Context) {
-	var req Create{{.Struct}}Request
+func (h *Handler) Handle(c *gin.Context) {
+	{{- if .Tenant }}
+	tc, ok := tenant.FromGin(c)
+	{{- if eq .Action "list" }}
+	if !ok || (!tc.IsRootScope && tc.CompanyID == 0) || (tc.IsRootScope && tc.CompanyID != 0) {
+	{{- else }}
+	if !ok || tc.IsRootScope || tc.CompanyID == 0 {
+	{{- end }}
+		response.HandleError(c, core.ErrTenantRequired)
+		return
+	}
+	{{- end }}
+	{{- if eq .Action "create" }}
+	var req entity.Create{{.Struct}}Request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
-		return
-	}
-	m, err := h.service.Create(c.Request.Context(), req)
-	if err != nil {
-		response.InternalServerError(c, err.Error())
-		return
-	}
-	response.Created(c, to{{.Struct}}Response(m))
-}
-
-// Get handles GET /{{.Table}}/:id.
-func (h *{{.Struct}}Handler) Get(c *gin.Context) {
-	publicID := c.Param("id")
-	{{- if .Tenant }}
-	tc, ok := tenant.FromGin(c)
-	if !ok {
-		response.Forbidden(c, "tenant context required")
-		return
-	}
-	{{- end }}
-	m, err := h.service.Get(c.Request.Context(), {{- if .Tenant }} tc, {{- end }} publicID)
-	if err != nil {
-		response.NotFound(c, "{{.Struct}} not found")
-		return
-	}
-	response.OK(c, to{{.Struct}}Response(m))
-}
-
-// List handles GET /{{.Table}} with pagination.
-func (h *{{.Struct}}Handler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if page < 1 {
-		page = 1
-	}
-	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "20"))
-	if perPage < 1 {
-		perPage = 20
-	}
-	{{- if .Tenant }}
-	tc, ok := tenant.FromGin(c)
-	if !ok {
-		response.Forbidden(c, "tenant context required")
-		return
-	}
-	{{- end }}
-	items, total, err := h.service.List(c.Request.Context(), {{- if .Tenant }} tc, {{- end }} page, perPage)
-	if err != nil {
-		response.InternalServerError(c, err.Error())
-		return
-	}
-	response.Paginated(c, "{{.Struct}} list retrieved", to{{.Struct}}ListResponse(items), page, perPage, total)
-}
-
-// Update handles PUT /{{.Table}}/:id.
-func (h *{{.Struct}}Handler) Update(c *gin.Context) {
-	publicID := c.Param("id")
-	var req Update{{.Struct}}Request
+	if response.RespondIfInvalid(c, req.Validate()) { return }
+	m, err := h.repo.Create(c.Request.Context(), {{if .Tenant}}tc, {{end}}&entity.{{.Struct}}{Name: req.Name})
+	if err != nil { response.HandleError(c, err); return }
+	var dto entity.{{.Struct}}Response
+	dto.FromModel(*m)
+	response.Created(c, "{{.Struct}} created", dto)
+	{{- else if eq .Action "get" }}
+	m, err := h.repo.Get(c.Request.Context(), {{if .Tenant}}tc, {{end}}c.Param("id"))
+	if err != nil { response.HandleError(c, err); return }
+	var dto entity.{{.Struct}}Response
+	dto.FromModel(*m)
+	response.Success(c, "{{.Struct}} retrieved", dto)
+	{{- else if eq .Action "list" }}
+	params := query.ListFromGin(c)
+	items, total, err := h.repo.List(c.Request.Context(), {{if .Tenant}}tc, {{end}}params)
+	if err != nil { response.HandleError(c, err); return }
+	dtos := make([]entity.{{.Struct}}Response, len(items))
+	for i, m := range items { dtos[i].FromModel(m) }
+	response.PaginatedWithFilters(c, "{{.Struct}} list retrieved", dtos, params, total)
+	{{- else if eq .Action "update" }}
+	var req entity.Update{{.Struct}}Request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	if errs := req.Validate(); errs.HasErrors() {
-		response.ValidationError(c, errs)
-		return
-	}
-	{{- if .Tenant }}
-	tc, ok := tenant.FromGin(c)
-	if !ok {
-		response.Forbidden(c, "tenant context required")
-		return
-	}
-	{{- end }}
-	m, err := h.service.Update(c.Request.Context(), {{- if .Tenant }} tc, {{- end }} publicID, req)
-	if err != nil {
-		response.NotFound(c, "{{.Struct}} not found")
-		return
-	}
-	response.OK(c, to{{.Struct}}Response(m))
-}
-
-// Delete handles DELETE /{{.Table}}/:id.
-func (h *{{.Struct}}Handler) Delete(c *gin.Context) {
-	publicID := c.Param("id")
-	{{- if .Tenant }}
-	tc, ok := tenant.FromGin(c)
-	if !ok {
-		response.Forbidden(c, "tenant context required")
-		return
-	}
-	{{- end }}
-	if err := h.service.Delete(c.Request.Context(), {{- if .Tenant }} tc, {{- end }} publicID); err != nil {
-		response.NotFound(c, "{{.Struct}} not found")
+	if response.RespondIfInvalid(c, req.Validate()) { return }
+	m, err := h.repo.Update(c.Request.Context(), {{if .Tenant}}tc, {{end}}c.Param("id"), req.Name)
+	if err != nil { response.HandleError(c, err); return }
+	var dto entity.{{.Struct}}Response
+	dto.FromModel(*m)
+	response.Success(c, "{{.Struct}} updated", dto)
+	{{- else if eq .Action "delete" }}
+	if err := h.repo.Delete(c.Request.Context(), {{if .Tenant}}tc, {{end}}c.Param("id")); err != nil {
+		response.HandleError(c, err)
 		return
 	}
 	response.NoContent(c)
-}
-
-func to{{.Struct}}Response(m *{{.Struct}}) {{.Struct}}Response {
-	return {{.Struct}}Response{
-		ID:        m.PublicID,
-		Name:      m.Name,
-		{{- if .Tenant }}
-		CompanyID: m.CompanyID,
-		{{- end }}
-		CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		UpdatedAt: m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-	}
-}
-
-func to{{.Struct}}ListResponse(items []{{.Struct}}) []{{.Struct}}Response {
-	out := make([]{{.Struct}}Response, len(items))
-	for i, m := range items {
-		out[i] = to{{.Struct}}Response(&m)
-	}
-	return out
+	{{- end }}
 }

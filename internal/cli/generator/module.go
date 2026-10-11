@@ -1,7 +1,9 @@
 package generator
 
 import (
+	"bytes"
 	"fmt"
+	"go/format"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -40,6 +42,7 @@ func ValidateName(name string) error {
 // GenerateModule creates the module directory and files.
 // If the target directory already exists, it returns ErrModuleExists.
 func GenerateModule(opts ModuleOptions) error {
+	opts.Name = strings.TrimSpace(opts.Name)
 	if err := ValidateName(opts.Name); err != nil {
 		return err
 	}
@@ -70,12 +73,14 @@ func GenerateModule(opts ModuleOptions) error {
 		Tenant:    opts.Tenant,
 	}
 
-	for _, fileName := range templates.FileNames() {
-		tmpl, err := templates.ParseModuleTemplate(fileName)
+	for _, file := range templates.ModuleFiles(data) {
+		tmpl, err := templates.ParseModuleTemplate(file.Template)
 		if err != nil {
 			return err
 		}
-		if err := executeTemplate(tmpl, moduleDir, fileName+".go", data); err != nil {
+		fileData := data
+		fileData.Action, fileData.UseCase = file.Action, file.UseCase
+		if err := executeTemplate(tmpl, moduleDir, file.Path, fileData); err != nil {
 			return err
 		}
 	}
@@ -92,14 +97,19 @@ func GenerateModule(opts ModuleOptions) error {
 
 func executeTemplate(tmpl *template.Template, dir, filename string, data templates.ModuleData) error {
 	path := filepath.Join(dir, filename)
-	f, err := os.Create(path)
-	if err != nil {
-		return fmt.Errorf("failed to create %s: %w", filename, err)
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("failed to create directory for %s: %w", filename, err)
 	}
-	defer f.Close()
-
-	if err := tmpl.Execute(f, data); err != nil {
+	var out bytes.Buffer
+	if err := tmpl.Execute(&out, data); err != nil {
 		return fmt.Errorf("failed to execute template %s: %w", filename, err)
+	}
+	formatted, err := format.Source(out.Bytes())
+	if err != nil {
+		return fmt.Errorf("failed to format %s: %w", filename, err)
+	}
+	if err := os.WriteFile(path, formatted, 0644); err != nil {
+		return fmt.Errorf("failed to write %s: %w", filename, err)
 	}
 	return nil
 }

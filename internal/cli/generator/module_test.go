@@ -36,21 +36,44 @@ func TestValidateName(t *testing.T) {
 	}
 }
 
-func TestGenerateModule_Idempotency(t *testing.T) {
+func TestGenerateModule_PathSafety(t *testing.T) {
 	dir := t.TempDir()
-	moduleDir := filepath.Join(dir, "internal", "modules", "testmod")
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(cwd)
+	moduleDir := filepath.Join("internal", "modules", "testmod")
 	if err := os.MkdirAll(moduleDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-
-	// Change working directory so generator writes into temp dir tree
-	// We simulate by using the current working dir; instead we test idempotency directly.
-	// Simpler: create the dir under CWD internal/modules and expect error.
-	// Better: make generator accept a base path for testability.
-	// Since generator uses hardcoded "internal/modules", we test idempotency
-	// by creating the dir first and checking that GenerateModule fails.
-	// However, we do NOT want to pollute the repo. Skip this in short tests.
-	t.Skip("idempotency test requires refactor to inject base path; covered manually")
+	marker := filepath.Join(moduleDir, "keep.txt")
+	if err := os.WriteFile(marker, []byte("preexisting"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"testmod", " testmod "} {
+		if err := GenerateModule(ModuleOptions{Name: name}); !errors.Is(err, ErrModuleExists) {
+			t.Fatalf("existing module %q: %v", name, err)
+		}
+	}
+	for _, name := range []string{"../escape", "a/b", "/absolute", ".", ".."} {
+		if err := GenerateModule(ModuleOptions{Name: name}); err == nil {
+			t.Errorf("unsafe path accepted: %q", name)
+		}
+	}
+	if got, err := os.ReadFile(marker); err != nil || string(got) != "preexisting" {
+		t.Fatalf("existing content changed: %q %v", got, err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "internal" {
+		t.Fatalf("unexpected writes: %v", entries)
+	}
 }
 
 func TestGenerateModule_TemplateExecution(t *testing.T) {
@@ -84,13 +107,18 @@ func TestGenerateModule_TemplateExecution(t *testing.T) {
 	}
 
 	expectedFiles := []string{
-		"model.go",
-		"dto.go",
-		"repository.go",
-		"service.go",
-		"handler.go",
+		"core/testmod/model.go",
+		"core/testmod/dtos.go",
+		"core/contracts.go",
+		"core/errors.go",
+		"container.go",
 		"routes.go",
-		"validation.go",
+		"slices/create_testmod/handler.go",
+		"slices/create_testmod/repository.go",
+		"slices/get_testmod/handler.go",
+		"slices/list_testmod/repository.go",
+		"slices/update_testmod/repository.go",
+		"slices/delete_testmod/repository.go",
 	}
 	moduleDir := filepath.Join(tmpDir, "internal", "modules", "testmod")
 	for _, f := range expectedFiles {

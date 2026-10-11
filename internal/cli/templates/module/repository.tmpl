@@ -1,81 +1,128 @@
-package {{.Package}}
+package {{.UseCase}}
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/enviniom/nexokit/internal/modules/{{.Name}}/core"
+	entity "github.com/enviniom/nexokit/internal/modules/{{.Name}}/core/{{.Package}}"
+	{{- if eq .Action "list" }}
+	"github.com/enviniom/nexokit/internal/platform/gormutil"
+	"github.com/enviniom/nexokit/internal/platform/query"
+	{{- end }}
 	{{- if .Tenant }}
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	{{- end }}
-	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )
 
-// {{.Struct}}Repository handles persistence for {{.Struct}}.
-type {{.Struct}}Repository struct {
-	db *gorm.DB
-}
+type Repository struct { db *gorm.DB }
 
-// New{{.Struct}}Repository creates a new repository instance.
-func New{{.Struct}}Repository(db *gorm.DB) *{{.Struct}}Repository {
-	return &{{.Struct}}Repository{db: db}
-}
+func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 
-// Create persists a new {{.Struct}}.
-func (r *{{.Struct}}Repository) Create(ctx context.Context, m *{{.Struct}}) error {
-	return r.db.WithContext(ctx).Create(m).Error
+{{if eq .Action "create"}}
+func (r *Repository) Create(ctx context.Context, {{if .Tenant}}tc tenant.TenantContext, {{end}}m *entity.{{.Struct}}) (*entity.{{.Struct}}, error) {
+	{{- if .Tenant }}
+	if tc.IsRootScope || tc.CompanyID == 0 { return nil, core.ErrTenantRequired }
+	// An INSERT cannot be constrained by WHERE; assign exclusively from trusted scope.
+	m.CompanyID = tc.CompanyID
+	{{- end }}
+	q := r.db.WithContext(ctx)
+	{{- if .Tenant }}
+	q = tenant.ApplyTenantScope(q, tc)
+	{{- end }}
+	if err := q.Create(m).Error; err != nil { return nil, persistenceError(err) }
+	return m, nil
 }
-
-// FindByPublicID retrieves a {{.Struct}} by its public ID.
-func (r *{{.Struct}}Repository) FindByPublicID(ctx context.Context, {{- if .Tenant }} tc tenant.TenantContext, {{- end }} publicID string) (*{{.Struct}}, error) {
-	var m {{.Struct}}
+{{else if eq .Action "get"}}
+func (r *Repository) Get(ctx context.Context, {{if .Tenant}}tc tenant.TenantContext, {{end}}publicID string) (*entity.{{.Struct}}, error) {
+	{{- if .Tenant }}
+	if tc.IsRootScope || tc.CompanyID == 0 { return nil, core.ErrTenantRequired }
+	{{- end }}
+	var m entity.{{.Struct}}
 	q := r.db.WithContext(ctx).Where("public_id = ?", publicID)
 	{{- if .Tenant }}
 	q = tenant.ApplyTenantScope(q, tc)
 	{{- end }}
-	if err := q.First(&m).Error; err != nil {
-		return nil, fmt.Errorf("{{.Package}} not found: %w", err)
-	}
+	if err := q.First(&m).Error; err != nil { return nil, persistenceError(err) }
 	return &m, nil
 }
-
-// List returns paginated {{.Table}}.
-func (r *{{.Struct}}Repository) List(ctx context.Context, {{- if .Tenant }} tc tenant.TenantContext, {{- end }} page, perPage int) ([]{{.Struct}}, error) {
-	var items []{{.Struct}}
-	offset := (page - 1) * perPage
-	q := r.db.WithContext(ctx).Limit(perPage).Offset(offset).Order("created_at DESC")
+{{else if eq .Action "list"}}
+func (r *Repository) List(ctx context.Context, {{if .Tenant}}tc tenant.TenantContext, {{end}}params query.ListParams) ([]entity.{{.Struct}}, int64, error) {
+	{{- if .Tenant }}
+	// Root-global is an explicit middleware policy, never a missing-context fallback.
+	if (!tc.IsRootScope && tc.CompanyID == 0) || (tc.IsRootScope && tc.CompanyID != 0) { return nil, 0, core.ErrTenantRequired }
+	{{- end }}
+	q := r.db.WithContext(ctx).Model(&entity.{{.Struct}}{})
 	{{- if .Tenant }}
 	q = tenant.ApplyTenantScope(q, tc)
 	{{- end }}
-	if err := q.Find(&items).Error; err != nil {
-		return nil, err
-	}
-	return items, nil
+	q = gormutil.ApplySearch(q, params.Search, "name")
+	q = gormutil.ApplyDateRange(q, params.Filters, "created_at")
+	var total int64
+	if err := q.Count(&total).Error; err != nil { return nil, 0, persistenceError(err) }
+	// Guard both syntax and the supported public sort fields.
+	q = gormutil.ApplySorting(q, params.Sort, "name", "created_at", "updated_at")
+	page, perPage := params.Pagination.Page, params.Pagination.PerPage
+	if page < 1 { page = query.DefaultPage }
+	if perPage < 1 { perPage = query.DefaultPerPage }
+	if perPage > query.MaxPerPage { perPage = query.MaxPerPage }
+	q = gormutil.ApplyPagination(q, page, perPage)
+	items := make([]entity.{{.Struct}}, 0)
+	if err := q.Find(&items).Error; err != nil { return nil, 0, persistenceError(err) }
+	return items, total, nil
 }
-
-// Count returns the total number of {{.Table}}.
-func (r *{{.Struct}}Repository) Count(ctx context.Context{{- if .Tenant }}, tc tenant.TenantContext{{- end }}) (int64, error) {
-	var count int64
-	q := r.db.WithContext(ctx).Model(&{{.Struct}}{})
+{{else if eq .Action "update"}}
+func (r *Repository) Update(ctx context.Context, {{if .Tenant}}tc tenant.TenantContext, {{end}}publicID, name string) (*entity.{{.Struct}}, error) {
 	{{- if .Tenant }}
-	q = tenant.ApplyTenantScope(q, tc)
+	if tc.IsRootScope || tc.CompanyID == 0 { return nil, core.ErrTenantRequired }
 	{{- end }}
-	if err := q.Count(&count).Error; err != nil {
-		return 0, err
-	}
-	return count, nil
+	var m entity.{{.Struct}}
+	// No Save/upsert: a miss must never insert or change company ownership.
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		q := tx.Model(&entity.{{.Struct}}{}).Where("public_id = ?", publicID)
+		{{- if .Tenant }}
+		q = tenant.ApplyTenantScope(q, tc)
+		{{- end }}
+		result := q.Update("name", name)
+		if result.Error != nil { return result.Error }
+		if result.RowsAffected == 0 { return core.ErrNotFound }
+		q = tx.Where("public_id = ?", publicID)
+		{{- if .Tenant }}
+		q = tenant.ApplyTenantScope(q, tc)
+		{{- end }}
+		return q.First(&m).Error
+	})
+	if err != nil { return nil, persistenceError(err) }
+	return &m, nil
 }
-
-// Update modifies an existing {{.Struct}}.
-func (r *{{.Struct}}Repository) Update(ctx context.Context, m *{{.Struct}}) error {
-	return r.db.WithContext(ctx).Save(m).Error
-}
-
-// Delete soft-deletes a {{.Struct}}.
-func (r *{{.Struct}}Repository) Delete(ctx context.Context, {{- if .Tenant }} tc tenant.TenantContext, {{- end }} publicID string) error {
+{{else if eq .Action "delete"}}
+func (r *Repository) Delete(ctx context.Context, {{if .Tenant}}tc tenant.TenantContext, {{end}}publicID string) error {
+	{{- if .Tenant }}
+	if tc.IsRootScope || tc.CompanyID == 0 { return core.ErrTenantRequired }
+	{{- end }}
 	q := r.db.WithContext(ctx).Where("public_id = ?", publicID)
 	{{- if .Tenant }}
 	q = tenant.ApplyTenantScope(q, tc)
 	{{- end }}
-	return q.Delete(&{{.Struct}}{}).Error
+	result := q.Delete(&entity.{{.Struct}}{})
+	if result.Error != nil { return persistenceError(result.Error) }
+	if result.RowsAffected == 0 { return core.ErrNotFound }
+	return nil
+}
+{{end}}
+
+// Translate known persistence outcomes while retaining their diagnostic cause.
+func persistenceError(err error) error {
+	switch {
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		return fmt.Errorf("%w: %w", core.ErrNotFound, err)
+	case errors.Is(err, gorm.ErrDuplicatedKey):
+		return fmt.Errorf("%w: %w", core.ErrConflict, err)
+	case errors.Is(err, gorm.ErrForeignKeyViolated):
+		return fmt.Errorf("%w: %w", core.ErrInvalidReference, err)
+	default:
+		return err
+	}
 }

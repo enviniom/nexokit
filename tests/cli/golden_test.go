@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/cli/generator"
+	"github.com/enviniom/nexokit/internal/cli/templates"
 )
 
 func TestGolden_ModuleWithAllFlags(t *testing.T) {
@@ -37,19 +38,33 @@ func TestGolden_ModuleWithAllFlags(t *testing.T) {
 	goldenDir := filepath.Join(cwd, "testdata", "golden", "goldenmod")
 	moduleDir := filepath.Join(tmpDir, "internal", "modules", "goldenmod")
 
-	files := []string{
-		"model.go",
-		"dto.go",
-		"repository.go",
-		"service.go",
-		"handler.go",
-		"routes.go",
-		"validation.go",
-	}
+	plan := templates.ModuleFiles(templates.ModuleData{Name: opts.Name, Package: opts.Name, CRUD: opts.CRUD, Tenant: opts.Tenant})
 
 	update := os.Getenv("UPDATE_GOLDEN") == "1"
 
-	for _, f := range files {
+	// Keep retired snapshots as inert markers rather than deleting tracked files.
+	// The negative assertion also protects against accidentally restoring flat output.
+	retired := []string{"model.go", "dto.go", "repository.go", "service.go", "handler.go", "validation.go"}
+	marker := []byte("package goldenmod\n\n// Retired flat scaffold snapshot. Current generated code lives in core/ and slices/.\n")
+	for _, name := range retired {
+		if _, err := os.Stat(filepath.Join(moduleDir, name)); !os.IsNotExist(err) {
+			t.Fatalf("retired root implementation %s generated: %v", name, err)
+		}
+		path := filepath.Join(goldenDir, name)
+		if update {
+			if err := os.WriteFile(path, marker, 0644); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			got, err := os.ReadFile(path)
+			if err != nil || string(got) != string(marker) {
+				t.Fatalf("retired snapshot %s not updated: %v", name, err)
+			}
+		}
+	}
+
+	for _, file := range plan {
+		f := file.Path
 		gotPath := filepath.Join(moduleDir, f)
 		got, err := os.ReadFile(gotPath)
 		if err != nil {
@@ -58,7 +73,9 @@ func TestGolden_ModuleWithAllFlags(t *testing.T) {
 
 		goldenPath := filepath.Join(goldenDir, f)
 		if update {
-			_ = os.MkdirAll(goldenDir, 0755)
+			if err := os.MkdirAll(filepath.Dir(goldenPath), 0755); err != nil {
+				t.Fatal(err)
+			}
 			if err := os.WriteFile(goldenPath, got, 0644); err != nil {
 				t.Fatalf("writing golden %s: %v", f, err)
 			}
@@ -85,7 +102,7 @@ func TestGolden_ModuleWithAllFlags(t *testing.T) {
 		}
 	}
 
-	repository, err := os.ReadFile(filepath.Join(moduleDir, "repository.go"))
+	repository, err := os.ReadFile(filepath.Join(moduleDir, "slices/list_goldenmod/repository.go"))
 	if err != nil {
 		t.Fatalf("reading generated repository.go: %v", err)
 	}

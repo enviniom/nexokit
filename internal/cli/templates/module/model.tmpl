@@ -1,12 +1,33 @@
 package {{.Package}}
 
-import "github.com/enviniom/nexokit/internal/shared"
+import (
+	"github.com/enviniom/nexokit/internal/platform/identity"
+	"github.com/enviniom/nexokit/internal/shared"
+	"github.com/oklog/ulid/v2"
+	"gorm.io/gorm"
+)
 
-// {{.Struct}} is the database model for {{.Name}}.
+// {{.Struct}} is a persistence record; expose it through {{.Struct}}Response only.
 type {{.Struct}} struct {
 	shared.BaseModel
 	{{- if .Tenant }}
-	CompanyID uint `gorm:"index;not null" json:"company_id"`
+	CompanyID uint `gorm:"index;not null"`
 	{{- end }}
-	Name string `gorm:"not null" json:"name"`
+	Name string `gorm:"not null"`
+}
+
+func ({{.Struct}}) TableName() string { return "{{.Table}}" }
+
+// BeforeCreate owns public-ID generation without changing shared model behavior.
+func (m *{{.Struct}}) BeforeCreate(_ *gorm.DB) error {
+	if m.PublicID != "" {
+		_, err := ulid.ParseStrict(m.PublicID)
+		return err
+	}
+	id, err := identity.Generate()
+	if err != nil {
+		return err
+	}
+	m.PublicID = id
+	return nil
 }

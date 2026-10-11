@@ -1,0 +1,43 @@
+package {{.Package}}
+
+import (
+	{{- if .CRUD }}
+	create "github.com/enviniom/nexokit/internal/modules/{{.Name}}/slices/create_{{.Package}}"
+	{{- end }}
+	get "github.com/enviniom/nexokit/internal/modules/{{.Name}}/slices/get_{{.Package}}"
+	list "github.com/enviniom/nexokit/internal/modules/{{.Name}}/slices/list_{{.Package}}"
+	{{- if .CRUD }}
+	update "github.com/enviniom/nexokit/internal/modules/{{.Name}}/slices/update_{{.Package}}"
+	del "github.com/enviniom/nexokit/internal/modules/{{.Name}}/slices/delete_{{.Package}}"
+	{{- end }}
+	"gorm.io/gorm"
+)
+
+// Container constructs dependencies only; app wiring and route guards remain explicit.
+type Container struct {
+	{{- if .CRUD }}
+	Create *create.Handler
+	{{- end }}
+	Get *get.Handler
+	List *list.Handler
+	{{- if .CRUD }}
+	Update *update.Handler
+	Delete *del.Handler
+	{{- end }}
+}
+
+// Enable GORM TranslateError in the application DB configuration to map
+// database duplicate-key/foreign-key failures to the module's known errors.
+func NewContainer(db *gorm.DB) *Container {
+	return &Container{
+		{{- if .CRUD }}
+		Create: create.NewHandler(create.NewRepository(db)),
+		{{- end }}
+		Get: get.NewHandler(get.NewRepository(db)),
+		List: list.NewHandler(list.NewRepository(db)),
+		{{- if .CRUD }}
+		Update: update.NewHandler(update.NewRepository(db)),
+		Delete: del.NewHandler(del.NewRepository(db)),
+		{{- end }}
+	}
+}

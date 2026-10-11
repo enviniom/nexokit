@@ -1,0 +1,14 @@
+package core
+
+import (
+	"github.com/enviniom/nexokit/internal/platform/apperror"
+)
+
+var (
+	ErrNotFound = apperror.NotFound("{{.Name}}.not_found", "{{.Struct}} not found", nil)
+	ErrConflict = apperror.Conflict("{{.Name}}.conflict", "{{.Struct}} already exists", nil)
+	ErrInvalidReference = apperror.BadRequest("{{.Name}}.invalid_reference", "Invalid {{.Name}} reference", nil)
+	{{- if .Tenant }}
+	ErrTenantRequired = apperror.BadRequest("{{.Name}}.tenant_required", "Valid company scope required", nil)
+	{{- end }}
+)

@@ -23,7 +23,7 @@ internal/modules/<name>/
 
 Do not put new slice implementation files in the module root or import that root from a slice. Extract reused persistence queries into `queries/`, preferably one operation per file; non-persistence helpers, DTO mapping and business policy belong elsewhere.
 
-This is a **new-code convention**, not an assertion of uniform existing directories or generator output. Current application models and DTOs remain in flat `core/model.go` and `core/dto.go`; the entity directories in the tree are a target, not an implemented migration. The current generator emits `dto.go`, `model.go` and layer files directly in the module root, not entity core directories, so its scaffold requires adaptation before adopting this layout. Auth and companies have flat `slices/<use_case>/`; IAM groups use cases under `users/`, `roles/`, `permissions/` and non-HTTP `internal/`; onboarding currently uses `onboard_company/` directly. Extend nearby conventions deliberately; do not restructure unrelated code to satisfy a diagram.
+This is a **new-code convention**, not an assertion of uniform existing directories. Current application models and DTOs remain in flat `core/model.go` and `core/dto.go`; they have not been migrated. New generator output follows the entity core and use-case layout above, with root `container.go`/`routes.go`, module contracts/errors and handler + repository slices. It creates `get_<name>`/`list_<name>` by default; `--crud` also creates `create_<name>`/`update_<name>`/`delete_<name>`. It does not create an empty `queries/` directory or automatically mount routes. Auth and companies have flat `slices/<use_case>/`; IAM groups use cases under `users/`, `roles/`, `permissions/` and non-HTTP `internal/`; onboarding currently uses `onboard_company/` directly. Extend nearby conventions deliberately; do not restructure unrelated code to satisfy a diagram.
 
 ## 2. Choose the smallest useful layering
 
@@ -79,7 +79,7 @@ Current flat `core/dto.go` and `core/model.go` contain persistence records and v
 
 ## 5. Tenant-owned use cases
 
-Resolve a trusted context before tenant-owned operations; pass it explicitly to repositories, which enforce `tenant.ApplyTenantScope`. Missing context is not permission to query globally. Global operations require intentional route policy. The exact root/header rules and isolation checklist live in [multitenancy](references/infrastructure/multitenancy.md), not in each slice guide.
+Resolve a trusted context before tenant-owned operations; pass it explicitly to repositories, which enforce `tenant.ApplyTenantScope`. Missing context is not permission to query globally. Global operations require intentional route policy. Generated tenant slices reject absent/zero or inconsistent contexts at both handler and repository boundaries. Only lists accept explicit trusted root-global context; create/get/update/delete require a selected company. Create assigns company ownership from that context, never JSON; update changes only editable fields, never company ownership. Generated entity models own a `BeforeCreate` hook calling `platform/identity.Generate` because shared `BaseModel` has no hook; explicitly supplied IDs must be valid ULIDs. The exact root/header rules and isolation checklist live in [multitenancy](references/infrastructure/multitenancy.md), not in each slice guide.
 
 ## 6. Review checklist
 

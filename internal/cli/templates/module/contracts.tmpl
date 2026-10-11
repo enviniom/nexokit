@@ -1,0 +1,33 @@
+package core
+
+import (
+	"context"
+
+	entity "github.com/enviniom/nexokit/internal/modules/{{.Name}}/core/{{.Package}}"
+	"github.com/enviniom/nexokit/internal/platform/query"
+	{{- if .Tenant }}
+	"github.com/enviniom/nexokit/internal/platform/tenant"
+	{{- end }}
+)
+
+// Each handler consumes only its own persistence capability.
+{{if .CRUD}}type CreateRepository interface {
+	Create(context.Context, {{if .Tenant}}tenant.TenantContext, {{end}}*entity.{{.Struct}}) (*entity.{{.Struct}}, error)
+}
+{{end}}
+type GetRepository interface {
+	Get(context.Context, {{if .Tenant}}tenant.TenantContext, {{end}}string) (*entity.{{.Struct}}, error)
+}
+
+type ListRepository interface {
+	List(context.Context, {{if .Tenant}}tenant.TenantContext, {{end}}query.ListParams) ([]entity.{{.Struct}}, int64, error)
+}
+{{if .CRUD}}
+type UpdateRepository interface {
+	Update(context.Context, {{if .Tenant}}tenant.TenantContext, {{end}}string, string) (*entity.{{.Struct}}, error)
+}
+
+type DeleteRepository interface {
+	Delete(context.Context, {{if .Tenant}}tenant.TenantContext, {{end}}string) error
+}
+{{end}}

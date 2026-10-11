@@ -40,6 +40,15 @@ For a fresh project, adjust initial schema and seeds coherently. For an existing
 go run ./cmd/nexokit make module widgets --crud --migration --tenant
 ```
 
-`widgets` is an illustrative new domain, not a shipped module. The generator currently emits flat legacy layer files, not a ready-to-mount vertical-slice container. The generator’s flat module-root `dto.go`/`model.go` output also needs adaptation to the [entity DTO and mapping convention](architecture_and_vsa.md#4-models-dtos-and-mapping); keep module contracts in `core/contracts.go`. This is adopter work, not a migration already performed in this checkout. Adapt the scaffold into use-case packages, review code/migration and compilation, construct a container, wire routes into the app, choose guards, and test tenant isolation. Default simple operations to two layers; add services for real orchestration. See [architecture](architecture_and_vsa.md) and [CLI flags](references/runtime/cli.md).
+`widgets` is an illustrative new domain, not a shipped module. New scaffolds include `core/widgets/model.go`/`dtos.go`, module `core/contracts.go`/`errors.go`, handler + repository packages under `slices/<use_case>/`, and root `container.go`/`routes.go`. Without `--crud`, only get/list slices and routes are generated. Existing legacy application modules are not migrated.
+
+To adopt the generated module:
+
+1. Review the model, validation and placeholder migration; implement the actual schema (including tenant ownership/indexes for `--tenant`). The entity hook generates ULID public IDs; responses omit internal relationship/audit IDs.
+2. Construct `widgets.NewContainer(db)` in the app composition root and explicitly call `widgets.Register(group, container)`. Generation never edits the app or automatically mounts routes. Choose authentication, permission guards and trusted tenant middleware before registration; configure GORM `TranslateError` to classify database constraint failures.
+3. For tenant operations, select a company through trusted middleware, not JSON. Create/get/update/delete reject missing or global scope; lists alone permit explicitly trusted root-global scope. JSON `company_id` cannot select/reassign ownership and is not exposed in responses.
+4. Test normalization, safe error responses, own/foreign-company reads and writes, soft deletion and root-global policy. Add a service only when business policy/orchestration warrants it; simple CRUD stays two layers.
+
+See [architecture](architecture_and_vsa.md) and [CLI flags](references/runtime/cli.md).
 
 Run focused tests, then relevant [quality checks](testing_and_quality.md#4-verification-commands). Build/deploy using the [runbook](deployment.md), not local development defaults.

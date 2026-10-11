@@ -25,8 +25,8 @@ Audit current implementation against repository documentation, correct demonstra
 - [x] T2 (done): Scope role-permission mutations to trusted tenant context, with regression tests for same/cross tenant, root-global, selected-root and transaction failures as applicable. Verify focused IAM tests.
 - [x] T5 (done): Reject absent tenant context in IAM handlers; assert no service calls and preserve explicit root/global/scoped contexts. Update affected HTTP integration wiring only when required.
 - [x] T6 (done): Return 400 for malformed permission-update JSON and retain 422 for valid JSON with invalid fields; prove with handler regression tests.
-- [ ] T3 (in_progress): Make generated modules conform to new-code layout, safe DTO mapping and normalization, trusted tenant scope and safe errors. Generate normal/tenant fixtures in temporary directories and prove compiled behavior with regression tests; update affected scaffold documentation accurately. Keep generator compatibility where safe; no unrelated module migration.
-- [ ] T4 (pending): Run final independent checks, reconcile every finding and publish audit evidence/limitations for human validation. Full tests, vet, module guards, format, diff checks; record work-unit commits.
+- [x] T3 (done): Make generated modules conform to new-code layout, safe DTO mapping and normalization, trusted tenant scope and safe errors. Generate normal/tenant fixtures in temporary directories and prove compiled behavior with regression tests; update affected scaffold documentation accurately. Keep generator compatibility where safe; no unrelated module migration.
+- [ ] T4 (in_progress): Run final independent checks, reconcile every finding and publish audit evidence/limitations for human validation. Full tests, vet, module guards, format, diff checks; record work-unit commits.
 
 ## Acceptance
 - Each confirmed violation is corrected with observed applicable checks, or explicitly recorded as blocked.
@@ -49,6 +49,12 @@ Verifier: `go test -timeout 180s ./...`, `go test -short ./...`, `go vet ./...`,
 - D4: Keep manual CI trigger, future CQRS guidance and documented operator production policies unchanged; no unsupported feature expansion.
 - D5: Binding failures return 400 and field validation 422; preserve response helpers and safe public messages.
 - D6: Do not enable RDD (currently off), publish branches or mutate real services for validation.
+- D7: BaseModel has no shared public-ID hook. Generated entity models will own BeforeCreate ULID generation using existing platform/identity instead of changing shared model behavior across existing modules. Preserve explicitly provided valid IDs if appropriate; tests verify ULID format and safe responses.
+- D8: Generated plain CRUD uses handler+repository slices, not pass-through services; default scaffold supplies get/list, --crud adds mutations; contracts/errors remain module core and wiring explicit.
+- D9: Generated tenant list allows explicit root-global scope; get/create/update/delete require selected scope. JSON company_id is ignored, inserts derive ownership from context, updates cannot reassign it and use scoped transactions instead of Save/upsert.
+- D10: Safe response mapping exposes ULID and safe fields; pointer DTO validation trims before rules; module errors preserve diagnostic causes while unknown technical failures become safe500.
+- D11: Generated table names match module names explicitly; migration stubs remain adopter-owned and generated routes must be wired with project guards.
+- Golden update convention is UPDATE_GOLDEN=1 (not a -update flag); rerun without the variable after inspecting fixture changes.
 
 ## Verification evidence
 - T2 work-unit commit: `e0c0f4c`.
@@ -57,7 +63,10 @@ Verifier: `go test -timeout 180s ./...`, `go test -short ./...`, `go vet ./...`,
 - T5 work-unit commit: `f848eb2`.
 - T5: all 15 handler fallbacks removed (7 roles, 8 users). Observed RED using unreachable-service sentinel, GREEN for missing400 and explicit root/scoped contexts. Formatted30 files; independent fresh role/user/integration tests and diff checks PASS. 872 changed lines largely preserve and expand existing test tables; coherent single policy unit.
 
+- T6 work-unit commit: `0ce7393`.
 - T6: RED for malformed JSON/wrong field types returning422; GREEN400 binding,422 invalid fields, zero service calls. Fresh writer+independent permission suite, format and diff checks PASS.
 
+- T3 writer: observed RED for missing nested output and nonpersistent trim; GREEN four compiled fixture variants and behavior regressions (safe JSON/errors, binding/validation, tenants, sort, soft deletion, error identity, rollback). CLI/docs/full tests, vet, guards and format PASS. Independent fresh CLI/docs/full tests, vet, module guard, all-Go formatting, tracked/untracked whitespace and explicit emitted-code fixture run PASS. Stale traceability-ledger sentence corrected with source-based prose readback and diff check; prose has no meaningful RED/GREEN. No behavior blockers.
+
 ## Progress and next step
-T1/T2/T5/T6 complete. Generator T3 active next; final T4 pending.
+T1/T2/T5/T6/T3 complete. Final T4 checks and audit closeout active. No push/PR or remediation merge to main.

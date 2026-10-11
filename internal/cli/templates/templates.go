@@ -20,6 +20,8 @@ type ModuleData struct {
 	CRUD      bool
 	Migration bool
 	Tenant    bool
+	Action    string // create, get, list, update or delete for a use-case template
+	UseCase   string // package/directory name, e.g. create_products
 }
 
 // ParseModuleTemplate loads and parses a named template from the embedded FS.
@@ -33,15 +35,39 @@ func ParseModuleTemplate(name string) (*template.Template, error) {
 
 // FileNames returns the list of template file names (without .tmpl extension).
 func FileNames() []string {
-	return []string{
-		"model",
-		"dto",
-		"repository",
-		"service",
-		"handler",
-		"routes",
-		"validation",
+	return []string{"model", "dto", "contracts", "errors", "container", "routes", "handler", "repository"}
+}
+
+// ModuleFile identifies one output and the use-case-specific template data.
+type ModuleFile struct {
+	Template string
+	Path     string
+	Action   string
+	UseCase  string
+}
+
+// ModuleFiles is the deterministic output plan. Without --crud, generate reads
+// only; --crud adds the mutation slices without introducing pass-through services.
+func ModuleFiles(data ModuleData) []ModuleFile {
+	files := []ModuleFile{
+		{Template: "model", Path: "core/" + data.Package + "/model.go"},
+		{Template: "dto", Path: "core/" + data.Package + "/dtos.go"},
+		{Template: "contracts", Path: "core/contracts.go"},
+		{Template: "errors", Path: "core/errors.go"},
+		{Template: "container", Path: "container.go"},
+		{Template: "routes", Path: "routes.go"},
 	}
+	actions := []string{"get", "list"}
+	if data.CRUD {
+		actions = []string{"create", "get", "list", "update", "delete"}
+	}
+	for _, action := range actions {
+		useCase := action + "_" + data.Package
+		for _, name := range []string{"handler", "repository"} {
+			files = append(files, ModuleFile{Template: name, Path: "slices/" + useCase + "/" + name + ".go", Action: action, UseCase: useCase})
+		}
+	}
+	return files
 }
 
 // NormalizePackage ensures the module name is valid snake_case.

@@ -29,11 +29,33 @@ Put the name **before** flags. Names must satisfy the generator's snake_case val
 
 | Flag | Effect |
 |---|---|
-| `--crud` | Enables CRUD handler/routes in the flat scaffold |
+| `--crud` | Adds create/update/delete slices and routes to the default get/list scaffold |
 | `--migration` | Generates corresponding migration |
-| `--tenant` | Adds company-scoped generation support |
+| `--tenant` | Requires trusted company scope; only list allows explicit root-global context |
 
-The current generator writes `model.go`, `dto.go`, `repository.go`, `service.go`, `handler.go`, `routes.go`, `validation.go` directly into the module root. It does not create a container, `core/` or use-case directories and does not wire itself into the app. Treat it as a legacy scaffold: adapt it to the [architecture conventions](../../architecture_and_vsa.md), verify it compiles, and review validation, schema, authorization and tenant behavior before using it. See [adoption](../../starter-template.md).
+The generator writes formatted Go following the [new-code architecture](../../architecture_and_vsa.md):
+
+```text
+internal/modules/<name>/
+├── container.go
+├── routes.go
+├── core/
+│   ├── contracts.go
+│   ├── errors.go
+│   └── <name>/
+│       ├── model.go
+│       └── dtos.go
+└── slices/
+    ├── get_<name>/       # handler.go + repository.go
+    ├── list_<name>/
+    └── ...              # create/update/delete with --crud
+```
+
+Plain CRUD uses handler + repository, not a pass-through service. DTO pointer validation trims names before rules; response DTOs own `FromModel`, exposing public IDs, names and timestamps only. Entity `BeforeCreate` generates ULIDs using `platform/identity` and preserves valid supplied IDs. Handlers use `response.HandleError` for safe unexpected errors; repositories translate GORM not-found, duplicate-key and foreign-key sentinels into module errors. Enable GORM `TranslateError` in the application's database configuration for driver constraint errors to become those sentinels; otherwise unexpected driver errors still receive safe 500 responses.
+
+Tenant handlers resolve `tenant.FromGin`; missing/invalid scope returns 400 before persistence. Create/get/update/delete require a selected company. Create assigns `company_id` from trusted scope; JSON `company_id` is ignored and is never returned. Updates cannot reassign ownership. Every repository read/write explicitly applies scope; only list permits a trusted root-global context established by deliberate middleware policy. Lists support normalized pagination (maximum 100), name search, creation-date filters and an explicit sorting allowlist (`name`, `created_at`, `updated_at`); there is no status field/filter in this scaffold.
+
+Generation does **not** migrate existing modules or wire routes into the app. Construct the generated container and explicitly register it on a group with appropriate authentication, permissions and tenant middleware. Review the placeholder migration, schema and route policy before use; generated migration stubs are not a finished tenant schema. Existing target directories are refused rather than overwritten. See [adoption](../../starter-template.md).
 
 ## Root creation and password handling
 

@@ -40,6 +40,50 @@ func TestMakeCommand_RunModule(t *testing.T) {
 	if _, err := os.Stat(moduleDir); os.IsNotExist(err) {
 		t.Fatalf("module dir not created")
 	}
+	for _, path := range []string{"container.go", "core/testmake/dtos.go", "slices/list_testmake/handler.go"} {
+		if _, err := os.Stat(filepath.Join(moduleDir, path)); err != nil {
+			t.Fatalf("missing generated %s: %v", path, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(moduleDir, "slices/create_testmake")); !os.IsNotExist(err) {
+		t.Fatalf("normal scaffold includes mutation: %v", err)
+	}
+}
+
+func TestMakeCommand_ModuleFlags(t *testing.T) {
+	dir := t.TempDir()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(cwd)
+	if err := os.MkdirAll("migrations", 0755); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	cmd := &MakeCommand{}
+	if err := cmd.Run(context.Background(), []string{"module", "order_items", "--crud", "--tenant", "--migration"}, cli.Stdio{Out: &out}); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"core/order_items/model.go", "slices/create_order_items/handler.go", "slices/update_order_items/repository.go", "slices/delete_order_items/repository.go"} {
+		if _, err := os.Stat(filepath.Join("internal/modules/order_items", path)); err != nil {
+			t.Fatalf("missing %s: %v", path, err)
+		}
+	}
+	model, err := os.ReadFile("internal/modules/order_items/core/order_items/model.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(model, []byte("CompanyID uint")) {
+		t.Fatal("tenant flag not propagated")
+	}
+	entries, err := os.ReadDir("migrations")
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("migration flag: entries=%v err=%v", entries, err)
+	}
 }
 
 func TestMakeCommand_RunModule_AlreadyExists(t *testing.T) {

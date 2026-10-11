@@ -1,5 +1,3 @@
 package goldenmod
 
-// Validation rules are defined on request DTOs via the Validate() method.
-// Use internal/platform/validator for field-level validation.
-// Add business-rule validation in the service layer.
+// Retired flat scaffold snapshot. Current generated code lives in core/ and slices/.
