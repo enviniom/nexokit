@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -74,14 +76,31 @@ func TestRedisLimiterIntegration(t *testing.T) {
 		t.Skip("integration test requires redis")
 	}
 
-	cfg := RedisLimiterConfig{Addr: "localhost:6379", Limit: 3, Window: 30 * time.Second, DialTimeout: 2 * time.Second, Prefix: "rl"}
+	var identity [16]byte
+	if _, err := rand.Read(identity[:]); err != nil {
+		t.Fatalf("generate test identity: %v", err)
+	}
+	cfg := RedisLimiterConfig{Addr: "localhost:6379", Limit: 3, Window: 30 * time.Second, DialTimeout: 2 * time.Second, Prefix: "rl:test:" + hex.EncodeToString(identity[:])}
 	limiter, err := NewRedisLimiter(cfg)
 	if err != nil {
 		t.Skipf("redis not available: %v", err)
 	}
-	t.Cleanup(func() { _ = limiter.Close() })
+	t.Cleanup(func() {
+		if err := limiter.Close(); err != nil {
+			t.Errorf("close redis limiter: %v", err)
+		}
+	})
 
 	key := "login:127.0.0.1"
+	redisKey := cfg.Prefix + ":" + key
+	// Registered after Close so LIFO cleanup deletes only our key while the client is open.
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := limiter.client.Del(ctx, redisKey).Err(); err != nil {
+			t.Errorf("delete test redis key %q: %v", redisKey, err)
+		}
+	})
 	for i := 0; i < 3; i++ {
 		ok, allowErr := limiter.Allow(context.Background(), key)
 		if allowErr != nil || !ok {
@@ -96,7 +115,7 @@ func TestRedisLimiterIntegration(t *testing.T) {
 		t.Fatalf("expected over-limit request denied")
 	}
 
-	ttl, err := limiter.client.TTL(context.Background(), "rl:"+key).Result()
+	ttl, err := limiter.client.TTL(context.Background(), redisKey).Result()
 	if err != nil {
 		t.Fatalf("ttl read failed: %v", err)
 	}
