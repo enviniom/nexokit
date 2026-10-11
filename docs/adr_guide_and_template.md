@@ -4,7 +4,7 @@ Record why a consequential design was chosen; keep day-to-day implementation rul
 
 ## Location and lifecycle
 
-The planned destination is [docs/adr/](adr/). This directory has not been created and no ADR records exist yet. Use sequential names such as `0001-short-title.md`, not year-based numbering.
+The planned destination is `docs/adr/`. This directory has not been created and no ADR records exist yet. Use sequential names such as `0001-short-title.md`, not year-based numbering.
 
 | Status | Meaning |
 |---|---|

@@ -18,7 +18,7 @@ Audit current implementation against repository documentation, correct demonstra
 2. Module generator templates expose technical errors, use value validation receivers, map responses in handlers, accept numeric tenant IDs and emit legacy root layout for new code.
 3. Several IAM handlers use tenant.NewRoot when tenant context is absent, violating fail-closed persistence policy.
 4. Permission update maps JSON binding errors to 422 instead of 400.
-5. Completed production inventory: 36/36 repositories, 23/23 queries, 32/32 handlers, 7/7 routes read. Core review completed 21/21; bounded production import scan checked 164 Go files and found zero sibling-module imports. Root-guarded company operations are intentional global policy, not tenant violations.
+5. Completed production inventory: 36/36 repositories, 22/22 tracked queries, 31/31 tracked handlers, 7/7 routes read. Core review completed 21/21; bounded production import scan checked 164 Go files and found zero sibling-module imports. Root-guarded company operations are intentional global policy, not tenant violations.
 
 ## Tasks
 - [x] T1 (done): Complete source compliance inventory and report demonstrated findings with explicit coverage. Audit all production persistence, routes/handlers, imports and remaining documentation/runtime surfaces; distinguish current rules, legacy conventions and future guidance.
@@ -26,7 +26,8 @@ Audit current implementation against repository documentation, correct demonstra
 - [x] T5 (done): Reject absent tenant context in IAM handlers; assert no service calls and preserve explicit root/global/scoped contexts. Update affected HTTP integration wiring only when required.
 - [x] T6 (done): Return 400 for malformed permission-update JSON and retain 422 for valid JSON with invalid fields; prove with handler regression tests.
 - [x] T3 (done): Make generated modules conform to new-code layout, safe DTO mapping and normalization, trusted tenant scope and safe errors. Generate normal/tenant fixtures in temporary directories and prove compiled behavior with regression tests; update affected scaffold documentation accurately. Keep generator compatibility where safe; no unrelated module migration.
-- [ ] T4 (in_progress): Run final independent checks, reconcile every finding and publish audit evidence/limitations for human validation. Full tests, vet, module guards, format, diff checks; record work-unit commits.
+- [x] T7 (done): Reconcile generator OpenSpec with current accepted guide/output, mark obsolete context snapshot as historical, remove the intentionally dangling planned ADR link, and correct audit inventory counts. Verify doc/source consistency without changing behavior.
+- [x] T4 (done): Run final independent checks, reconcile every finding and publish audit evidence/limitations for human validation. Full tests, vet, module guards, format, diff checks; record work-unit commits.
 
 ## Acceptance
 - Each confirmed violation is corrected with observed applicable checks, or explicitly recorded as blocked.
@@ -40,7 +41,7 @@ Verifier: `go test -timeout 180s ./...`, `go test -short ./...`, `go vet ./...`,
 
 ## Audit evidence and project decisions
 - T1 work-unit commit: `f08da92` — `docs(odd): record compliance audit and remediation plan`.
-- Coverage: all 36 repositories, 23 queries, 32 handlers, 7 route files and 21 module core files read; all 164 production module Go files scanned for sibling imports (none).
+- Coverage: all 36 repositories, 22 tracked query files, 31 tracked handler files, 7 route files and 21 module core files read; all 164 production module Go files scanned for sibling imports (none).
 - Scope is source-level compliance review, not formal security certification; PostgreSQL/Goose and Redis runtime remain unverified.
 - D1: Preserve documented legacy layouts and payload conventions; enforce entity DTO/new-code conventions on generated modules instead of broad unrelated migration.
 - D2: Require explicit trusted tenant context at handler and mutation boundaries. Missing handler context returns existing 400 contract; global scope remains explicit middleware policy.
@@ -54,6 +55,7 @@ Verifier: `go test -timeout 180s ./...`, `go test -short ./...`, `go vet ./...`,
 - D9: Generated tenant list allows explicit root-global scope; get/create/update/delete require selected scope. JSON company_id is ignored, inserts derive ownership from context, updates cannot reassign it and use scoped transactions instead of Save/upsert.
 - D10: Safe response mapping exposes ULID and safe fields; pointer DTO validation trims before rules; module errors preserve diagnostic causes while unknown technical failures become safe500.
 - D11: Generated table names match module names explicitly; migration stubs remain adopter-owned and generated routes must be wired with project guards.
+- D12: Reconcile the old generator OpenSpec with current accepted architecture and tested output; preserve obsolete context.md body with a historical warning instead of treating it as current guidance. Planned ADR paths are literal until records exist. No unrelated historical archive repair.
 - Golden update convention is UPDATE_GOLDEN=1 (not a -update flag); rerun without the variable after inspecting fixture changes.
 
 ## Verification evidence
@@ -66,7 +68,16 @@ Verifier: `go test -timeout 180s ./...`, `go test -short ./...`, `go vet ./...`,
 - T6 work-unit commit: `0ce7393`.
 - T6: RED for malformed JSON/wrong field types returning422; GREEN400 binding,422 invalid fields, zero service calls. Fresh writer+independent permission suite, format and diff checks PASS.
 
+- T3 work-unit commit: `fa2f893` (47 files, 1696 additions/679 deletions, including emitted-code snapshots and compiled fixture tests). Large but one coherent generator contract; review code/templates before generated snapshots.
 - T3 writer: observed RED for missing nested output and nonpersistent trim; GREEN four compiled fixture variants and behavior regressions (safe JSON/errors, binding/validation, tenants, sort, soft deletion, error identity, rollback). CLI/docs/full tests, vet, guards and format PASS. Independent fresh CLI/docs/full tests, vet, module guard, all-Go formatting, tracked/untracked whitespace and explicit emitted-code fixture run PASS. Stale traceability-ledger sentence corrected with source-based prose readback and diff check; prose has no meaningful RED/GREEN. No behavior blockers.
 
+## Final verification and limitations
+- T4 independent fresh `go test -count=1 -timeout 300s ./...`, `go vet ./...`, `go build ./...`, `make check-module-errors`, tracked-Go `gofmt -l`, `git diff main..HEAD --check` and worktree diff check: PASS at fa2f893. Four generated variants compiled and behavior tests executed.
+- Zero IAM handler implicit-root fallbacks; production sibling-import scan:164 files, zero violations. Reproducible tracked counts:36 repositories,22 query files,31 handlers,7 routes,21 core files. Initial scout23/32 claims corrected; inventory is not security certification.
+- T7 passive docs: writer and independent `go test -count=1 -timeout 180s ./tests/docs ./tests/cli`, source/layout comparison, local links/anchors and diff checks PASS. Historical context body preserved exactly. No source changed after full checks; no behavioral RED/GREEN applies to prose.
+- Failed final checks: none. Redis-backed tests SKIPPED because no service was available (`TestRedisCache/*`, `TestRedisLimiterIntegration`); PostgreSQL/Goose runtime and actual Redis behavior UNVERIFIED. SQLite integration is not production database certification.
+- GORM constraint sentinel translation requires TranslateError. Generated update RowsAffected assumptions are tested on SQLite; project-target PostgreSQL driver/locking not exercised, no MySQL portability claim.
+- No new broken current-documentation links/anchors. Pre-existing archived OpenSpec verify-report link to starter-template.md remains outside this change. Harmless retired templates/snapshots and unused FileNames helper retained, not emitted as runtime code.
+
 ## Progress and next step
-T1/T2/T5/T6/T3 complete. Final T4 checks and audit closeout active. No push/PR or remediation merge to main.
+All seven tasks complete within the documented audit scope. Review commits on fix/documentation-compliance against main, especially generator source/templates before snapshots. main remains58ce598. No push/PR or remediation merge to main; final human validation pending.

@@ -1,3 +1,7 @@
+> **Historical context — not current guidance**
+>
+> This is an obsolete historical snapshot, preserved below without rewriting its original findings or recommendations. Start with [current documentation](docs/README.md) and the [application map](docs/system-map.md). `response.NoContent` is now implemented in [response.go](internal/platform/response/response.go) and covered by [response tests](internal/platform/response/response_test.go). Current delete slices include [IAM role deletion](internal/modules/iam/roles/delete_role/handler.go), [IAM user deletion](internal/modules/iam/users/delete_user/handler.go) and [company deletion](internal/modules/companies/slices/delete_company/handler.go); the old flat paths and missing-helper claims below are not current guidance. Generated delete handlers use [the slice template](internal/cli/templates/module/handler.tmpl).
+
 # Code Context
 
 ## Files Retrieved
