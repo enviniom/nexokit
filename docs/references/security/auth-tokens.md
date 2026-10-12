@@ -1,6 +1,6 @@
 # Access and refresh tokens
 
-The auth module issues PASETO v4.local access tokens and database-backed opaque refresh tokens. [Request flow](../runtime/request-flow.md) owns route/middleware ordering.
+IAM's internal authentication slice (`internal/modules/iam/slices/auth`) issues PASETO v4.local access tokens and database-backed opaque refresh tokens. [Request flow](../runtime/request-flow.md) owns route/middleware ordering.
 
 ## Access claims and key configuration
 
@@ -27,4 +27,4 @@ IAM password change currently updates the password hash only; it does **not** re
 
 Never log tokens or password hashes; HTTP error/logging policy belongs in [API validation and errors](../../api_validation_and_errors.md#6-response-safety-and-logging). Reassess revocation/concurrency requirements before treating this base as a complete session-security policy.
 
-Sources: `internal/platform/token/token.go`, auth `authenticate_user`, `rotate_token`, `revoke_token` slices; `internal/middleware/auth.go`; IAM `change_user_password/repository.go`.
+Sources: `internal/platform/token/token.go`; `authenticate_user`, `rotate_token`, `revoke_token` under `internal/modules/iam/slices/auth`; `internal/middleware/auth.go`; `internal/modules/iam/slices/users/change_user_password/repository.go`.

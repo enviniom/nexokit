@@ -43,7 +43,7 @@ Run focused package tests first; use broader commands when the change warrants t
 
 | Command | Actual scope |
 |---|---|
-| `go test ./internal/modules/auth/...` | Example focused module run |
+| `go test ./internal/modules/iam/slices/auth/...` | Focused IAM authentication slices and queries |
 | `make test` | `go test ./...` |
 | `make test-unit` | `go test -short` excluding `/tests/integration` |
 | `make test-integration` | `go test ./tests/integration/...` |
@@ -53,5 +53,7 @@ Run focused package tests first; use broader commands when the change warrants t
 | `gofmt -l .` | Lists formatting drift without rewriting files |
 
 `check-module-errors` checks ad-hoc `apperror` use in module layer files, GORM leaks in services and legacy `mapServiceError` adapters. It is not a comprehensive architecture or sibling-import checker. Coverage helps identify risk; do not invent a percentage gate that the Makefile does not enforce.
+
+IAM authentication ownership coverage lives in `internal/modules/iam/routes_test.go`: IAM-only registration mounts all four auth endpoints with their supplied rate-limit/auth guards, outside global/tenant protected groups. `tests/integration/auth_test.go` exercises IAM construction and registration for login, rotation/revocation and sanitized sessions.
 
 For documentation-only work, verify links, examples against source and `git diff --check`; there is no meaningful behavioral RED/GREEN for prose edits.

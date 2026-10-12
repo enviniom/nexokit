@@ -1,11 +1,13 @@
 package iam
 
 import (
-	"log/slog"
+	"time"
 
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
+	authcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	"github.com/enviniom/nexokit/internal/modules/iam/slices"
+	"github.com/enviniom/nexokit/internal/modules/iam/slices/auth"
 	"github.com/enviniom/nexokit/internal/modules/iam/slices/permissions"
 	"github.com/enviniom/nexokit/internal/modules/iam/slices/roles"
 	"github.com/enviniom/nexokit/internal/modules/iam/slices/users"
@@ -15,6 +17,7 @@ import (
 // Container is the root IAM container used by app wiring.
 // Entity containers and internal capabilities share the supplied database and cache.
 type Container struct {
+	Auth        *auth.Container
 	Users       *users.Container
 	Roles       *roles.Container
 	Permissions *permissions.Container
@@ -26,13 +29,14 @@ type Container struct {
 	Catalog          core.PermissionCatalogReader
 }
 
-func NewContainer(db *gorm.DB, c cache.Cache, _ *slog.Logger) *Container {
+func NewContainer(db *gorm.DB, c cache.Cache, verifier authcore.PasswordVerifier, tokenManager authcore.TokenManager, refreshTTL time.Duration) *Container {
 	usersContainer := users.NewContainer(db, c)
 	rolesContainer := roles.NewContainer(db, c)
 	permissionsContainer := permissions.NewContainer(db)
 	capabilities := slices.NewCapabilities(db, c)
 
 	return &Container{
+		Auth:             auth.NewContainer(db, verifier, tokenManager, refreshTTL),
 		Users:            usersContainer,
 		Roles:            rolesContainer,
 		Permissions:      permissionsContainer,

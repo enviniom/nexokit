@@ -25,12 +25,11 @@ These are commands for the adopter to run, not part of a documentation-only veri
 
 | Module | Keep for |
 |---|---|
-| auth | Credentials, access/refresh tokens and session handling |
 | companies | Company/domain administration and tenant resolution |
-| IAM | Users, roles, permissions and authenticated-user lookup |
+| IAM | Authentication, access/refresh tokens, sessions, users, roles, permissions and authenticated-user lookup |
 | onboarding | Root-controlled creation of a company and its initial identities |
 
-Removing a module is more than removing its folder: remove its imports, container fields/construction, injected dependencies and `RegisterModules` mounting in `internal/app/container.go`. Review `SyncPermissions`, tenant resolvers, auth lookup, CLI root creation, seeds, migrations, fixtures and tests. Auth relies on IAM user data; current private routing relies on companies; CLI root creation relies on IAM. Choose an alternate identity/tenant policy before removing those capabilities.
+Removing a module is more than removing its folder: remove its imports, container fields/construction, injected dependencies and `RegisterModules` mounting in `internal/app/container.go`. Review `SyncPermissions`, tenant resolvers, auth lookup, CLI root creation, seeds, migrations, fixtures and tests. Authentication is internal to IAM under `slices/auth`, not an independently constructed or registered module. Its credential, session and token projections remain separate from IAM entity models. Current private routing relies on companies; CLI root creation relies on IAM. Choose an alternate identity/tenant policy before removing those capabilities.
 
 For a fresh project, adjust initial schema and seeds coherently. For an existing deployed project, preserve migration history and add reviewed forward migrations rather than deleting already-applied files.
 

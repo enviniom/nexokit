@@ -62,13 +62,15 @@ internal/infra/       DB, cache, logger adapters
 internal/server/      HTTP server and router
 internal/middleware/  Auth, tenant, rate limit, logging
 internal/platform/    Cross-cutting contracts and helpers
-internal/modules/     Business modules (auth, companies, iam, onboarding)
+internal/modules/     Business modules (companies, iam, onboarding)
 internal/shared/      BaseModel types
 migrations/           Goose SQL migrations
 seeds/                Go seed files
 scripts/              Hooks and helper scripts
 tests/                Integration tests and helpers
 ```
+
+IAM owns authentication under `internal/modules/iam/slices/auth`, including credentials, token lifecycle and session handling. Public authentication routes remain `/api/v1/auth/{login,refresh,logout,me}`.
 
 ## Using NexoKit as a starter
 

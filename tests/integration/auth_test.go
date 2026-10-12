@@ -3,9 +3,9 @@ package integration_test
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
-	userentity "github.com/enviniom/nexokit/internal/modules/auth/core/user"
+	userentity "github.com/enviniom/nexokit/internal/modules/iam/core/auth"
 	"github.com/enviniom/nexokit/internal/modules/iam/core/permission"
+	"github.com/enviniom/nexokit/internal/modules/iam/core/refresh_token"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/enviniom/nexokit/internal/middleware"
-	"github.com/enviniom/nexokit/internal/modules/auth"
 	"github.com/enviniom/nexokit/internal/modules/iam"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
@@ -60,11 +59,11 @@ func TestAuthIntegration(t *testing.T) {
 	}
 
 	manager := token.NewManager("nexokit-test-secret", time.Hour)
-	c := auth.NewContainer(db, pw, manager, 24*time.Hour)
+	iamContainer := iam.NewContainer(db, nil, pw, manager, 24*time.Hour)
 	r := gin.New()
 	v1 := r.Group("/api/v1")
-	iamContainer := iam.NewContainer(db, nil, nil)
-	auth.Register(v1, c, middleware.Auth(manager, integrationAuthUserLookup{resolver: iamContainer.AuthUserResolver}), func(c *gin.Context) { c.Next() }, func(c *gin.Context) { c.Next() })
+	pass := func(c *gin.Context) { c.Next() }
+	iam.Register(v1, v1.Group(""), v1.Group(""), iamContainer, func(string) gin.HandlerFunc { return pass }, middleware.Auth(manager, integrationAuthUserLookup{resolver: iamContainer.AuthUserResolver}), pass, pass)
 
 	t.Run("login success returns token pair", func(t *testing.T) {
 		w := requestJSON(r, http.MethodPost, "/api/v1/auth/login", map[string]string{"email": "active@example.com", "password": "secret123"})

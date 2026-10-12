@@ -8,7 +8,6 @@ import (
 	"github.com/enviniom/nexokit/internal/config"
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/middleware"
-	"github.com/enviniom/nexokit/internal/modules/auth"
 	"github.com/enviniom/nexokit/internal/modules/companies"
 	"github.com/enviniom/nexokit/internal/modules/iam"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
@@ -25,7 +24,6 @@ import (
 type Container struct {
 	IAM                *iam.Container
 	Companies          *companies.Container
-	authContainer      *auth.Container
 	Onboarding         *onboarding.Container
 	authMW             gin.HandlerFunc
 	loginRateLimitMW   gin.HandlerFunc
@@ -36,13 +34,11 @@ type Container struct {
 // Config, DB, Logger and Cache are passed as constructor parameters but are NOT
 // stored as public fields; they are only used during module wiring.
 func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache.Cache, limiter middleware.Limiter) *Container {
-	_ = log
 	companiesContainer := companies.NewContainer(db)
-	iamContainer := iam.NewContainer(db, cache, log)
 	passwordManager := password.Manager{}
 
 	tokenManager := token.NewManager(cfg.Auth.PASETOKey, time.Duration(cfg.Auth.AccessTTLMinutes)*time.Minute)
-	authContainer := auth.NewContainer(db, passwordManager, tokenManager, time.Duration(cfg.Auth.RefreshTTLDays)*24*time.Hour)
+	iamContainer := iam.NewContainer(db, cache, passwordManager, tokenManager, time.Duration(cfg.Auth.RefreshTTLDays)*24*time.Hour)
 	authMW := middleware.Auth(tokenManager, userLookup{resolver: iamContainer.AuthUserResolver})
 	window := time.Duration(cfg.RateLimit.WindowSeconds) * time.Second
 	loginRateLimitMW := middleware.RateLimitMiddleware(limiter, cfg.RateLimit.Enabled, "login", cfg.RateLimit.LoginRPM, window)
@@ -53,7 +49,6 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 	return &Container{
 		IAM:                iamContainer,
 		Companies:          companiesContainer,
-		authContainer:      authContainer,
 		Onboarding:         onboardingContainer,
 		authMW:             authMW,
 		loginRateLimitMW:   loginRateLimitMW,
@@ -63,13 +58,12 @@ func NewContainer(cfg *config.Config, db *gorm.DB, log *slog.Logger, cache cache
 
 // RegisterModules mounts all business module routes onto the v1 router group.
 func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
-	auth.Register(v1, c.authContainer, c.authMW, c.loginRateLimitMW, c.refreshRateLimitMW)
 	globalProtected := v1.Group("")
 	globalProtected.Use(c.authMW, middleware.AllowRootGlobalScope(c.Companies.Resolver()))
 	companies.Register(globalProtected, c.Companies, middleware.RequirePermission, middleware.RequireRole)
 	tenantProtected := v1.Group("")
 	tenantProtected.Use(c.authMW, middleware.RequireTenantScope(c.Companies.Resolver()))
-	iam.Register(globalProtected, c.IAM, tenantProtected, middleware.RequirePermission, middleware.RequireRole)
+	iam.Register(v1, globalProtected, tenantProtected, c.IAM, middleware.RequirePermission, c.authMW, c.loginRateLimitMW, c.refreshRateLimitMW)
 	onboarding.Register(globalProtected, c.Onboarding, middleware.RequireRole)
 }
 

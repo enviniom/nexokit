@@ -1,6 +1,6 @@
 # Application map
 
-NexoKit composes four modules into a Go/Gin API. Use this map to locate a change before reading the [slice conventions](architecture_and_vsa.md).
+NexoKit composes three modules into a Go/Gin API. Use this map to locate a change before reading the [slice conventions](architecture_and_vsa.md).
 
 ## Entrypoints and startup
 
@@ -20,10 +20,12 @@ All module routes are under `/api/v1`; health endpoints are unversioned. IAM URL
 
 | Module | Mounted paths | Responsibility / scope |
 |---|---|---|
-| auth | `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me` | Credentials, opaque refresh rotation/revocation and current session; only `/me` applies bearer auth |
+| IAM authentication | `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me` | IAM-owned `slices/auth`: credentials, opaque refresh rotation/revocation and current session; only `/auth/me` applies bearer auth |
 | companies | `/companies`, `/companies/:id`, `/companies/:id/domains`, `/companies/:id/domains/:domain_id` | Company and domain administration; mostly root guards |
 | IAM | `/users`, `/roles`, `/permissions` and entity subroutes | Users, roles and permission catalog in `slices/{users,roles,permissions}`; capabilities in `slices/internal` via `slices/capabilities.go`; users require selected tenant, roles/permissions allow root-global scope |
 | onboarding | `POST /onboarding/companies` | Root-authenticated company onboarding, **not public self-signup** |
+
+IAM constructs authentication and registers its routes on the public v1 group, with rate limits on login/refresh and bearer auth on `/auth/me`. Authentication does not inherit global/tenant scope middleware.
 
 The app mounts `Auth` + `AllowRootGlobalScope` for companies, roles, permissions and onboarding; users use `Auth` + `RequireTenantScope`. Route-specific permission/role guards follow. See [request flow](references/runtime/request-flow.md) for the authoritative middleware sequence and root selection table.
 
@@ -46,6 +48,6 @@ Capabilities are not all mounted features: `PublicTenant` exists but the current
 
 1. Locate its module `routes.go`, then container and use-case package.
 2. Read handler → optional service → repository → reused query.
-3. Inspect entity `model.go`/`dtos.go` in Auth's `core/user` or `core/refresh_token` and IAM's `core/user`, `core/role` or `core/permission`, plus module-root contracts/errors/constants and the corresponding migration. Companies uses `core/company` and `core/company_domain`. Onboarding uses `core/{company,company_domain,user,role,permission}` local records and company-owned workflow DTOs, with its use case in `slices/onboard_company`; for entity ownership and applicable DTO mapping, follow [Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping).
+3. Inspect entity `model.go`/`dtos.go` in IAM authentication's `core/auth` or `core/refresh_token` and IAM's `core/user`, `core/role` or `core/permission`, plus the corresponding local contracts/errors/constants and the corresponding migration. Companies uses `core/company` and `core/company_domain`. Onboarding uses `core/{company,company_domain,user,role,permission}` local records and company-owned workflow DTOs, with its use case in `slices/onboard_company`; for entity ownership and applicable DTO mapping, follow [Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping).
 4. Follow injected capabilities back to the app container; do not add sibling-module imports.
 5. Read adjacent tests and the relevant reference from the [navigation hub](README.md).
