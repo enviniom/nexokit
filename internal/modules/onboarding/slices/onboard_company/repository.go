@@ -2,6 +2,11 @@ package onboard_company
 
 import (
 	"context"
+	companyentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company"
+	company_domainentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company_domain"
+	permissionentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/permission"
+	roleentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/role"
+	userentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/user"
 
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
 	"github.com/enviniom/nexokit/internal/modules/onboarding/queries"
@@ -17,12 +22,12 @@ type Repository interface {
 	EnsureCompanySlugAvailable(slug string) error
 	EnsureDomainAvailable(domain string, duplicateErr error) error
 	EnsureEmailAvailable(email string) error
-	CreateCompany(name, slug string) (*core.OnboardingCompany, error)
+	CreateCompany(name, slug string) (*companyentity.OnboardingCompany, error)
 	CreateCompanyDomain(companyID uint, domain, kind string) error
-	CreateRole(companyID uint, name, slug, description string) (*core.OnboardingRole, error)
-	ListSystemPermissions() ([]core.OnboardingPermission, error)
+	CreateRole(companyID uint, name, slug, description string) (*roleentity.OnboardingRole, error)
+	ListSystemPermissions() ([]permissionentity.OnboardingPermission, error)
 	AssignPermissionToRole(roleID, permissionID uint) error
-	CreateAdminUser(companyID, roleID uint, name, email, passwordHash string) (*core.OnboardingUser, error)
+	CreateAdminUser(companyID, roleID uint, name, email, passwordHash string) (*userentity.OnboardingUser, error)
 }
 
 type repository struct {
@@ -54,13 +59,13 @@ func (r *repository) EnsureEmailAvailable(email string) error {
 	return queries.CheckEmailAvailable(r.db, email)
 }
 
-func (r *repository) CreateCompany(name, slug string) (*core.OnboardingCompany, error) {
+func (r *repository) CreateCompany(name, slug string) (*companyentity.OnboardingCompany, error) {
 	publicID, err := identity.Generate()
 	if err != nil {
 		return nil, err
 	}
 
-	company := &core.OnboardingCompany{
+	company := &companyentity.OnboardingCompany{
 		BaseModel: shared.BaseModel{PublicID: publicID},
 		Name:      name,
 		Slug:      slug,
@@ -83,7 +88,7 @@ func (r *repository) CreateCompanyDomain(companyID uint, domain, kind string) er
 		return err
 	}
 
-	err = r.db.Create(&core.OnboardingCompanyDomain{
+	err = r.db.Create(&company_domainentity.OnboardingCompanyDomain{
 		BaseModel:         shared.BaseModel{PublicID: publicID},
 		CompanyID:         companyID,
 		Domain:            domain,
@@ -104,13 +109,13 @@ func (r *repository) CreateCompanyDomain(companyID uint, domain, kind string) er
 	return err
 }
 
-func (r *repository) CreateRole(companyID uint, name, slug, description string) (*core.OnboardingRole, error) {
+func (r *repository) CreateRole(companyID uint, name, slug, description string) (*roleentity.OnboardingRole, error) {
 	publicID, err := identity.Generate()
 	if err != nil {
 		return nil, err
 	}
 
-	role := &core.OnboardingRole{
+	role := &roleentity.OnboardingRole{
 		BaseModel:   shared.BaseModel{PublicID: publicID},
 		Name:        name,
 		Slug:        slug,
@@ -126,7 +131,7 @@ func (r *repository) CreateRole(companyID uint, name, slug, description string) 
 	return role, nil
 }
 
-func (r *repository) ListSystemPermissions() ([]core.OnboardingPermission, error) {
+func (r *repository) ListSystemPermissions() ([]permissionentity.OnboardingPermission, error) {
 	return queries.ListSystemPermissions(r.db)
 }
 
@@ -134,13 +139,13 @@ func (r *repository) AssignPermissionToRole(roleID, permissionID uint) error {
 	return queries.AssignPermissionToRole(r.db, roleID, permissionID)
 }
 
-func (r *repository) CreateAdminUser(companyID, roleID uint, name, email, passwordHash string) (*core.OnboardingUser, error) {
+func (r *repository) CreateAdminUser(companyID, roleID uint, name, email, passwordHash string) (*userentity.OnboardingUser, error) {
 	publicID, err := identity.Generate()
 	if err != nil {
 		return nil, err
 	}
 
-	adminUser := &core.OnboardingUser{
+	adminUser := &userentity.OnboardingUser{
 		BaseModel:    shared.BaseModel{PublicID: publicID},
 		Name:         name,
 		Email:        email,

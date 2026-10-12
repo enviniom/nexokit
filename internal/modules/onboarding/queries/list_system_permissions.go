@@ -1,12 +1,12 @@
 package queries
 
 import (
-	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
+	permissionentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/permission"
 	"gorm.io/gorm"
 )
 
-func ListSystemPermissions(db *gorm.DB) ([]core.OnboardingPermission, error) {
-	var permissions []core.OnboardingPermission
+func ListSystemPermissions(db *gorm.DB) ([]permissionentity.OnboardingPermission, error) {
+	var permissions []permissionentity.OnboardingPermission
 	if err := db.Where("is_system = ?", true).Find(&permissions).Error; err != nil {
 		return nil, err
 	}

@@ -1,7 +1,8 @@
-package core
+package onboard_company
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
 	"strings"
 	"testing"
 
@@ -18,37 +19,37 @@ func TestSentinels_Status_Code_PublicMessage(t *testing.T) {
 	}{
 		{
 			name:       "duplicate company slug",
-			err:        ErrDuplicateCompanySlug,
+			err:        core.ErrDuplicateCompanySlug,
 			wantStatus: 422,
-			wantCode:   CodeDuplicateCompanySlug,
+			wantCode:   core.CodeDuplicateCompanySlug,
 			wantMsg:    "company slug already exists",
 		},
 		{
 			name:       "duplicate company domain",
-			err:        ErrDuplicateCompanyDomain,
+			err:        core.ErrDuplicateCompanyDomain,
 			wantStatus: 422,
-			wantCode:   CodeDuplicateCompanyDomain,
+			wantCode:   core.CodeDuplicateCompanyDomain,
 			wantMsg:    "company domain already exists",
 		},
 		{
 			name:       "duplicate technical domain",
-			err:        ErrDuplicateTechnicalDomain,
+			err:        core.ErrDuplicateTechnicalDomain,
 			wantStatus: 422,
-			wantCode:   CodeDuplicateTechnicalDomain,
+			wantCode:   core.CodeDuplicateTechnicalDomain,
 			wantMsg:    "company technical domain already exists",
 		},
 		{
 			name:       "missing platform domain",
-			err:        ErrMissingPlatformDomain,
+			err:        core.ErrMissingPlatformDomain,
 			wantStatus: 422,
-			wantCode:   CodeMissingPlatformDomain,
+			wantCode:   core.CodeMissingPlatformDomain,
 			wantMsg:    "platform domain is required to generate technical domain",
 		},
 		{
 			name:       "duplicate admin email",
-			err:        ErrDuplicateAdminEmail,
+			err:        core.ErrDuplicateAdminEmail,
 			wantStatus: 422,
-			wantCode:   CodeDuplicateAdminEmail,
+			wantCode:   core.CodeDuplicateAdminEmail,
 			wantMsg:    "admin email already exists",
 		},
 	}

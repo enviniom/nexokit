@@ -3,6 +3,11 @@ package onboard_company
 import (
 	"context"
 	"errors"
+	companyentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company"
+	company_domainentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company_domain"
+	permissionentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/permission"
+	roleentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/role"
+	userentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/user"
 	"github.com/enviniom/nexokit/internal/shared"
 	"testing"
 	"time"
@@ -24,7 +29,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&core.OnboardingCompany{}, &core.OnboardingCompanyDomain{}, &core.OnboardingRole{}, &core.OnboardingPermission{}, &core.OnboardingUser{}); err != nil {
+	if err := db.AutoMigrate(&companyentity.OnboardingCompany{}, &company_domainentity.OnboardingCompanyDomain{}, &roleentity.OnboardingRole{}, &permissionentity.OnboardingPermission{}, &userentity.OnboardingUser{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	if err := db.Exec("CREATE TABLE role_permissions (role_id integer not null, permission_id integer not null)").Error; err != nil {
@@ -35,7 +40,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 
 func seedPermissions(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	perms := []core.OnboardingPermission{
+	perms := []permissionentity.OnboardingPermission{
 		{Slug: "users.create", Name: "Create Users", Module: "users", Action: "create", IsSystem: true},
 		{Slug: "users.view", Name: "View Users", Module: "users", Action: "view", IsSystem: true},
 		{Slug: "roles.view", Name: "View Roles", Module: "roles", Action: "view", IsSystem: true},
@@ -53,8 +58,8 @@ func newService(db *gorm.DB, platformDomain string) Service {
 	return NewService(NewRepository(db), fakePasswordHasher{}, platformDomain)
 }
 
-func baseRequest() core.OnboardCompanyRequest {
-	return core.OnboardCompanyRequest{Name: "Acme Inc", Slug: "acme", AdminName: "Jane Admin", AdminEmail: "jane@acme.com", AdminPassword: "SuperSecurePassword123"}
+func baseRequest() companyentity.OnboardCompanyRequest {
+	return companyentity.OnboardCompanyRequest{Name: "Acme Inc", Slug: "acme", AdminName: "Jane Admin", AdminEmail: "jane@acme.com", AdminPassword: "SuperSecurePassword123"}
 }
 
 func TestService_Onboard_Success(t *testing.T) {
@@ -82,7 +87,7 @@ func TestService_Onboard_CreatesPrimaryDomain(t *testing.T) {
 	if _, err := svc.Onboard(context.Background(), req); err != nil {
 		t.Fatalf("onboard: %v", err)
 	}
-	var d core.OnboardingCompanyDomain
+	var d company_domainentity.OnboardingCompanyDomain
 	if err := db.Where("domain = ?", "dreammakers.com.co").First(&d).Error; err != nil {
 		t.Fatalf("expected primary domain: %v", err)
 	}
@@ -102,7 +107,7 @@ func TestService_Onboard_CreatesTechnicalDomainWhenRequested(t *testing.T) {
 	if _, err := svc.Onboard(context.Background(), req); err != nil {
 		t.Fatalf("onboard: %v", err)
 	}
-	var d core.OnboardingCompanyDomain
+	var d company_domainentity.OnboardingCompanyDomain
 	if err := db.Where("domain = ?", "dreammakers.kilashop.com").First(&d).Error; err != nil {
 		t.Fatalf("expected technical domain: %v", err)
 	}
@@ -119,7 +124,7 @@ func TestService_Onboard_SkipsTechnicalDomainWhenNotRequested(t *testing.T) {
 		t.Fatalf("onboard: %v", err)
 	}
 	var count int64
-	db.Model(&core.OnboardingCompanyDomain{}).Where("domain = ?", "dreammakers.kilashop.com").Count(&count)
+	db.Model(&company_domainentity.OnboardingCompanyDomain{}).Where("domain = ?", "dreammakers.kilashop.com").Count(&count)
 	if count != 0 {
 		t.Fatalf("expected technical domain skipped, got %d", count)
 	}
@@ -129,8 +134,8 @@ func TestService_Onboard_DuplicateDomain_Rollback(t *testing.T) {
 	db := setupTestDB(t)
 	seedPermissions(t, db)
 	svc := newService(db, "")
-	_ = db.Create(&core.OnboardingCompany{Slug: "existing", Name: "Existing", Status: core.CompanyStatusActive}).Error
-	_ = db.Create(&core.OnboardingCompanyDomain{CompanyID: 1, Domain: "dreammakers.com.co", Kind: core.DomainKindPrimary, Status: core.DomainStatusActive}).Error
+	_ = db.Create(&companyentity.OnboardingCompany{Slug: "existing", Name: "Existing", Status: core.CompanyStatusActive}).Error
+	_ = db.Create(&company_domainentity.OnboardingCompanyDomain{CompanyID: 1, Domain: "dreammakers.com.co", Kind: core.DomainKindPrimary, Status: core.DomainStatusActive}).Error
 	domain := "dreammakers.com.co"
 	req := baseRequest()
 	req.Slug = "dreammakers"
@@ -146,8 +151,8 @@ func TestService_Onboard_DuplicateDomainWithTrailingDot_Rollback(t *testing.T) {
 	db := setupTestDB(t)
 	seedPermissions(t, db)
 	svc := newService(db, "")
-	_ = db.Create(&core.OnboardingCompany{Slug: "existing", Name: "Existing", Status: core.CompanyStatusActive}).Error
-	_ = db.Create(&core.OnboardingCompanyDomain{CompanyID: 1, Domain: "dreammakers.com.co", Kind: core.DomainKindPrimary, Status: core.DomainStatusActive}).Error
+	_ = db.Create(&companyentity.OnboardingCompany{Slug: "existing", Name: "Existing", Status: core.CompanyStatusActive}).Error
+	_ = db.Create(&company_domainentity.OnboardingCompanyDomain{CompanyID: 1, Domain: "dreammakers.com.co", Kind: core.DomainKindPrimary, Status: core.DomainStatusActive}).Error
 	domain := "dreammakers.com.co."
 	req := baseRequest()
 	req.Slug = "dreammakers"
@@ -163,8 +168,8 @@ func TestService_Onboard_DuplicateTechnicalDomain_Rollback(t *testing.T) {
 	db := setupTestDB(t)
 	seedPermissions(t, db)
 	svc := newService(db, "kilashop.com")
-	_ = db.Create(&core.OnboardingCompany{Slug: "existing", Name: "Existing", Status: core.CompanyStatusActive}).Error
-	_ = db.Create(&core.OnboardingCompanyDomain{CompanyID: 1, Domain: "dreammakers.kilashop.com", Kind: core.DomainKindTechnical, Status: core.DomainStatusActive}).Error
+	_ = db.Create(&companyentity.OnboardingCompany{Slug: "existing", Name: "Existing", Status: core.CompanyStatusActive}).Error
+	_ = db.Create(&company_domainentity.OnboardingCompanyDomain{CompanyID: 1, Domain: "dreammakers.kilashop.com", Kind: core.DomainKindTechnical, Status: core.DomainStatusActive}).Error
 	req := baseRequest()
 	req.Slug = "dreammakers"
 	req.AdminEmail = "jane@dreammakers.com.co"
@@ -195,7 +200,7 @@ func TestService_Onboard_DuplicateSlug_Rollback(t *testing.T) {
 	db := setupTestDB(t)
 	seedPermissions(t, db)
 	svc := newService(db, "")
-	_ = db.Create(&core.OnboardingCompany{Name: "Acme Existing", Slug: "acme", Status: core.CompanyStatusActive}).Error
+	_ = db.Create(&companyentity.OnboardingCompany{Name: "Acme Existing", Slug: "acme", Status: core.CompanyStatusActive}).Error
 	_, err := svc.Onboard(context.Background(), baseRequest())
 	if !errors.Is(err, core.ErrDuplicateCompanySlug) {
 		t.Fatalf("expected duplicate slug, got: %v", err)
@@ -206,7 +211,7 @@ func TestService_Onboard_DuplicateEmail_Rollback(t *testing.T) {
 	db := setupTestDB(t)
 	seedPermissions(t, db)
 	svc := newService(db, "")
-	_ = db.Create(&core.OnboardingUser{Name: "Jane Existing", Email: "jane@acme.com", PasswordHash: "secret", RoleID: 1}).Error
+	_ = db.Create(&userentity.OnboardingUser{Name: "Jane Existing", Email: "jane@acme.com", PasswordHash: "secret", RoleID: 1}).Error
 	req := baseRequest()
 	req.Slug = "acme-new"
 	_, err := svc.Onboard(context.Background(), req)
@@ -265,7 +270,7 @@ func TestService_Onboard_SoftDeletedKeysPreventProvisioning(t *testing.T) {
 			var record any
 			switch tc.name {
 			case "slug":
-				record = &core.OnboardingCompany{BaseModel: deleted, Name: "Reserved", Slug: req.Slug, Status: core.CompanyStatusActive}
+				record = &companyentity.OnboardingCompany{BaseModel: deleted, Name: "Reserved", Slug: req.Slug, Status: core.CompanyStatusActive}
 			case "primary domain", "technical domain":
 				domain := "acme.example.com"
 				kind := core.DomainKindPrimary
@@ -275,9 +280,9 @@ func TestService_Onboard_SoftDeletedKeysPreventProvisioning(t *testing.T) {
 					req.GenerateTechnicalDomain = true
 					kind = core.DomainKindTechnical
 				}
-				record = &core.OnboardingCompanyDomain{BaseModel: deleted, CompanyID: 99, Domain: domain, Kind: kind, Status: core.DomainStatusActive}
+				record = &company_domainentity.OnboardingCompanyDomain{BaseModel: deleted, CompanyID: 99, Domain: domain, Kind: kind, Status: core.DomainStatusActive}
 			case "email":
-				record = &core.OnboardingUser{BaseModel: deleted, Name: "Reserved", Email: req.AdminEmail, PasswordHash: "hash", RoleID: 99}
+				record = &userentity.OnboardingUser{BaseModel: deleted, Name: "Reserved", Email: req.AdminEmail, PasswordHash: "hash", RoleID: 99}
 			}
 			if err := db.Create(record).Error; err != nil {
 				t.Fatalf("seed reserved key: %v", err)

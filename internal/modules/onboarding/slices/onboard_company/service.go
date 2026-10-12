@@ -3,6 +3,7 @@ package onboard_company
 import (
 	"context"
 	"fmt"
+	companyentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company"
 
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
 	"github.com/enviniom/nexokit/internal/platform/shared/string"
@@ -10,7 +11,7 @@ import (
 
 // Service coordinates the company onboarding workflow.
 type Service interface {
-	Onboard(ctx context.Context, req core.OnboardCompanyRequest) (*core.OnboardCompanyResponse, error)
+	Onboard(ctx context.Context, req companyentity.OnboardCompanyRequest) (*companyentity.OnboardCompanyResponse, error)
 }
 
 type service struct {
@@ -28,12 +29,12 @@ func NewService(repo Repository, hasher core.PasswordHasher, platformDomain stri
 	}
 }
 
-func (s *service) Onboard(ctx context.Context, req core.OnboardCompanyRequest) (*core.OnboardCompanyResponse, error) {
+func (s *service) Onboard(ctx context.Context, req companyentity.OnboardCompanyRequest) (*companyentity.OnboardCompanyResponse, error) {
 	if errs := req.Validate(); len(errs) > 0 {
 		return nil, fmt.Errorf("validation failed: %v", errs)
 	}
 
-	var res core.OnboardCompanyResponse
+	var res companyentity.OnboardCompanyResponse
 
 	err := s.repo.WithTx(ctx, func(tx Repository) error {
 		normalizedSlug := str.NormalizeSlug(req.Slug)

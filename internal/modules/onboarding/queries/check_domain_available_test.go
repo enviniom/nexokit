@@ -2,6 +2,7 @@ package queries
 
 import (
 	"errors"
+	company_domainentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company_domain"
 	"gorm.io/gorm"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ import (
 func TestCheckDomainAvailable(t *testing.T) {
 	db := newTestDB(t)
 
-	if err := db.Create(&core.OnboardingCompanyDomain{
+	if err := db.Create(&company_domainentity.OnboardingCompanyDomain{
 		BaseModel: shared.BaseModel{PublicID: "dom_01"},
 		CompanyID: 1,
 		Domain:    "acme.com",
@@ -23,7 +24,7 @@ func TestCheckDomainAvailable(t *testing.T) {
 		t.Fatalf("seed domain: %v", err)
 	}
 
-	if err := db.Create(&core.OnboardingCompanyDomain{
+	if err := db.Create(&company_domainentity.OnboardingCompanyDomain{
 		BaseModel: shared.BaseModel{PublicID: "deleted_domain", DeletedAt: gorm.DeletedAt{Time: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}},
 		CompanyID: 2, Domain: "reserved.com", Status: core.DomainStatusActive, Kind: core.DomainKindPrimary,
 	}).Error; err != nil {

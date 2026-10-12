@@ -2,6 +2,7 @@ package onboard_company
 
 import (
 	"errors"
+	companyentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company"
 
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
 	"github.com/enviniom/nexokit/internal/platform/messages"
@@ -21,7 +22,7 @@ func NewHandler(service Service) *Handler {
 }
 
 func (h *Handler) Handle(c *gin.Context) {
-	var req core.OnboardCompanyRequest
+	var req companyentity.OnboardCompanyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return

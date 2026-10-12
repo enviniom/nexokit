@@ -2,6 +2,11 @@ package onboard_company
 
 import (
 	"errors"
+	companyentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company"
+	company_domainentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company_domain"
+	permissionentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/permission"
+	roleentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/role"
+	userentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/user"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
@@ -15,7 +20,7 @@ func repoTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&core.OnboardingCompany{}, &core.OnboardingCompanyDomain{}, &core.OnboardingRole{}, &core.OnboardingPermission{}, &core.OnboardingUser{}); err != nil {
+	if err := db.AutoMigrate(&companyentity.OnboardingCompany{}, &company_domainentity.OnboardingCompanyDomain{}, &roleentity.OnboardingRole{}, &permissionentity.OnboardingPermission{}, &userentity.OnboardingUser{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	if err := db.Exec("CREATE TABLE role_permissions (role_id integer not null, permission_id integer not null)").Error; err != nil {
@@ -53,7 +58,7 @@ func TestRepository_CreateAndAssignRecords(t *testing.T) {
 		t.Fatalf("create role: %v", err)
 	}
 
-	perm := core.OnboardingPermission{Slug: "users.view", Name: "View", Module: "users", Action: "view", IsSystem: true}
+	perm := permissionentity.OnboardingPermission{Slug: "users.view", Name: "View", Module: "users", Action: "view", IsSystem: true}
 	perm.PublicID = "perm_users_view"
 	if err := db.Create(&perm).Error; err != nil {
 		t.Fatalf("seed permission: %v", err)

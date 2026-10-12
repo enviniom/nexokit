@@ -35,6 +35,8 @@ Current IAM mapping/serialization examples live in `users/view_user/dto_test.go`
 
 Support `testing.Short()` skips for genuinely external or slow integration work. Do not label an in-memory suite as external merely because it lives under `tests/integration`.
 
+Onboarding regression tests live in `internal/modules/onboarding/slices/onboard_company`: relocated validation/error/table-name tests, exact public workflow serialization and module `NewContainer`/`Register` SQLite provisioning coverage with an injected hasher and role guard. The wiring test does not verify production authentication, tenant middleware or PostgreSQL migrations.
+
 ## 4. Verification commands
 
 Run focused package tests first; use broader commands when the change warrants them:

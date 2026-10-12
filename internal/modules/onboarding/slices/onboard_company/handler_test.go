@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	companyentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,11 +16,11 @@ import (
 )
 
 type fakeOnboardingService struct {
-	res *core.OnboardCompanyResponse
+	res *companyentity.OnboardCompanyResponse
 	err error
 }
 
-func (f *fakeOnboardingService) Onboard(ctx context.Context, req core.OnboardCompanyRequest) (*core.OnboardCompanyResponse, error) {
+func (f *fakeOnboardingService) Onboard(ctx context.Context, req companyentity.OnboardCompanyRequest) (*companyentity.OnboardCompanyResponse, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -68,18 +69,18 @@ func onboardJSONRequest(body any) *http.Request {
 }
 
 func TestHandler_Onboard_RootSuccess(t *testing.T) {
-	svc := &fakeOnboardingService{res: &core.OnboardCompanyResponse{CompanyPublicID: "comp_123", CompanySlug: "acme", AdminPublicID: "usr_admin", AdminEmail: "jane@acme.com"}}
+	svc := &fakeOnboardingService{res: &companyentity.OnboardCompanyResponse{CompanyPublicID: "comp_123", CompanySlug: "acme", AdminPublicID: "usr_admin", AdminEmail: "jane@acme.com"}}
 	r := setupOnboardingRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, svc)
 
 	w := httptest.NewRecorder()
-	payload := core.OnboardCompanyRequest{Name: "Acme Corp", Slug: "acme", AdminName: "Jane Doe", AdminEmail: "jane@acme.com", AdminPassword: "SuperSecurePassword123"}
+	payload := companyentity.OnboardCompanyRequest{Name: "Acme Corp", Slug: "acme", AdminName: "Jane Doe", AdminEmail: "jane@acme.com", AdminPassword: "SuperSecurePassword123"}
 	r.ServeHTTP(w, onboardJSONRequest(payload))
 
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected status 201 Created, got %d. Body: %s", w.Code, w.Body.String())
 	}
 
-	var resp response.APIResponse[core.OnboardCompanyResponse]
+	var resp response.APIResponse[companyentity.OnboardCompanyResponse]
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -93,7 +94,7 @@ func TestHandler_Onboard_NonRootForbidden(t *testing.T) {
 		t.Run(role, func(t *testing.T) {
 			r := setupOnboardingRouter(&authctx.User{RoleSlug: role}, &fakeOnboardingService{})
 			w := httptest.NewRecorder()
-			payload := core.OnboardCompanyRequest{Name: "Acme Corp", Slug: "acme", AdminName: "Jane Doe", AdminEmail: "jane@acme.com", AdminPassword: "SuperSecurePassword123"}
+			payload := companyentity.OnboardCompanyRequest{Name: "Acme Corp", Slug: "acme", AdminName: "Jane Doe", AdminEmail: "jane@acme.com", AdminPassword: "SuperSecurePassword123"}
 			r.ServeHTTP(w, onboardJSONRequest(payload))
 			if w.Code != http.StatusForbidden {
 				t.Fatalf("expected status 403 Forbidden for role %s, got %d", role, w.Code)
@@ -120,7 +121,7 @@ func TestHandler_Onboard_ValidationErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := setupOnboardingRouter(&authctx.User{RoleSlug: "root", IsRoot: true}, &fakeOnboardingService{err: tt.err})
 			w := httptest.NewRecorder()
-			payload := core.OnboardCompanyRequest{Name: "Acme Corp", Slug: "acme", AdminName: "Jane Doe", AdminEmail: "jane@acme.com", AdminPassword: "SuperSecurePassword123"}
+			payload := companyentity.OnboardCompanyRequest{Name: "Acme Corp", Slug: "acme", AdminName: "Jane Doe", AdminEmail: "jane@acme.com", AdminPassword: "SuperSecurePassword123"}
 			r.ServeHTTP(w, onboardJSONRequest(payload))
 			if w.Code != http.StatusUnprocessableEntity {
 				t.Fatalf("expected status 422 Unprocessable Entity, got %d. Body: %s", w.Code, w.Body.String())

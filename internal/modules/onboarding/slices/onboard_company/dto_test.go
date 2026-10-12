@@ -1,7 +1,8 @@
-package core
+package onboard_company
 
 import (
 	"fmt"
+	companyentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/platform/messages"
@@ -15,7 +16,7 @@ func TestOnboardCompanyRequest_Validate(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		req          OnboardCompanyRequest
+		req          companyentity.OnboardCompanyRequest
 		wantFields   []string
 		wantRequired bool
 		wantMinLen   bool
@@ -23,7 +24,7 @@ func TestOnboardCompanyRequest_Validate(t *testing.T) {
 	}{
 		{
 			name: "valid request",
-			req: OnboardCompanyRequest{
+			req: companyentity.OnboardCompanyRequest{
 				Name:          "Acme Inc",
 				Slug:          "acme",
 				AdminName:     "Jane Admin",
@@ -33,7 +34,7 @@ func TestOnboardCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "all required fields missing",
-			req:  OnboardCompanyRequest{},
+			req:  companyentity.OnboardCompanyRequest{},
 			wantFields: []string{
 				"name",
 				"slug",
@@ -45,7 +46,7 @@ func TestOnboardCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "name too short",
-			req: OnboardCompanyRequest{
+			req: companyentity.OnboardCompanyRequest{
 				Name:          "A",
 				Slug:          "acme",
 				AdminName:     "Jane Admin",
@@ -57,7 +58,7 @@ func TestOnboardCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "slug too short",
-			req: OnboardCompanyRequest{
+			req: companyentity.OnboardCompanyRequest{
 				Name:          "Acme Inc",
 				Slug:          "a",
 				AdminName:     "Jane Admin",
@@ -69,7 +70,7 @@ func TestOnboardCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "admin name too short",
-			req: OnboardCompanyRequest{
+			req: companyentity.OnboardCompanyRequest{
 				Name:          "Acme Inc",
 				Slug:          "acme",
 				AdminName:     "J",
@@ -81,7 +82,7 @@ func TestOnboardCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "admin email invalid",
-			req: OnboardCompanyRequest{
+			req: companyentity.OnboardCompanyRequest{
 				Name:          "Acme Inc",
 				Slug:          "acme",
 				AdminName:     "Jane Admin",
@@ -93,7 +94,7 @@ func TestOnboardCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "admin password too short",
-			req: OnboardCompanyRequest{
+			req: companyentity.OnboardCompanyRequest{
 				Name:          "Acme Inc",
 				Slug:          "acme",
 				AdminName:     "Jane Admin",
@@ -105,7 +106,7 @@ func TestOnboardCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "multiple validation failures",
-			req: OnboardCompanyRequest{
+			req: companyentity.OnboardCompanyRequest{
 				Name:          "",
 				Slug:          "a",
 				AdminName:     "",

@@ -2,7 +2,7 @@ package onboarding
 
 import (
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
-	"github.com/enviniom/nexokit/internal/modules/onboarding/onboard_company"
+	"github.com/enviniom/nexokit/internal/modules/onboarding/slices/onboard_company"
 	"gorm.io/gorm"
 )
 

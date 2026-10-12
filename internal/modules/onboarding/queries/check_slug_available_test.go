@@ -2,6 +2,7 @@ package queries
 
 import (
 	"errors"
+	companyentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company"
 	"gorm.io/gorm"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ import (
 func TestCheckSlugAvailable(t *testing.T) {
 	db := newTestDB(t)
 
-	if err := db.Create(&core.OnboardingCompany{
+	if err := db.Create(&companyentity.OnboardingCompany{
 		BaseModel: shared.BaseModel{PublicID: "cmp_01"},
 		Name:      "Acme",
 		Slug:      "acme",
@@ -22,7 +23,7 @@ func TestCheckSlugAvailable(t *testing.T) {
 		t.Fatalf("seed company: %v", err)
 	}
 
-	if err := db.Create(&core.OnboardingCompany{
+	if err := db.Create(&companyentity.OnboardingCompany{
 		BaseModel: shared.BaseModel{PublicID: "deleted_slug", DeletedAt: gorm.DeletedAt{Time: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}},
 		Name:      "Deleted", Slug: "reserved", Status: core.CompanyStatusActive,
 	}).Error; err != nil {

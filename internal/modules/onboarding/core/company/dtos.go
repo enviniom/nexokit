@@ -1,4 +1,4 @@
-package core
+package company
 
 import (
 	"github.com/enviniom/nexokit/internal/platform/validator"
@@ -24,7 +24,7 @@ type OnboardCompanyResponse struct {
 }
 
 // Validate executes structured, field-level validations on the onboarding request.
-func (r OnboardCompanyRequest) Validate() validator.ValidationErrors {
+func (r *OnboardCompanyRequest) Validate() validator.ValidationErrors {
 	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	validator.Field(errs, "slug", r.Slug).Required().Apply(validator.MinLength(2))

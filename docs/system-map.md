@@ -46,6 +46,6 @@ Capabilities are not all mounted features: `PublicTenant` exists but the current
 
 1. Locate its module `routes.go`, then container and use-case package.
 2. Read handler → optional service → repository → reused query.
-3. Inspect entity `model.go`/`dtos.go` in Auth's `core/user` or `core/refresh_token` and IAM's `core/user`, `core/role` or `core/permission`, plus module-root contracts/errors/constants and the corresponding migration. Companies/onboarding retain flat `core/dto.go`/`core/model.go`; for their target placement and DTO-owned mapping, follow [Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping).
+3. Inspect entity `model.go`/`dtos.go` in Auth's `core/user` or `core/refresh_token` and IAM's `core/user`, `core/role` or `core/permission`, plus module-root contracts/errors/constants and the corresponding migration. Companies uses `core/company` and `core/company_domain`. Onboarding uses `core/{company,company_domain,user,role,permission}` local records and company-owned workflow DTOs, with its use case in `slices/onboard_company`; for entity ownership and applicable DTO mapping, follow [Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping).
 4. Follow injected capabilities back to the app container; do not add sibling-module imports.
 5. Read adjacent tests and the relevant reference from the [navigation hub](README.md).
