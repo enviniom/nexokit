@@ -3,7 +3,7 @@ package queries
 import (
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/driver/sqlite"
@@ -15,11 +15,11 @@ func TestExistsRoleByName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&core.IAMRole{}); err != nil {
+	if err := db.AutoMigrate(&iamrole.IAMRole{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
 	}
 
-	items := []core.IAMRole{
+	items := []iamrole.IAMRole{
 		{BaseModel: shared.BaseModel{PublicID: "role-root"}, Name: "Manager", Slug: "manager", CompanyID: nil},
 		{BaseModel: shared.BaseModel{PublicID: "role-root-director"}, Name: "Director", Slug: "director", CompanyID: nil},
 		{BaseModel: shared.BaseModel{PublicID: "role-acme-1"}, Name: "Manager", Slug: "manager-acme-1", CompanyID: uintPtr(10)},

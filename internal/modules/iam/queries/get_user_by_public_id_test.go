@@ -4,7 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/driver/sqlite"
@@ -23,10 +24,10 @@ func TestGetUserByPublicID(t *testing.T) {
 			publicID: "user-1",
 			seed: func(t *testing.T, db *gorm.DB) {
 				t.Helper()
-				if err := db.AutoMigrate(&core.IAMRole{}, &core.IAMUser{}); err != nil {
+				if err := db.AutoMigrate(&iamrole.IAMRole{}, &iamuser.IAMUser{}); err != nil {
 					t.Fatalf("automigrate: %v", err)
 				}
-				role := core.IAMRole{
+				role := iamrole.IAMRole{
 					BaseModel: shared.BaseModel{PublicID: "role-1"},
 					Name:      "Admin",
 					Slug:      "admin",
@@ -34,7 +35,7 @@ func TestGetUserByPublicID(t *testing.T) {
 				if err := db.Create(&role).Error; err != nil {
 					t.Fatalf("seed role: %v", err)
 				}
-				user := core.IAMUser{
+				user := iamuser.IAMUser{
 					BaseModel:    shared.BaseModel{PublicID: "user-1"},
 					Name:         "Alice",
 					Email:        "alice@example.com",
@@ -58,7 +59,7 @@ func TestGetUserByPublicID(t *testing.T) {
 			publicID: "user-missing",
 			seed: func(t *testing.T, db *gorm.DB) {
 				t.Helper()
-				if err := db.AutoMigrate(&core.IAMRole{}, &core.IAMUser{}); err != nil {
+				if err := db.AutoMigrate(&iamrole.IAMRole{}, &iamuser.IAMUser{}); err != nil {
 					t.Fatalf("automigrate: %v", err)
 				}
 			},

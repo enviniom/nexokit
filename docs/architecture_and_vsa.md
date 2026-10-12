@@ -24,7 +24,9 @@ internal/modules/<name>/
 Do not put new slice implementation files in the module root or import that root from a slice. Extract reused persistence queries into `queries/`, preferably one operation per file; non-persistence helpers, DTO mapping and business policy belong elsewhere.
 
 
-Auth uses `core/user` and `core/refresh_token` directly, without flat core model/DTO aliases or slice aliases. `SessionView` belongs to the user entity; the core root retains module contracts and errors. Other existing modules may still use flat core layouts.
+Auth uses `core/user` and `core/refresh_token` directly, without flat core model/DTO aliases or slice aliases. `SessionView` belongs to the user entity; the core root retains module contracts and errors. IAM uses `core/user`, `core/role` and `core/permission`, each with `model.go` and `dtos.go`, without flat compatibility aliases. Its core root retains module contracts, errors and constants. Companies and onboarding still use legacy flat core layouts; the entity layout above remains their target.
+
+IAM groups use cases under `slices/users`, `slices/roles` and `slices/permissions`, with non-HTTP capabilities under `slices/internal`. Entity containers and routes stay with their groups. `slices/capabilities.go` assembles internal services and exposes root `core` contracts to the module container: Go permits imports of `slices/internal` only from within `slices`, not from the IAM root.
 
 ## 2. Choose the smallest useful layering
 
@@ -72,7 +74,9 @@ for i, model := range models {
 }
 ```
 
-Adapt the illustrative model field types and response helper arguments to the actual API. Mapping exposes only public IDs and safe fields, never passwords, hashes or internal fields. DTOs perform no database calls or business orchestration. Request validation/sanitization uses pointer receivers; request-to-model conversion may live in `dtos.go` when applicable, but requests need not map from persistence models and bidirectional mapping is not required. [API validation and errors](api_validation_and_errors.md#4-dto-sanitization-and-validation) owns validation details.
+Adapt the illustrative model field types and response helper arguments to the actual API. Mapping exposes safe public contract fields, never private entity primary IDs, passwords or hashes. Existing IAM contracts retain numeric user `role_id`/`company_id` and numeric `created_by`/`updated_by` audit fields; these are not private primary IDs. Role responses use a public string company ID. DTOs perform no database calls or business orchestration. Request validation/sanitization uses pointer receivers; request-to-model conversion may live in `dtos.go` when applicable, but requests need not map from persistence models and bidirectional mapping is not required. [API validation and errors](api_validation_and_errors.md#4-dto-sanitization-and-validation) owns validation details.
+
+IAM response mapping lives in the corresponding entity `dtos.go`, including role catalog/assignment projections in `core/role/dtos.go`. Callers retain permission selection and sorting; DTO mapping preserves existing optional-field and collection shapes.
 
 For now, declare contracts centrally in module `core/contracts.go`, not entity or slice packages. Keep signatures small and consumer-defined, with constructor injection. Parent `core` contracts may import entity types; entity packages must not import parent `core`, so dependencies stay one-way. If an entity DTO needs a shared error, use an appropriate platform error type or return validation results for the caller to translate into module errors; do not introduce a parent import cycle.
 

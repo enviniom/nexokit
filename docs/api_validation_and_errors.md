@@ -20,7 +20,7 @@ Return immediately after writing a failure. Keep HTTP decisions in handlers and 
 
 Paginated responses nest metadata under `meta.pagination` (`page`, `per_page`, `total`, `total_pages`) and `meta.filters` (`status`, `created_from`, `created_to`, `sort`, `order`, `search`). Do not assume `total_records` or flat pagination metadata.
 
-Validation `errors` is a map of field names to string arrays. Public entity references should use ULID public IDs for new APIs; see [current DTO caveats](architecture_and_vsa.md#4-models-dtos-and-mapping).
+Validation `errors` is a map of field names to string arrays. Public entity references should use ULID public IDs for new APIs; see [current DTO contracts](architecture_and_vsa.md#4-models-dtos-and-mapping). Existing IAM numeric user `role_id`/`company_id` and numeric audit fields remain public contract fields, not private entity primary IDs.
 
 ## 3. List query inputs
 

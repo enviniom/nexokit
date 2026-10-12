@@ -22,7 +22,7 @@ All module routes are under `/api/v1`; health endpoints are unversioned. IAM URL
 |---|---|---|
 | auth | `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me` | Credentials, opaque refresh rotation/revocation and current session; only `/me` applies bearer auth |
 | companies | `/companies`, `/companies/:id`, `/companies/:id/domains`, `/companies/:id/domains/:domain_id` | Company and domain administration; mostly root guards |
-| IAM | `/users`, `/roles`, `/permissions` and entity subroutes | Users, roles and permission catalog; users require selected tenant, roles/permissions allow root-global scope |
+| IAM | `/users`, `/roles`, `/permissions` and entity subroutes | Users, roles and permission catalog in `slices/{users,roles,permissions}`; capabilities in `slices/internal` via `slices/capabilities.go`; users require selected tenant, roles/permissions allow root-global scope |
 | onboarding | `POST /onboarding/companies` | Root-authenticated company onboarding, **not public self-signup** |
 
 The app mounts `Auth` + `AllowRootGlobalScope` for companies, roles, permissions and onboarding; users use `Auth` + `RequireTenantScope`. Route-specific permission/role guards follow. See [request flow](references/runtime/request-flow.md) for the authoritative middleware sequence and root selection table.
@@ -46,6 +46,6 @@ Capabilities are not all mounted features: `PublicTenant` exists but the current
 
 1. Locate its module `routes.go`, then container and use-case package.
 2. Read handler → optional service → repository → reused query.
-3. Inspect current flat `core/dto.go`, `core/model.go`, module contracts/errors and the corresponding migration. For new entity DTO placement and mapping, follow [Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping); this map does not claim entity core directories already exist.
+3. Inspect entity `model.go`/`dtos.go` in Auth's `core/user` or `core/refresh_token` and IAM's `core/user`, `core/role` or `core/permission`, plus module-root contracts/errors/constants and the corresponding migration. Companies/onboarding retain flat `core/dto.go`/`core/model.go`; for their target placement and DTO-owned mapping, follow [Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping).
 4. Follow injected capabilities back to the app container; do not add sibling-module imports.
 5. Read adjacent tests and the relevant reference from the [navigation hub](README.md).

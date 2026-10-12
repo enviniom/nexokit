@@ -10,7 +10,9 @@ import (
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/modules/companies"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
-	iamusers "github.com/enviniom/nexokit/internal/modules/iam/users"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
+	iamusers "github.com/enviniom/nexokit/internal/modules/iam/slices/users"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
@@ -24,7 +26,7 @@ func TestUsersCRUDIntegration(t *testing.T) {
 	}
 
 	gin.SetMode(gin.TestMode)
-	db := helpers.NewSQLiteDB(t, &iamcore.IAMRole{}, &companies.Company{}, &iamcore.IAMUser{})
+	db := helpers.NewSQLiteDB(t, &iamrole.IAMRole{}, &companies.Company{}, &iamuser.IAMUser{})
 	company := helpers.SeedCompany(t, db, "acme")
 	adminRole := helpers.SeedRole(t, db, iamcore.AdminRoleSlug)
 	_ = helpers.SeedRole(t, db, iamcore.RootRoleSlug)
@@ -40,14 +42,14 @@ func TestUsersCRUDIntegration(t *testing.T) {
 	})
 	iamusers.Register(r.Group(""), container, middleware.RequirePermission)
 
-	var created iamcore.UserResponse
+	var created iamuser.UserResponse
 	t.Run("create user", func(t *testing.T) {
 		payload := map[string]any{"name": "John Tester", "email": "john@example.com", "password": "secret123", "role_id": adminRole.ID}
 		w := requestJSON(r, http.MethodPost, "/users", payload)
 		if w.Code != http.StatusCreated {
 			t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 		}
-		var resp response.APIResponse[iamcore.UserResponse]
+		var resp response.APIResponse[iamuser.UserResponse]
 		mustDecode(t, w.Body.Bytes(), &resp)
 		created = resp.Data
 		if created.PublicID == "" {
@@ -62,7 +64,7 @@ func TestUsersCRUDIntegration(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 		}
-		var resp response.PaginatedResponse[[]iamcore.UserResponse]
+		var resp response.PaginatedResponse[[]iamuser.UserResponse]
 		mustDecode(t, w.Body.Bytes(), &resp)
 		if len(resp.Data) == 0 {
 			t.Fatalf("expected non-empty users list")

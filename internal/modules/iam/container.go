@@ -5,20 +5,15 @@ import (
 
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
-	iaminternal "github.com/enviniom/nexokit/internal/modules/iam/internal"
-	"github.com/enviniom/nexokit/internal/modules/iam/internal/list_all_permissions"
-	"github.com/enviniom/nexokit/internal/modules/iam/internal/resolve_auth_user"
-	"github.com/enviniom/nexokit/internal/modules/iam/internal/resolve_role_by_slug"
-	"github.com/enviniom/nexokit/internal/modules/iam/internal/resolve_user_permissions"
-	"github.com/enviniom/nexokit/internal/modules/iam/internal/sync_permissions"
-	"github.com/enviniom/nexokit/internal/modules/iam/permissions"
-	"github.com/enviniom/nexokit/internal/modules/iam/roles"
-	"github.com/enviniom/nexokit/internal/modules/iam/users"
+	"github.com/enviniom/nexokit/internal/modules/iam/slices"
+	"github.com/enviniom/nexokit/internal/modules/iam/slices/permissions"
+	"github.com/enviniom/nexokit/internal/modules/iam/slices/roles"
+	"github.com/enviniom/nexokit/internal/modules/iam/slices/users"
 	"gorm.io/gorm"
 )
 
 // Container is the root IAM container used by app wiring.
-// Foundation slice exposes contracts first; entity sub-containers are wired in later slices.
+// Entity containers and internal capabilities share the supplied database and cache.
 type Container struct {
 	Users       *users.Container
 	Roles       *roles.Container
@@ -32,14 +27,19 @@ type Container struct {
 }
 
 func NewContainer(db *gorm.DB, c cache.Cache, _ *slog.Logger) *Container {
+	usersContainer := users.NewContainer(db, c)
+	rolesContainer := roles.NewContainer(db, c)
+	permissionsContainer := permissions.NewContainer(db)
+	capabilities := slices.NewCapabilities(db, c)
+
 	return &Container{
-		Users:            users.NewContainer(db, c),
-		Roles:            roles.NewContainer(db, c),
-		Permissions:      permissions.NewContainer(db),
-		AuthUserResolver: iaminternal.NewResolveAuthUserService(resolve_auth_user.NewRepository(db)),
-		Resolver:         iaminternal.NewResolveUserPermissionsService(resolve_user_permissions.NewRepository(db), c),
-		Syncer:           iaminternal.NewSyncPermissionsService(sync_permissions.NewRepository(db)),
-		RoleResolver:     iaminternal.NewResolveRoleBySlugService(resolve_role_by_slug.NewRepository(db)),
-		Catalog:          iaminternal.NewListAllPermissionsService(list_all_permissions.NewRepository(db)),
+		Users:            usersContainer,
+		Roles:            rolesContainer,
+		Permissions:      permissionsContainer,
+		AuthUserResolver: capabilities.AuthUserResolver,
+		Resolver:         capabilities.Resolver,
+		Syncer:           capabilities.Syncer,
+		RoleResolver:     capabilities.RoleResolver,
+		Catalog:          capabilities.Catalog,
 	}
 }

@@ -12,7 +12,7 @@ RequirePermission("users.list")
   → permission insertion + assignment to admin roles
 ```
 
-`internal/modules/iam/internal/sync_permissions/service.go` processes slugs containing a dot, skipping malformed entries and existing permission records. New entries receive a public ID, humanized name/description, module/action, display order and `IsSystem=true`. The repository inserts a corresponding `role_permissions` row for every role with slug `admin`, using `ON CONFLICT DO NOTHING`.
+`internal/modules/iam/slices/internal/sync_permissions/service.go` processes slugs containing a dot, skipping malformed entries and existing permission records. New entries receive a public ID, humanized name/description, module/action, display order and `IsSystem=true`. The repository inserts a corresponding `role_permissions` row for every role with slug `admin`, using `ON CONFLICT DO NOTHING`.
 
 ## Operational consequences
 

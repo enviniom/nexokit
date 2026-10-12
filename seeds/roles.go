@@ -6,6 +6,7 @@ import (
 	"github.com/enviniom/nexokit/internal/config"
 	"github.com/enviniom/nexokit/internal/infra/db"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	"github.com/enviniom/nexokit/internal/platform/identity"
 	"gorm.io/gorm"
 )
@@ -26,12 +27,12 @@ func RolesSeed() error {
 }
 
 func seedRoles(database *gorm.DB) error {
-	roleList := []iamcore.IAMRole{
+	roleList := []iamrole.IAMRole{
 		{Name: "root", Slug: iamcore.RootRoleSlug, Description: "System root role", IsSystem: true},
 	}
 
 	for i := range roleList {
-		var existing iamcore.IAMRole
+		var existing iamrole.IAMRole
 		result := database.Where("name = ?", roleList[i].Name).First(&existing)
 		if result.Error == nil {
 			// Already exists, skip

@@ -12,6 +12,8 @@ import (
 	"github.com/enviniom/nexokit/internal/config"
 	"github.com/enviniom/nexokit/internal/infra/db"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	"gorm.io/gorm"
 )
 
@@ -73,15 +75,15 @@ func TestCreateRootCommand_IdempotentRealDB(t *testing.T) {
 	defer db.Close(database)
 
 	// Ensure schema exists
-	if err := database.AutoMigrate(&iamcore.IAMRole{}, &iamcore.IAMUser{}); err != nil {
+	if err := database.AutoMigrate(&iamrole.IAMRole{}, &iamuser.IAMUser{}); err != nil {
 		t.Fatalf("failed to auto-migrate: %v", err)
 	}
 
 	// Seed root role if missing
-	var rootRole iamcore.IAMRole
+	var rootRole iamrole.IAMRole
 	if err := database.Where("slug = ?", iamcore.RootRoleSlug).First(&rootRole).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			rootRole = iamcore.IAMRole{Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
+			rootRole = iamrole.IAMRole{Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
 			if createErr := database.Create(&rootRole).Error; createErr != nil {
 				t.Fatalf("failed to seed root role: %v", createErr)
 			}

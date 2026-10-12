@@ -11,7 +11,9 @@ import (
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/modules/companies"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
-	iamusers "github.com/enviniom/nexokit/internal/modules/iam/users"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
+	iamusers "github.com/enviniom/nexokit/internal/modules/iam/slices/users"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
@@ -24,8 +26,8 @@ import (
 func TestUsersIsolation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := newUsersIsolationDB(t)
-	rootRole := iamcore.IAMRole{BaseModel: shared.BaseModel{ID: 1, PublicID: "role-root"}, Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
-	adminRole := iamcore.IAMRole{BaseModel: shared.BaseModel{ID: 2, PublicID: "role-admin"}, Name: "admin", Slug: iamcore.AdminRoleSlug, IsSystem: true}
+	rootRole := iamrole.IAMRole{BaseModel: shared.BaseModel{ID: 1, PublicID: "role-root"}, Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
+	adminRole := iamrole.IAMRole{BaseModel: shared.BaseModel{ID: 2, PublicID: "role-admin"}, Name: "admin", Slug: iamcore.AdminRoleSlug, IsSystem: true}
 	if err := db.Create(&rootRole).Error; err != nil {
 		t.Fatalf("seed root role: %v", err)
 	}
@@ -117,7 +119,7 @@ func newUsersIsolationDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&iamcore.IAMRole{}, &companies.Company{}, &iamcore.IAMUser{}); err != nil {
+	if err := db.AutoMigrate(&iamrole.IAMRole{}, &companies.Company{}, &iamuser.IAMUser{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 	return db
@@ -125,7 +127,7 @@ func newUsersIsolationDB(t *testing.T) *gorm.DB {
 
 func seedUser(t *testing.T, db *gorm.DB, publicID, email string, roleID uint, companyID *uint) {
 	t.Helper()
-	user := iamcore.IAMUser{BaseModel: shared.BaseModel{PublicID: publicID}, Name: publicID, Email: email, PasswordHash: "hash", RoleID: roleID, CompanyID: companyID, IsActive: true}
+	user := iamuser.IAMUser{BaseModel: shared.BaseModel{PublicID: publicID}, Name: publicID, Email: email, PasswordHash: "hash", RoleID: roleID, CompanyID: companyID, IsActive: true}
 	if err := db.Create(&user).Error; err != nil {
 		t.Fatalf("seed user %s: %v", publicID, err)
 	}
@@ -160,9 +162,9 @@ func withActor(req *http.Request, actor string, companyID uint) {
 	_ = companyID
 }
 
-func decodeUsers(t *testing.T, w *httptest.ResponseRecorder) response.APIResponse[[]iamcore.UserResponse] {
+func decodeUsers(t *testing.T, w *httptest.ResponseRecorder) response.APIResponse[[]iamuser.UserResponse] {
 	t.Helper()
-	var resp response.APIResponse[[]iamcore.UserResponse]
+	var resp response.APIResponse[[]iamuser.UserResponse]
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}

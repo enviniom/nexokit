@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -14,7 +16,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to open in-memory db: %v", err)
 	}
-	if err := db.AutoMigrate(&iamcore.IAMRole{}, &iamcore.IAMUser{}); err != nil {
+	if err := db.AutoMigrate(&iamrole.IAMRole{}, &iamuser.IAMUser{}); err != nil {
 		t.Fatalf("failed to migrate: %v", err)
 	}
 	return db
@@ -37,7 +39,7 @@ func TestRootStorage_RootExists_RoleButNoUser(t *testing.T) {
 	db := setupTestDB(t)
 	storage := newRootStorage(db)
 
-	rootRole := iamcore.IAMRole{Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
+	rootRole := iamrole.IAMRole{Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
 	if err := db.Create(&rootRole).Error; err != nil {
 		t.Fatalf("failed to create root role: %v", err)
 	}
@@ -55,12 +57,12 @@ func TestRootStorage_RootExists_UserExists(t *testing.T) {
 	db := setupTestDB(t)
 	storage := newRootStorage(db)
 
-	rootRole := iamcore.IAMRole{Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
+	rootRole := iamrole.IAMRole{Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
 	if err := db.Create(&rootRole).Error; err != nil {
 		t.Fatalf("failed to create root role: %v", err)
 	}
 
-	user := &iamcore.IAMUser{
+	user := &iamuser.IAMUser{
 		BaseModel: shared.BaseModel{PublicID: "usr01"},
 		Name:      "Root",
 		Email:     "root@example.com",
@@ -84,7 +86,7 @@ func TestRootStorage_CreateRoot_Success(t *testing.T) {
 	db := setupTestDB(t)
 	storage := newRootStorage(db)
 
-	rootRole := iamcore.IAMRole{Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
+	rootRole := iamrole.IAMRole{Name: "root", Slug: iamcore.RootRoleSlug, IsSystem: true}
 	if err := db.Create(&rootRole).Error; err != nil {
 		t.Fatalf("failed to create root role: %v", err)
 	}
@@ -94,14 +96,14 @@ func TestRootStorage_CreateRoot_Success(t *testing.T) {
 	}
 
 	var count int64
-	if err := db.Model(&iamcore.IAMUser{}).Count(&count).Error; err != nil {
+	if err := db.Model(&iamuser.IAMUser{}).Count(&count).Error; err != nil {
 		t.Fatalf("failed to count users: %v", err)
 	}
 	if count != 1 {
 		t.Errorf("expected 1 user, got %d", count)
 	}
 
-	var created iamcore.IAMUser
+	var created iamuser.IAMUser
 	if err := db.First(&created).Error; err != nil {
 		t.Fatalf("failed to fetch created user: %v", err)
 	}

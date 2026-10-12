@@ -1,6 +1,10 @@
 package core
 
-import "github.com/enviniom/nexokit/internal/platform/authctx"
+import (
+	"github.com/enviniom/nexokit/internal/modules/iam/core/permission"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
+)
 
 // AuthUserResolver resolves a user for authentication middleware.
 type AuthUserResolver interface {
@@ -19,10 +23,10 @@ type PermissionSyncer interface {
 
 // RoleBySlugResolver resolves a role by slug.
 type RoleBySlugResolver interface {
-	ResolveRoleBySlug(slug string) (*IAMRole, error)
+	ResolveRoleBySlug(slug string) (*iamrole.IAMRole, error)
 }
 
 // PermissionCatalogReader returns all permissions.
 type PermissionCatalogReader interface {
-	ListAllPermissions() ([]IAMPermission, error)
+	ListAllPermissions() ([]permission.IAMPermission, error)
 }

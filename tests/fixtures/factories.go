@@ -2,9 +2,12 @@ package fixtures
 
 import (
 	"fmt"
+	"github.com/enviniom/nexokit/internal/modules/iam/core/permission"
 
 	"github.com/enviniom/nexokit/internal/modules/companies"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	platformPerms "github.com/enviniom/nexokit/internal/platform/permissions"
 	"github.com/enviniom/nexokit/internal/shared"
 )
@@ -21,11 +24,11 @@ func BuildCompany(slug string) companies.Company {
 	}
 }
 
-func BuildRole(slug string) iamcore.IAMRole {
+func BuildRole(slug string) iamrole.IAMRole {
 	if slug == "" {
 		slug = iamcore.UserRoleSlug
 	}
-	return iamcore.IAMRole{
+	return iamrole.IAMRole{
 		BaseModel:   shared.BaseModel{PublicID: fmt.Sprintf("role-%s", slug)},
 		Name:        fmt.Sprintf("Role %s", slug),
 		Slug:        slug,
@@ -34,7 +37,7 @@ func BuildRole(slug string) iamcore.IAMRole {
 	}
 }
 
-func BuildPermission(module, action string) iamcore.IAMPermission {
+func BuildPermission(module, action string) permission.IAMPermission {
 	if module == "" {
 		module = "users"
 	}
@@ -42,7 +45,7 @@ func BuildPermission(module, action string) iamcore.IAMPermission {
 		action = platformPerms.ActionView
 	}
 	slug := platformPerms.Format(module, action)
-	return iamcore.IAMPermission{
+	return permission.IAMPermission{
 		BaseModel:    shared.BaseModel{PublicID: fmt.Sprintf("perm-%s-%s", module, action)},
 		Slug:         slug,
 		Name:         fmt.Sprintf("%s %s", module, action),
@@ -54,11 +57,11 @@ func BuildPermission(module, action string) iamcore.IAMPermission {
 	}
 }
 
-func BuildUser(publicID string, roleID uint, companyID *uint) iamcore.IAMUser {
+func BuildUser(publicID string, roleID uint, companyID *uint) iamuser.IAMUser {
 	if publicID == "" {
 		publicID = "user-fixture"
 	}
-	return iamcore.IAMUser{
+	return iamuser.IAMUser{
 		BaseModel:    shared.BaseModel{PublicID: publicID},
 		Name:         publicID,
 		Email:        fmt.Sprintf("%s@example.com", publicID),

@@ -1,0 +1,45 @@
+package resolve_role_by_slug
+
+import (
+	"errors"
+	"testing"
+
+	"github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+)
+
+type fakeRepo struct {
+	role *iamrole.IAMRole
+	err  error
+}
+
+func (f fakeRepo) GetRoleBySlug(string) (*iamrole.IAMRole, error) { return f.role, f.err }
+
+func TestResolveRoleBySlugPropagatesNotFound(t *testing.T) {
+	svc := NewService(fakeRepo{err: core.ErrNotFound})
+	_, err := svc.ResolveRoleBySlug("missing")
+	if !errors.Is(err, core.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestResolveRoleBySlugPropagatesRepositoryError(t *testing.T) {
+	repoErr := errors.New("db down")
+	svc := NewService(fakeRepo{err: repoErr})
+	_, err := svc.ResolveRoleBySlug("admin")
+	if !errors.Is(err, repoErr) {
+		t.Fatalf("expected repo error, got %v", err)
+	}
+}
+
+func TestResolveRoleBySlugSuccess(t *testing.T) {
+	role := &iamrole.IAMRole{Name: "Admin", Slug: "admin"}
+	svc := NewService(fakeRepo{role: role})
+	result, err := svc.ResolveRoleBySlug("admin")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Slug != "admin" {
+		t.Fatalf("expected slug admin, got %s", result.Slug)
+	}
+}

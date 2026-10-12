@@ -36,6 +36,8 @@ Review replacement coverage here without navigating removed documents. This is a
 
 ## Corrections to inherited assumptions
 
-Auth consumers import entity models and DTOs directly from `core/user` and `core/refresh_token`; no flat compatibility aliases remain. Mapping and validation regression tests live with those entities.
+Auth consumers import entity models and DTOs directly from `core/user` and `core/refresh_token`; no flat compatibility aliases remain. Mapping and validation regression coverage lives in slices or integration, without reopening Auth's completed scope.
+
+IAM consumers import models/DTOs from `core/user`, `core/role` and `core/permission`, without flat aliases. Entity `dtos.go` files own response mapping, including the role permission catalog. Module-root contracts/errors/constants remain. IAM use cases and their mapper, validation and serialization tests are grouped under `slices/{users,roles,permissions}`; non-HTTP capabilities live under `slices/internal`, assembled by `slices/capabilities.go` through root core contracts. New tests belong in these slices or integration; existing `core/errors_test.go` remains. Companies/onboarding retain legacy flat cores rather than claiming the entity target is already implemented.
 
 Specialized references remain because they own unique operational/security contracts. Removed downstream-only material is not retained as a historical runtime specification. ADR records are future artifacts, not evidence claimed by this ledger.

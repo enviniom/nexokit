@@ -9,7 +9,7 @@ import (
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/modules/iam"
-	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	platformPerms "github.com/enviniom/nexokit/internal/platform/permissions"
 	"github.com/gin-gonic/gin"
@@ -104,9 +104,9 @@ type fakeAuthUserResolver struct{ user *authctx.User }
 
 func (f fakeAuthUserResolver) ResolveAuthUser(string) (*authctx.User, error) { return f.user, nil }
 
-type fakeRoleBySlugResolver struct{ role *iamcore.IAMRole }
+type fakeRoleBySlugResolver struct{ role *iamrole.IAMRole }
 
-func (f fakeRoleBySlugResolver) ResolveRoleBySlug(string) (*iamcore.IAMRole, error) {
+func (f fakeRoleBySlugResolver) ResolveRoleBySlug(string) (*iamrole.IAMRole, error) {
 	return f.role, nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/enviniom/nexokit/internal/modules/auth/core/refresh_token"
 	userentity "github.com/enviniom/nexokit/internal/modules/auth/core/user"
+	"github.com/enviniom/nexokit/internal/modules/iam/core/permission"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -15,6 +16,8 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/auth"
 	"github.com/enviniom/nexokit/internal/modules/iam"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/password"
 	"github.com/enviniom/nexokit/internal/platform/response"
@@ -30,9 +33,9 @@ func TestAuthIntegration(t *testing.T) {
 	}
 
 	gin.SetMode(gin.TestMode)
-	db := helpers.NewSQLiteDB(t, &iamcore.IAMRole{}, &iamcore.IAMPermission{}, &iamcore.IAMUser{}, &refresh_token.RefreshToken{})
+	db := helpers.NewSQLiteDB(t, &iamrole.IAMRole{}, &permission.IAMPermission{}, &iamuser.IAMUser{}, &refresh_token.RefreshToken{})
 	adminRole := helpers.SeedRole(t, db, iamcore.AdminRoleSlug)
-	permissions := []iamcore.IAMPermission{
+	permissions := []permission.IAMPermission{
 		{BaseModel: shared.BaseModel{PublicID: "auth-permission-users-list"}, Slug: "users.list", Name: "List users", Module: "users", Action: "list"},
 		{BaseModel: shared.BaseModel{PublicID: "auth-permission-roles-view"}, Slug: "roles.view", Name: "View roles", Module: "roles", Action: "view"},
 	}
@@ -44,15 +47,15 @@ func TestAuthIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hash password: %v", err)
 	}
-	activeUser := iamcore.IAMUser{BaseModel: shared.BaseModel{PublicID: "auth-active"}, Name: "Active", Email: "active@example.com", PasswordHash: hash, RoleID: adminRole.ID, IsActive: true}
-	inactiveUser := iamcore.IAMUser{BaseModel: shared.BaseModel{PublicID: "auth-inactive"}, Name: "Inactive", Email: "inactive@example.com", PasswordHash: hash, RoleID: adminRole.ID, IsActive: false}
+	activeUser := iamuser.IAMUser{BaseModel: shared.BaseModel{PublicID: "auth-active"}, Name: "Active", Email: "active@example.com", PasswordHash: hash, RoleID: adminRole.ID, IsActive: true}
+	inactiveUser := iamuser.IAMUser{BaseModel: shared.BaseModel{PublicID: "auth-inactive"}, Name: "Inactive", Email: "inactive@example.com", PasswordHash: hash, RoleID: adminRole.ID, IsActive: false}
 	if err := db.Create(&activeUser).Error; err != nil {
 		t.Fatalf("seed active user: %v", err)
 	}
 	if err := db.Create(&inactiveUser).Error; err != nil {
 		t.Fatalf("seed inactive user: %v", err)
 	}
-	if err := db.Model(&iamcore.IAMUser{}).Where("id = ?", inactiveUser.ID).Update("is_active", false).Error; err != nil {
+	if err := db.Model(&iamuser.IAMUser{}).Where("id = ?", inactiveUser.ID).Update("is_active", false).Error; err != nil {
 		t.Fatalf("mark inactive user: %v", err)
 	}
 
@@ -122,7 +125,7 @@ func TestAuthIntegration(t *testing.T) {
 		{name: "refresh after user deactivation returns 401 without replacement", publicID: "auth-refresh-deactivated"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			user := iamcore.IAMUser{BaseModel: shared.BaseModel{PublicID: tc.publicID}, Name: "Refresh rejection", Email: tc.publicID + "@example.com", PasswordHash: hash, RoleID: adminRole.ID, IsActive: true}
+			user := iamuser.IAMUser{BaseModel: shared.BaseModel{PublicID: tc.publicID}, Name: "Refresh rejection", Email: tc.publicID + "@example.com", PasswordHash: hash, RoleID: adminRole.ID, IsActive: true}
 			if err := db.Create(&user).Error; err != nil {
 				t.Fatalf("seed refresh user: %v", err)
 			}
@@ -250,7 +253,7 @@ func TestAuthIntegration(t *testing.T) {
 	})
 }
 
-func assertAuthUserJSON(t *testing.T, payload []byte, model iamcore.IAMUser, roleName string, me bool) {
+func assertAuthUserJSON(t *testing.T, payload []byte, model iamuser.IAMUser, roleName string, me bool) {
 	t.Helper()
 	var fields map[string]json.RawMessage
 	mustDecode(t, payload, &fields)

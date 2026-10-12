@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -15,11 +15,11 @@ func TestGetRoleBySlug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&core.IAMRole{}); err != nil {
+	if err := db.AutoMigrate(&iamrole.IAMRole{}); err != nil {
 		t.Fatalf("automigrate: %v", err)
 	}
 
-	role := core.IAMRole{
+	role := iamrole.IAMRole{
 		BaseModel: shared.BaseModel{PublicID: "role-root"},
 		Name:      "Root",
 		Slug:      "root",

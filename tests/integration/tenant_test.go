@@ -9,7 +9,9 @@ import (
 	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/modules/companies"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
-	iamusers "github.com/enviniom/nexokit/internal/modules/iam/users"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
+	iamusers "github.com/enviniom/nexokit/internal/modules/iam/slices/users"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
@@ -23,7 +25,7 @@ func TestTenantIsolationIntegration(t *testing.T) {
 	}
 
 	gin.SetMode(gin.TestMode)
-	db := helpers.NewSQLiteDB(t, &iamcore.IAMRole{}, &companies.Company{}, &iamcore.IAMUser{})
+	db := helpers.NewSQLiteDB(t, &iamrole.IAMRole{}, &companies.Company{}, &iamuser.IAMUser{})
 	rootRole := helpers.SeedRole(t, db, iamcore.RootRoleSlug)
 	adminRole := helpers.SeedRole(t, db, iamcore.AdminRoleSlug)
 	companyA := helpers.SeedCompany(t, db, "acme")
@@ -70,7 +72,7 @@ func TestTenantIsolationIntegration(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp response.PaginatedResponse[[]iamcore.UserResponse]
+		var resp response.PaginatedResponse[[]iamuser.UserResponse]
 		mustDecode(t, w.Body.Bytes(), &resp)
 		if len(resp.Data) < 4 {
 			t.Fatalf("expected root to see all users, got %d", len(resp.Data))
@@ -85,7 +87,7 @@ func TestTenantIsolationIntegration(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d", w.Code)
 		}
-		var resp response.PaginatedResponse[[]iamcore.UserResponse]
+		var resp response.PaginatedResponse[[]iamuser.UserResponse]
 		mustDecode(t, w.Body.Bytes(), &resp)
 		for _, u := range resp.Data {
 			if u.CompanyID == nil || *u.CompanyID != companyB.ID {

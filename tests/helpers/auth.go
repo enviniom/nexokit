@@ -8,6 +8,8 @@ import (
 
 	"github.com/enviniom/nexokit/internal/modules/companies"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	"github.com/enviniom/nexokit/internal/platform/token"
 	"gorm.io/gorm"
 )
@@ -22,11 +24,11 @@ type UserOptions struct {
 }
 
 type Actor struct {
-	User iamcore.IAMUser
-	Role iamcore.IAMRole
+	User iamuser.IAMUser
+	Role iamrole.IAMRole
 }
 
-func SeedUser(t *testing.T, db *gorm.DB, opts UserOptions) iamcore.IAMUser {
+func SeedUser(t *testing.T, db *gorm.DB, opts UserOptions) iamuser.IAMUser {
 	t.Helper()
 
 	roleSlug := opts.RoleSlug
@@ -35,7 +37,7 @@ func SeedUser(t *testing.T, db *gorm.DB, opts UserOptions) iamcore.IAMUser {
 	}
 
 	role := SeedRole(t, db, roleSlug)
-	user := iamcore.IAMUser{
+	user := iamuser.IAMUser{
 		Name:         opts.Name,
 		Email:        opts.Email,
 		PasswordHash: "hash",
@@ -63,10 +65,10 @@ func SeedUser(t *testing.T, db *gorm.DB, opts UserOptions) iamcore.IAMUser {
 	return user
 }
 
-func CreateTestToken(t *testing.T, db *gorm.DB, user iamcore.IAMUser) string {
+func CreateTestToken(t *testing.T, db *gorm.DB, user iamuser.IAMUser) string {
 	t.Helper()
 
-	var withRole iamcore.IAMUser
+	var withRole iamuser.IAMUser
 	if err := db.Preload("Role").First(&withRole, user.ID).Error; err != nil {
 		t.Fatalf("load user role: %v", err)
 	}
@@ -120,7 +122,7 @@ func SeedAuthActor(t *testing.T, db *gorm.DB, opts UserOptions) Actor {
 		}
 	}
 	user := SeedUser(t, db, opts)
-	role := iamcore.IAMRole{}
+	role := iamrole.IAMRole{}
 	if err := db.First(&role, user.RoleID).Error; err != nil {
 		t.Fatalf("load actor role: %v", err)
 	}

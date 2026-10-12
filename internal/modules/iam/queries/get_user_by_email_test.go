@@ -4,7 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/iam/core"
+	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -16,17 +17,17 @@ func TestGetUserByEmail(t *testing.T) {
 		email     string
 		seed      func(t *testing.T, db *gorm.DB)
 		assertErr func(t *testing.T, err error)
-		assertFn  func(t *testing.T, user *core.IAMUser)
+		assertFn  func(t *testing.T, user *iamuser.IAMUser)
 	}{
 		{
 			name:  "returns user when found",
 			email: "alice@example.com",
 			seed: func(t *testing.T, db *gorm.DB) {
 				t.Helper()
-				if err := db.AutoMigrate(&core.IAMRole{}, &core.IAMUser{}); err != nil {
+				if err := db.AutoMigrate(&iamrole.IAMRole{}, &iamuser.IAMUser{}); err != nil {
 					t.Fatalf("automigrate: %v", err)
 				}
-				role := core.IAMRole{
+				role := iamrole.IAMRole{
 					BaseModel: shared.BaseModel{PublicID: "role-1"},
 					Name:      "Admin",
 					Slug:      "admin",
@@ -34,7 +35,7 @@ func TestGetUserByEmail(t *testing.T) {
 				if err := db.Create(&role).Error; err != nil {
 					t.Fatalf("seed role: %v", err)
 				}
-				user := core.IAMUser{
+				user := iamuser.IAMUser{
 					BaseModel:    shared.BaseModel{PublicID: "user-1"},
 					Name:         "Alice",
 					Email:        "alice@example.com",
@@ -52,7 +53,7 @@ func TestGetUserByEmail(t *testing.T) {
 					t.Fatalf("unexpected error: %v", err)
 				}
 			},
-			assertFn: func(t *testing.T, user *core.IAMUser) {
+			assertFn: func(t *testing.T, user *iamuser.IAMUser) {
 				t.Helper()
 				if user.Email != "alice@example.com" {
 					t.Fatalf("expected email alice@example.com, got %s", user.Email)
@@ -67,7 +68,7 @@ func TestGetUserByEmail(t *testing.T) {
 			email: "nobody@example.com",
 			seed: func(t *testing.T, db *gorm.DB) {
 				t.Helper()
-				if err := db.AutoMigrate(&core.IAMRole{}, &core.IAMUser{}); err != nil {
+				if err := db.AutoMigrate(&iamrole.IAMRole{}, &iamuser.IAMUser{}); err != nil {
 					t.Fatalf("automigrate: %v", err)
 				}
 			},
