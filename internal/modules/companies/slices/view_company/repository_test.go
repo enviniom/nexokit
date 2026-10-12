@@ -25,8 +25,11 @@ func TestGormRepository_GetByPublicID_WithDomains(t *testing.T) {
 
 	repo := NewRepository(db)
 	got, err := repo.GetByPublicID("cmp_01")
-	if err != nil || len(got.Domains) != 1 {
-		t.Fatalf("expected company with one domain, got err=%v domains=%d", err, len(got.Domains))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Domains) != 1 || got.Domains[0].PublicID != "dom_01" || got.Domains[0].CompanyID != company.ID {
+		t.Fatalf("expected associated domain, got %+v", got.Domains)
 	}
 }
 

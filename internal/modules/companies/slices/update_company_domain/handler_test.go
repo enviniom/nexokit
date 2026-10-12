@@ -14,13 +14,40 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type fakeUpdateDomainService struct{ err error }
+type fakeUpdateDomainService struct {
+	err   error
+	calls int
+}
 
 func (f *fakeUpdateDomainService) UpdateDomain(string, string, company_domain.UpdateCompanyDomainRequest) (*company_domain.CompanyDomainResponse, error) {
+	f.calls++
 	if f.err != nil {
 		return nil, f.err
 	}
 	return &company_domain.CompanyDomainResponse{PublicID: "dom_01"}, nil
+}
+
+func TestHandler_RejectsInvalidInputBeforeService(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tt := range []struct{ name, body, field string }{
+		{"empty normalized domain", `{"domain":"   ","kind":"alias","status":"active"}`, "domain"},
+		{"primary redirect", `{"domain":"acme.com","kind":"primary","status":"active","redirect_to_primary":true}`, "redirect_to_primary"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &fakeUpdateDomainService{}
+			r := gin.New()
+			r.PUT("/companies/:id/domains/:domain_id", NewHandler(svc).Handle)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodPut, "/companies/cmp_01/domains/dom_01", bytes.NewBufferString(tt.body)))
+			var resp response.ValidationErrorResponse
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+			if w.Code != http.StatusUnprocessableEntity || svc.calls != 0 || len(resp.Errors[tt.field]) == 0 {
+				t.Fatalf("status=%d service calls=%d errors=%v", w.Code, svc.calls, resp.Errors)
+			}
+		})
+	}
 }
 
 func TestHandler_Handle(t *testing.T) {

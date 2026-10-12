@@ -53,6 +53,17 @@ func TestService_CreateDomain_DuplicateAndPrimaryConflict(t *testing.T) {
 	}
 }
 
+func TestService_CreateDomain_PersistsNormalizedDomain(t *testing.T) {
+	repo := &fakeDomainRepo{company: &company.Company{BaseModel: shared.BaseModel{ID: 10, PublicID: "cmp_01"}}}
+	got, err := NewService(repo).CreateDomain("cmp_01", company_domain.CreateCompanyDomainRequest{Domain: "  ACME.COM  ", Kind: core.CompanyDomainKindAlias, Status: core.CompanyDomainStatusActive, RedirectToPrimary: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repo.created == nil || repo.created.Domain != "acme.com" || repo.created.CompanyID != 10 || !repo.created.RedirectToPrimary || got.Domain != "acme.com" || got.CompanyPublicID != "cmp_01" {
+		t.Fatalf("persisted=%+v response=%+v", repo.created, got)
+	}
+}
+
 func TestService_CreateDomain_CompanyNotFound(t *testing.T) {
 	repo := &fakeDomainRepo{}
 	svc := NewService(repo)

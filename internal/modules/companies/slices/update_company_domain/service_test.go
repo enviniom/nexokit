@@ -34,9 +34,13 @@ func (f *fakeUpdateDomainRepo) UpdateDomain(d *company_domain.CompanyDomain) err
 }
 
 func TestService_UpdateDomain(t *testing.T) {
-	svc := NewService(&fakeUpdateDomainRepo{})
+	repo := &fakeUpdateDomainRepo{}
+	svc := NewService(repo)
 	got, err := svc.UpdateDomain("cmp_01", "dom_01", company_domain.UpdateCompanyDomainRequest{Domain: " Acme.com ", Kind: core.CompanyDomainKindAlias, Status: core.CompanyDomainStatusActive, RedirectToPrimary: true})
-	if err != nil || got.Domain != "acme.com" {
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Domain != "acme.com" || repo.updated == nil || repo.updated.Domain != "acme.com" || repo.updated.CompanyID != 10 || !repo.updated.RedirectToPrimary {
 		t.Fatalf("unexpected result: err=%v got=%#v", err, got)
 	}
 }

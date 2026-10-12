@@ -15,15 +15,41 @@ import (
 )
 
 type fakeUpdateService struct {
-	resp *company.CompanyResponse
-	err  error
+	resp  *company.CompanyResponse
+	err   error
+	calls int
 }
 
 func (f *fakeUpdateService) Update(string, company.UpdateCompanyRequest) (*company.CompanyResponse, error) {
+	f.calls++
 	if f.err != nil {
 		return nil, f.err
 	}
 	return f.resp, nil
+}
+
+func TestHandler_RejectsInvalidInputBeforeService(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tt := range []struct{ name, body, field string }{
+		{"missing name", `{"slug":"acme","status":"active"}`, "name"},
+		{"short slug", `{"name":"Acme","slug":"a","status":"active"}`, "slug"},
+		{"invalid status", `{"name":"Acme","slug":"acme","status":"other"}`, "status"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &fakeUpdateService{}
+			r := gin.New()
+			r.PUT("/companies/:id", NewHandler(svc).Handle)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest(http.MethodPut, "/companies/cmp_01", bytes.NewBufferString(tt.body)))
+			var resp response.ValidationErrorResponse
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatal(err)
+			}
+			if w.Code != http.StatusUnprocessableEntity || svc.calls != 0 || len(resp.Errors[tt.field]) == 0 {
+				t.Fatalf("status=%d service calls=%d errors=%v", w.Code, svc.calls, resp.Errors)
+			}
+		})
+	}
 }
 
 func TestHandler_Handle(t *testing.T) {

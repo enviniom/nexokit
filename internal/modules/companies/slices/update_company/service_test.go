@@ -34,12 +34,15 @@ func TestService_Update_PreservesDomains(t *testing.T) {
 	repo := &fakeRepo{byID: map[string]*company.Company{"01H": {BaseModel: shared.BaseModel{PublicID: "01H"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive, Domains: []company_domain.CompanyDomain{{BaseModel: shared.BaseModel{PublicID: "D1"}, Domain: "acme.com"}}}}, bySlug: map[string]*company.Company{}}
 	svc := NewService(repo)
 
-	res, err := svc.Update("01H", company.UpdateCompanyRequest{Name: "Acme New", Slug: "acme", Status: core.CompanyStatusInactive})
+	res, err := svc.Update("01H", company.UpdateCompanyRequest{Name: "  Acme New  ", Slug: "  ACME  ", Status: core.CompanyStatusInactive})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if res.Status != core.CompanyStatusInactive {
 		t.Fatalf("expected inactive response, got %#v", res)
+	}
+	if repo.updated == nil || res.Name != "  Acme New  " || res.Slug != "acme" || repo.updated.Name != res.Name || repo.updated.Slug != res.Slug {
+		t.Fatalf("name must be preserved and slug normalized: response=%+v persisted=%+v", res, repo.updated)
 	}
 	if repo.updated == nil || len(repo.updated.Domains) != 1 || repo.updated.Domains[0].PublicID != "D1" {
 		t.Fatalf("expected update to preserve domains, got %#v", repo.updated)
