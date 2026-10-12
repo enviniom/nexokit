@@ -2,6 +2,7 @@ package list_companies
 
 import (
 	"encoding/json"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,20 +13,20 @@ import (
 )
 
 type fakeListService struct {
-	req   core.ListCompaniesRequest
-	data  []core.CompanyResponse
+	req   company.ListCompaniesRequest
+	data  []company.CompanyResponse
 	total int64
 	err   error
 }
 
-func (f *fakeListService) List(req core.ListCompaniesRequest) ([]core.CompanyResponse, int64, error) {
+func (f *fakeListService) List(req company.ListCompaniesRequest) ([]company.CompanyResponse, int64, error) {
 	f.req = req
 	return f.data, f.total, f.err
 }
 
 func TestHandler_List(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	svc := &fakeListService{data: []core.CompanyResponse{{PublicID: "01H", Status: core.CompanyStatusActive}}, total: 1}
+	svc := &fakeListService{data: []company.CompanyResponse{{PublicID: "01H", Status: core.CompanyStatusActive}}, total: 1}
 	r := gin.New()
 	r.GET("/companies", NewHandler(svc).Handle)
 
@@ -38,7 +39,7 @@ func TestHandler_List(t *testing.T) {
 	if !svc.req.IncludeInactive || svc.req.ListParams.Pagination.Page != 2 || svc.req.ListParams.Pagination.PerPage != 5 || svc.req.ListParams.Filters.Status != "active" || svc.req.ListParams.Search.Query != "acme" {
 		t.Fatalf("unexpected request parsed: %#v", svc.req)
 	}
-	var resp response.APIResponse[[]core.CompanyResponse]
+	var resp response.APIResponse[[]company.CompanyResponse]
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}

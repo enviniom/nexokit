@@ -2,6 +2,7 @@ package delete_company
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -15,10 +16,10 @@ func TestGormRepository_DeleteSoftDeletes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&core.Company{}); err != nil {
+	if err := db.AutoMigrate(&company.Company{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	company := core.Company{BaseModel: shared.BaseModel{PublicID: "company_delete"}, Name: "Delete", Slug: "delete", Status: core.CompanyStatusActive}
+	company := company.Company{BaseModel: shared.BaseModel{PublicID: "company_delete"}, Name: "Delete", Slug: "delete", Status: core.CompanyStatusActive}
 	if err := db.Create(&company).Error; err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -34,7 +35,7 @@ func TestGormRepository_DeleteSoftDeletes(t *testing.T) {
 
 func TestGormRepository_GetByPublicID_NotFound(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	_ = db.AutoMigrate(&core.Company{})
+	_ = db.AutoMigrate(&company.Company{})
 
 	repo := NewRepository(db)
 	_, err := repo.GetByPublicID("missing")
@@ -45,7 +46,7 @@ func TestGormRepository_GetByPublicID_NotFound(t *testing.T) {
 
 func TestGormRepository_Delete_ZeroRowsIsNotFound(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	_ = db.AutoMigrate(&core.Company{})
+	_ = db.AutoMigrate(&company.Company{})
 	err := NewRepository(db).Delete("missing")
 	if !errors.Is(err, core.ErrCompanyNotFound) {
 		t.Fatalf("expected ErrCompanyNotFound, got %v", err)

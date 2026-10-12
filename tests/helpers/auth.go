@@ -1,12 +1,12 @@
 package helpers
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"io"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/enviniom/nexokit/internal/modules/companies"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
@@ -116,7 +116,7 @@ func SeedAuthActor(t *testing.T, db *gorm.DB, opts UserOptions) Actor {
 		opts.RoleSlug = iamcore.AdminRoleSlug
 	}
 	if opts.CompanyID != nil {
-		company := companies.Company{}
+		company := company.Company{}
 		if err := db.First(&company, *opts.CompanyID).Error; err != nil {
 			t.Fatalf("company for actor not found: %v", err)
 		}

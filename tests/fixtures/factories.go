@@ -2,9 +2,10 @@ package fixtures
 
 import (
 	"fmt"
+	"github.com/enviniom/nexokit/internal/modules/companies/core"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"github.com/enviniom/nexokit/internal/modules/iam/core/permission"
 
-	"github.com/enviniom/nexokit/internal/modules/companies"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
@@ -12,15 +13,15 @@ import (
 	"github.com/enviniom/nexokit/internal/shared"
 )
 
-func BuildCompany(slug string) companies.Company {
+func BuildCompany(slug string) company.Company {
 	if slug == "" {
 		slug = "acme"
 	}
-	return companies.Company{
+	return company.Company{
 		BaseModel: shared.BaseModel{PublicID: fmt.Sprintf("company-%s", slug)},
 		Name:      fmt.Sprintf("Company %s", slug),
 		Slug:      slug,
-		Status:    companies.CompanyStatusActive,
+		Status:    core.CompanyStatusActive,
 	}
 }
 

@@ -2,18 +2,19 @@ package update_company_domain
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
 	"github.com/enviniom/nexokit/internal/platform/shared/string"
 )
 
 type Service interface {
-	UpdateDomain(companyPublicID, domainPublicID string, req core.UpdateCompanyDomainRequest) (*core.CompanyDomainResponse, error)
+	UpdateDomain(companyPublicID, domainPublicID string, req company_domain.UpdateCompanyDomainRequest) (*company_domain.CompanyDomainResponse, error)
 }
 type service struct{ repo Repository }
 
 func NewService(repo Repository) Service { return &service{repo: repo} }
-func (s *service) UpdateDomain(companyPublicID, domainPublicID string, req core.UpdateCompanyDomainRequest) (*core.CompanyDomainResponse, error) {
+func (s *service) UpdateDomain(companyPublicID, domainPublicID string, req company_domain.UpdateCompanyDomainRequest) (*company_domain.CompanyDomainResponse, error) {
 	c, err := s.repo.GetByPublicID(companyPublicID)
 	if err != nil {
 		return nil, err
@@ -44,5 +45,7 @@ func (s *service) UpdateDomain(companyPublicID, domainPublicID string, req core.
 	if err := s.repo.UpdateDomain(d); err != nil {
 		return nil, err
 	}
-	return &core.CompanyDomainResponse{PublicID: d.PublicID, CompanyPublicID: c.PublicID, Domain: d.Domain, Status: d.Status, Kind: d.Kind, RedirectToPrimary: d.RedirectToPrimary, CreatedAt: d.CreatedAt, UpdatedAt: d.UpdatedAt}, nil
+	var dto company_domain.CompanyDomainResponse
+	dto.FromModel(*d, c.PublicID)
+	return &dto, nil
 }

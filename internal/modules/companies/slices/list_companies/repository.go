@@ -2,23 +2,24 @@ package list_companies
 
 import (
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"github.com/enviniom/nexokit/internal/modules/companies/queries"
 	"github.com/enviniom/nexokit/internal/platform/gormutil"
 	"gorm.io/gorm"
 )
 
 type Repository interface {
-	List(req core.ListCompaniesRequest) ([]core.Company, int64, error)
+	List(req company.ListCompaniesRequest) ([]company.Company, int64, error)
 }
 
 type GormRepository struct{ db *gorm.DB }
 
 func NewRepository(db *gorm.DB) *GormRepository { return &GormRepository{db: db} }
 
-func (r *GormRepository) List(req core.ListCompaniesRequest) ([]core.Company, int64, error) {
-	var rows []core.Company
+func (r *GormRepository) List(req company.ListCompaniesRequest) ([]company.Company, int64, error) {
+	var rows []company.Company
 	var total int64
-	db := r.db.Model(&core.Company{})
+	db := r.db.Model(&company.Company{})
 	if !req.IncludeInactive {
 		db = db.Where("status = ?", core.CompanyStatusActive)
 	}

@@ -2,6 +2,8 @@ package view_company
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -12,12 +14,12 @@ import (
 
 func TestGormRepository_GetByPublicID_WithDomains(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	_ = db.AutoMigrate(&core.Company{}, &core.CompanyDomain{})
-	company := core.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}
+	_ = db.AutoMigrate(&company.Company{}, &company_domain.CompanyDomain{})
+	company := company.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}
 	if err := db.Create(&company).Error; err != nil {
 		t.Fatalf("seed company: %v", err)
 	}
-	if err := db.Create(&core.CompanyDomain{BaseModel: shared.BaseModel{PublicID: "dom_01"}, CompanyID: company.ID, Domain: "acme.com", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindPrimary}).Error; err != nil {
+	if err := db.Create(&company_domain.CompanyDomain{BaseModel: shared.BaseModel{PublicID: "dom_01"}, CompanyID: company.ID, Domain: "acme.com", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindPrimary}).Error; err != nil {
 		t.Fatalf("seed domain: %v", err)
 	}
 
@@ -30,7 +32,7 @@ func TestGormRepository_GetByPublicID_WithDomains(t *testing.T) {
 
 func TestGormRepository_GetByPublicID_NotFound(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	_ = db.AutoMigrate(&core.Company{})
+	_ = db.AutoMigrate(&company.Company{})
 
 	repo := NewRepository(db)
 	_, err := repo.GetByPublicID("missing")

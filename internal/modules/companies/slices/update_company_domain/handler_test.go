@@ -3,6 +3,7 @@ package update_company_domain
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,11 +16,11 @@ import (
 
 type fakeUpdateDomainService struct{ err error }
 
-func (f *fakeUpdateDomainService) UpdateDomain(string, string, core.UpdateCompanyDomainRequest) (*core.CompanyDomainResponse, error) {
+func (f *fakeUpdateDomainService) UpdateDomain(string, string, company_domain.UpdateCompanyDomainRequest) (*company_domain.CompanyDomainResponse, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &core.CompanyDomainResponse{PublicID: "dom_01"}, nil
+	return &company_domain.CompanyDomainResponse{PublicID: "dom_01"}, nil
 }
 
 func TestHandler_Handle(t *testing.T) {

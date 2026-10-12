@@ -3,13 +3,15 @@ package integration_test
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/enviniom/nexokit/internal/modules/companies/core"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/middleware"
-	"github.com/enviniom/nexokit/internal/modules/companies"
+
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
@@ -34,8 +36,8 @@ func TestUsersIsolation(t *testing.T) {
 	if err := db.Create(&adminRole).Error; err != nil {
 		t.Fatalf("seed admin role: %v", err)
 	}
-	companyOne := companies.Company{BaseModel: shared.BaseModel{ID: 1, PublicID: "company-acme"}, Name: "Acme", Slug: "acme", Status: companies.CompanyStatusActive}
-	companyTwo := companies.Company{BaseModel: shared.BaseModel{ID: 2, PublicID: "company-globex"}, Name: "Globex", Slug: "globex", Status: companies.CompanyStatusActive}
+	companyOne := company.Company{BaseModel: shared.BaseModel{ID: 1, PublicID: "company-acme"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}
+	companyTwo := company.Company{BaseModel: shared.BaseModel{ID: 2, PublicID: "company-globex"}, Name: "Globex", Slug: "globex", Status: core.CompanyStatusActive}
 	if err := db.Create(&companyOne).Error; err != nil {
 		t.Fatalf("seed company one: %v", err)
 	}
@@ -119,7 +121,7 @@ func newUsersIsolationDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	if err := db.AutoMigrate(&iamrole.IAMRole{}, &companies.Company{}, &iamuser.IAMUser{}); err != nil {
+	if err := db.AutoMigrate(&iamrole.IAMRole{}, &company.Company{}, &iamuser.IAMUser{}); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}
 	return db

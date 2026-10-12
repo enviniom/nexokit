@@ -1,6 +1,8 @@
 package companies
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -14,16 +16,16 @@ func TestResolver_ResolveHostUsesActiveDomainAndCompany(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&core.Company{}, &core.CompanyDomain{}); err != nil {
+	if err := db.AutoMigrate(&company.Company{}, &company_domain.CompanyDomain{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	company := core.Company{BaseModel: shared.BaseModel{PublicID: "company_acme"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}
+	company := company.Company{BaseModel: shared.BaseModel{PublicID: "company_acme"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}
 	if err := db.Create(&company).Error; err != nil {
 		t.Fatalf("create company: %v", err)
 	}
-	alias := core.CompanyDomain{BaseModel: shared.BaseModel{PublicID: "d1"}, CompanyID: company.ID, Domain: "www.acme.com", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindAlias, RedirectToPrimary: true}
-	primary := core.CompanyDomain{BaseModel: shared.BaseModel{PublicID: "d2"}, CompanyID: company.ID, Domain: "acme.com", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindPrimary}
-	if err := db.Create(&[]core.CompanyDomain{alias, primary}).Error; err != nil {
+	alias := company_domain.CompanyDomain{BaseModel: shared.BaseModel{PublicID: "d1"}, CompanyID: company.ID, Domain: "www.acme.com", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindAlias, RedirectToPrimary: true}
+	primary := company_domain.CompanyDomain{BaseModel: shared.BaseModel{PublicID: "d2"}, CompanyID: company.ID, Domain: "acme.com", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindPrimary}
+	if err := db.Create(&[]company_domain.CompanyDomain{alias, primary}).Error; err != nil {
 		t.Fatalf("create domains: %v", err)
 	}
 

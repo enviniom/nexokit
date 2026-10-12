@@ -2,6 +2,7 @@ package update_company_domain
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
 	"github.com/enviniom/nexokit/internal/platform/messages"
@@ -14,7 +15,7 @@ type Handler struct{ service Service }
 
 func NewHandler(service Service) *Handler { return &Handler{service: service} }
 func (h *Handler) Handle(c *gin.Context) {
-	var req core.UpdateCompanyDomainRequest
+	var req company_domain.UpdateCompanyDomainRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return

@@ -1,22 +1,22 @@
 package view_company
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/companies/core"
 	"github.com/gin-gonic/gin"
 )
 
-type fakeViewService struct{ resp *core.CompanyResponse }
+type fakeViewService struct{ resp *company.CompanyResponse }
 
-func (f *fakeViewService) GetByPublicID(string) (*core.CompanyResponse, error) { return f.resp, nil }
+func (f *fakeViewService) GetByPublicID(string) (*company.CompanyResponse, error) { return f.resp, nil }
 
 func TestHandler_Handle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	r.GET("/companies/:id", NewHandler(&fakeViewService{resp: &core.CompanyResponse{PublicID: "cmp_01"}}).Handle)
+	r.GET("/companies/:id", NewHandler(&fakeViewService{resp: &company.CompanyResponse{PublicID: "cmp_01"}}).Handle)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/companies/cmp_01", nil))
 	if w.Code != http.StatusOK {

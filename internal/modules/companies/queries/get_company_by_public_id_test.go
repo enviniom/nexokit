@@ -1,6 +1,8 @@
 package queries
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -11,7 +13,7 @@ import (
 
 func TestGetCompanyByPublicID(t *testing.T) {
 	db := newTestDB(t)
-	seed := core.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}
+	seed := company.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}
 	if err := db.Create(&seed).Error; err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -31,7 +33,7 @@ func newTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	if err := db.AutoMigrate(&core.Company{}, &core.CompanyDomain{}); err != nil {
+	if err := db.AutoMigrate(&company.Company{}, &company_domain.CompanyDomain{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 	return db

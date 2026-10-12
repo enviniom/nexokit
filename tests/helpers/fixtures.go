@@ -1,10 +1,10 @@
 package helpers
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"github.com/enviniom/nexokit/internal/modules/iam/core/permission"
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/companies"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	"github.com/enviniom/nexokit/tests/fixtures"
@@ -20,7 +20,7 @@ func SeedRole(t *testing.T, db *gorm.DB, slug string) iamrole.IAMRole {
 	return role
 }
 
-func SeedCompany(t *testing.T, db *gorm.DB, slug string) companies.Company {
+func SeedCompany(t *testing.T, db *gorm.DB, slug string) company.Company {
 	t.Helper()
 	company := fixtures.BuildCompany(slug)
 	if err := db.Create(&company).Error; err != nil {
@@ -38,7 +38,7 @@ func SeedPermission(t *testing.T, db *gorm.DB, module, action string) permission
 	return permission
 }
 
-func SeedUserWithRole(t *testing.T, db *gorm.DB, publicID string, role iamrole.IAMRole, company *companies.Company) iamuser.IAMUser {
+func SeedUserWithRole(t *testing.T, db *gorm.DB, publicID string, role iamrole.IAMRole, company *company.Company) iamuser.IAMUser {
 	t.Helper()
 	var companyID *uint
 	if company != nil {

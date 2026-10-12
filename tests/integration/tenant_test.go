@@ -1,13 +1,14 @@
 package integration_test
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/middleware"
-	"github.com/enviniom/nexokit/internal/modules/companies"
+
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
@@ -25,7 +26,7 @@ func TestTenantIsolationIntegration(t *testing.T) {
 	}
 
 	gin.SetMode(gin.TestMode)
-	db := helpers.NewSQLiteDB(t, &iamrole.IAMRole{}, &companies.Company{}, &iamuser.IAMUser{})
+	db := helpers.NewSQLiteDB(t, &iamrole.IAMRole{}, &company.Company{}, &iamuser.IAMUser{})
 	rootRole := helpers.SeedRole(t, db, iamcore.RootRoleSlug)
 	adminRole := helpers.SeedRole(t, db, iamcore.AdminRoleSlug)
 	companyA := helpers.SeedCompany(t, db, "acme")

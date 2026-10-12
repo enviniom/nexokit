@@ -2,6 +2,7 @@ package delete_company
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -12,11 +13,11 @@ type fakeDeleteRepo struct {
 	err     error
 }
 
-func (f *fakeDeleteRepo) GetByPublicID(string) (*core.Company, error) {
+func (f *fakeDeleteRepo) GetByPublicID(string) (*company.Company, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &core.Company{}, nil
+	return &company.Company{}, nil
 }
 func (f *fakeDeleteRepo) Delete(id string) error { f.deleted = id; return nil }
 

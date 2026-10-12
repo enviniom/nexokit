@@ -1,10 +1,10 @@
 package helpers
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"testing"
 	"time"
 
-	"github.com/enviniom/nexokit/internal/modules/companies"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
@@ -86,7 +86,7 @@ func TestAuthHelpers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			db := NewSQLiteDB(t, &iamrole.IAMRole{}, &companies.Company{}, &iamuser.IAMUser{})
+			db := NewSQLiteDB(t, &iamrole.IAMRole{}, &company.Company{}, &iamuser.IAMUser{})
 			company := SeedCompany(t, db, "acme")
 			user := SeedUser(t, db, UserOptions{PublicID: tt.publicID, Email: tt.publicID + "@example.com", Name: tt.publicID, RoleSlug: tt.roleSlug, CompanyID: &company.ID})
 			state := &DBState{db: db}

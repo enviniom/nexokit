@@ -1,6 +1,8 @@
 package queries
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -9,11 +11,11 @@ import (
 
 func TestCountActivePrimaryDomains(t *testing.T) {
 	db := newTestDB(t)
-	company := core.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}
+	company := company.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}
 	if err := db.Create(&company).Error; err != nil {
 		t.Fatalf("seed company: %v", err)
 	}
-	rows := []core.CompanyDomain{
+	rows := []company_domain.CompanyDomain{
 		{BaseModel: shared.BaseModel{PublicID: "dom_01"}, CompanyID: company.ID, Domain: "a.acme.com", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindPrimary},
 		{BaseModel: shared.BaseModel{PublicID: "dom_02"}, CompanyID: company.ID, Domain: "b.acme.com", Status: core.CompanyDomainStatusInactive, Kind: core.CompanyDomainKindPrimary},
 	}

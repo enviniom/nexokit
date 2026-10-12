@@ -2,6 +2,8 @@ package companies
 
 import (
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"gorm.io/gorm"
 )
@@ -11,7 +13,7 @@ type Resolver struct{ db *gorm.DB }
 func NewResolver(db *gorm.DB) *Resolver { return &Resolver{db: db} }
 
 func (r *Resolver) FindByPublicIDOrSlug(value string) (tenant.CompanyRef, error) {
-	var company core.Company
+	var company company.Company
 	if err := r.db.Where("public_id = ? OR slug = ?", value, value).First(&company).Error; err != nil {
 		return tenant.CompanyRef{}, err
 	}
@@ -19,7 +21,7 @@ func (r *Resolver) FindByPublicIDOrSlug(value string) (tenant.CompanyRef, error)
 }
 
 func (r *Resolver) ResolveHost(host string) (tenant.HostResolution, error) {
-	var domain core.CompanyDomain
+	var domain company_domain.CompanyDomain
 	if err := r.db.Preload("Company").
 		Joins("JOIN companies ON companies.id = company_domains.company_id").
 		Where("company_domains.domain = ? AND company_domains.status = ? AND companies.status = ?", host, core.CompanyDomainStatusActive, core.CompanyStatusActive).
@@ -35,7 +37,7 @@ func (r *Resolver) ResolveHost(host string) (tenant.HostResolution, error) {
 	}
 
 	if domain.RedirectToPrimary {
-		var primary core.CompanyDomain
+		var primary company_domain.CompanyDomain
 		if err := r.db.Where("company_id = ? AND kind = ? AND status = ?", domain.CompanyID, core.CompanyDomainKindPrimary, core.CompanyDomainStatusActive).First(&primary).Error; err == nil {
 			res.PrimaryDomain = &primary.Domain
 		} else if err != gorm.ErrRecordNotFound {

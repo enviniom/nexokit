@@ -2,6 +2,8 @@ package view_company
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -9,11 +11,11 @@ import (
 )
 
 type fakeViewRepo struct {
-	company *core.Company
+	company *company.Company
 	err     error
 }
 
-func (f *fakeViewRepo) GetByPublicID(string) (*core.Company, error) {
+func (f *fakeViewRepo) GetByPublicID(string) (*company.Company, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -21,7 +23,7 @@ func (f *fakeViewRepo) GetByPublicID(string) (*core.Company, error) {
 }
 
 func TestService_GetByPublicID_MapsDomains(t *testing.T) {
-	repo := &fakeViewRepo{company: &core.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive, Domains: []core.CompanyDomain{{BaseModel: shared.BaseModel{PublicID: "dom_01"}, Domain: "acme.com", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindPrimary}}}}
+	repo := &fakeViewRepo{company: &company.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive, Domains: []company_domain.CompanyDomain{{BaseModel: shared.BaseModel{PublicID: "dom_01"}, Domain: "acme.com", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindPrimary}}}}
 	svc := NewService(repo)
 
 	got, err := svc.GetByPublicID("cmp_01")

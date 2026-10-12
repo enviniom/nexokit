@@ -1,7 +1,10 @@
-package core
+package update_company
 
 import (
 	"fmt"
+	"github.com/enviniom/nexokit/internal/modules/companies/core"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/platform/messages"
@@ -10,20 +13,20 @@ import (
 func TestCreateCompanyRequest_Validate(t *testing.T) {
 	tests := []struct {
 		name     string
-		req      CreateCompanyRequest
+		req      company.CreateCompanyRequest
 		wantMsgs map[string]string
 	}{
 		{
 			name: "valid request",
-			req: CreateCompanyRequest{
+			req: company.CreateCompanyRequest{
 				Name:   "Acme Inc",
 				Slug:   "acme",
-				Status: CompanyStatusActive,
+				Status: core.CompanyStatusActive,
 			},
 		},
 		{
 			name: "all required fields missing",
-			req:  CreateCompanyRequest{},
+			req:  company.CreateCompanyRequest{},
 			wantMsgs: map[string]string{
 				"name": messages.MsgRequired,
 				"slug": messages.MsgRequired,
@@ -31,10 +34,10 @@ func TestCreateCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "name too short",
-			req: CreateCompanyRequest{
+			req: company.CreateCompanyRequest{
 				Name:   "A",
 				Slug:   "acme",
-				Status: CompanyStatusActive,
+				Status: core.CompanyStatusActive,
 			},
 			wantMsgs: map[string]string{
 				"name": fmt.Sprintf(messages.MsgMinLength, 2),
@@ -42,10 +45,10 @@ func TestCreateCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "slug too short",
-			req: CreateCompanyRequest{
+			req: company.CreateCompanyRequest{
 				Name:   "Acme Inc",
 				Slug:   "a",
-				Status: CompanyStatusActive,
+				Status: core.CompanyStatusActive,
 			},
 			wantMsgs: map[string]string{
 				"slug": fmt.Sprintf(messages.MsgMinLength, 2),
@@ -53,7 +56,7 @@ func TestCreateCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid status",
-			req: CreateCompanyRequest{
+			req: company.CreateCompanyRequest{
 				Name:   "Acme Inc",
 				Slug:   "acme",
 				Status: "invalid",
@@ -74,20 +77,20 @@ func TestCreateCompanyRequest_Validate(t *testing.T) {
 func TestUpdateCompanyRequest_Validate(t *testing.T) {
 	tests := []struct {
 		name     string
-		req      UpdateCompanyRequest
+		req      company.UpdateCompanyRequest
 		wantMsgs map[string]string
 	}{
 		{
 			name: "valid request",
-			req: UpdateCompanyRequest{
+			req: company.UpdateCompanyRequest{
 				Name:   "Acme Inc",
 				Slug:   "acme",
-				Status: CompanyStatusActive,
+				Status: core.CompanyStatusActive,
 			},
 		},
 		{
 			name: "all required fields missing",
-			req:  UpdateCompanyRequest{},
+			req:  company.UpdateCompanyRequest{},
 			wantMsgs: map[string]string{
 				"name": messages.MsgRequired,
 				"slug": messages.MsgRequired,
@@ -95,10 +98,10 @@ func TestUpdateCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "name too short",
-			req: UpdateCompanyRequest{
+			req: company.UpdateCompanyRequest{
 				Name:   "A",
 				Slug:   "acme",
-				Status: CompanyStatusActive,
+				Status: core.CompanyStatusActive,
 			},
 			wantMsgs: map[string]string{
 				"name": fmt.Sprintf(messages.MsgMinLength, 2),
@@ -106,10 +109,10 @@ func TestUpdateCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "slug too short",
-			req: UpdateCompanyRequest{
+			req: company.UpdateCompanyRequest{
 				Name:   "Acme Inc",
 				Slug:   "a",
-				Status: CompanyStatusActive,
+				Status: core.CompanyStatusActive,
 			},
 			wantMsgs: map[string]string{
 				"slug": fmt.Sprintf(messages.MsgMinLength, 2),
@@ -117,7 +120,7 @@ func TestUpdateCompanyRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid status",
-			req: UpdateCompanyRequest{
+			req: company.UpdateCompanyRequest{
 				Name:   "Acme Inc",
 				Slug:   "acme",
 				Status: "invalid",
@@ -138,29 +141,29 @@ func TestUpdateCompanyRequest_Validate(t *testing.T) {
 func TestCreateCompanyDomainRequest_Validate(t *testing.T) {
 	tests := []struct {
 		name     string
-		req      CreateCompanyDomainRequest
+		req      company_domain.CreateCompanyDomainRequest
 		wantMsgs map[string]string
 	}{
 		{
 			name: "valid primary request",
-			req: CreateCompanyDomainRequest{
+			req: company_domain.CreateCompanyDomainRequest{
 				Domain: "acme.com",
-				Kind:   CompanyDomainKindPrimary,
-				Status: CompanyDomainStatusActive,
+				Kind:   core.CompanyDomainKindPrimary,
+				Status: core.CompanyDomainStatusActive,
 			},
 		},
 		{
 			name: "valid alias request",
-			req: CreateCompanyDomainRequest{
+			req: company_domain.CreateCompanyDomainRequest{
 				Domain:            "www.acme.com",
-				Kind:              CompanyDomainKindAlias,
-				Status:            CompanyDomainStatusActive,
+				Kind:              core.CompanyDomainKindAlias,
+				Status:            core.CompanyDomainStatusActive,
 				RedirectToPrimary: true,
 			},
 		},
 		{
 			name: "missing fields",
-			req:  CreateCompanyDomainRequest{},
+			req:  company_domain.CreateCompanyDomainRequest{},
 			wantMsgs: map[string]string{
 				"domain": messages.MsgRequired,
 				"kind":   messages.MsgInvalidFormat,
@@ -169,10 +172,10 @@ func TestCreateCompanyDomainRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "domain too short",
-			req: CreateCompanyDomainRequest{
+			req: company_domain.CreateCompanyDomainRequest{
 				Domain: "a",
-				Kind:   CompanyDomainKindPrimary,
-				Status: CompanyDomainStatusActive,
+				Kind:   core.CompanyDomainKindPrimary,
+				Status: core.CompanyDomainStatusActive,
 			},
 			wantMsgs: map[string]string{
 				"domain": fmt.Sprintf(messages.MsgMinLength, 3),
@@ -180,10 +183,10 @@ func TestCreateCompanyDomainRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid kind",
-			req: CreateCompanyDomainRequest{
+			req: company_domain.CreateCompanyDomainRequest{
 				Domain: "acme.com",
 				Kind:   "invalid",
-				Status: CompanyDomainStatusActive,
+				Status: core.CompanyDomainStatusActive,
 			},
 			wantMsgs: map[string]string{
 				"kind": messages.MsgInvalidFormat,
@@ -191,9 +194,9 @@ func TestCreateCompanyDomainRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "invalid status",
-			req: CreateCompanyDomainRequest{
+			req: company_domain.CreateCompanyDomainRequest{
 				Domain: "acme.com",
-				Kind:   CompanyDomainKindPrimary,
+				Kind:   core.CompanyDomainKindPrimary,
 				Status: "invalid",
 			},
 			wantMsgs: map[string]string{
@@ -202,10 +205,10 @@ func TestCreateCompanyDomainRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "redirect on primary kind",
-			req: CreateCompanyDomainRequest{
+			req: company_domain.CreateCompanyDomainRequest{
 				Domain:            "acme.com",
-				Kind:              CompanyDomainKindPrimary,
-				Status:            CompanyDomainStatusActive,
+				Kind:              core.CompanyDomainKindPrimary,
+				Status:            core.CompanyDomainStatusActive,
 				RedirectToPrimary: true,
 			},
 			wantMsgs: map[string]string{
@@ -224,20 +227,20 @@ func TestCreateCompanyDomainRequest_Validate(t *testing.T) {
 func TestUpdateCompanyDomainRequest_Validate(t *testing.T) {
 	tests := []struct {
 		name     string
-		req      UpdateCompanyDomainRequest
+		req      company_domain.UpdateCompanyDomainRequest
 		wantMsgs map[string]string
 	}{
 		{
 			name: "valid request",
-			req: UpdateCompanyDomainRequest{
+			req: company_domain.UpdateCompanyDomainRequest{
 				Domain: "www.acme.com",
-				Kind:   CompanyDomainKindAlias,
-				Status: CompanyDomainStatusActive,
+				Kind:   core.CompanyDomainKindAlias,
+				Status: core.CompanyDomainStatusActive,
 			},
 		},
 		{
 			name: "missing fields",
-			req:  UpdateCompanyDomainRequest{},
+			req:  company_domain.UpdateCompanyDomainRequest{},
 			wantMsgs: map[string]string{
 				"domain": messages.MsgRequired,
 				"kind":   messages.MsgInvalidFormat,
@@ -246,10 +249,10 @@ func TestUpdateCompanyDomainRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "domain too short",
-			req: UpdateCompanyDomainRequest{
+			req: company_domain.UpdateCompanyDomainRequest{
 				Domain: "a",
-				Kind:   CompanyDomainKindPrimary,
-				Status: CompanyDomainStatusActive,
+				Kind:   core.CompanyDomainKindPrimary,
+				Status: core.CompanyDomainStatusActive,
 			},
 			wantMsgs: map[string]string{
 				"domain": fmt.Sprintf(messages.MsgMinLength, 3),
@@ -257,10 +260,10 @@ func TestUpdateCompanyDomainRequest_Validate(t *testing.T) {
 		},
 		{
 			name: "redirect on primary kind",
-			req: UpdateCompanyDomainRequest{
+			req: company_domain.UpdateCompanyDomainRequest{
 				Domain:            "acme.com",
-				Kind:              CompanyDomainKindPrimary,
-				Status:            CompanyDomainStatusActive,
+				Kind:              core.CompanyDomainKindPrimary,
+				Status:            core.CompanyDomainStatusActive,
 				RedirectToPrimary: true,
 			},
 			wantMsgs: map[string]string{

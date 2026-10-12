@@ -2,18 +2,19 @@ package update_company
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
 	"github.com/enviniom/nexokit/internal/platform/shared/string"
 )
 
 type Service interface {
-	Update(publicID string, req core.UpdateCompanyRequest) (*core.CompanyResponse, error)
+	Update(publicID string, req company.UpdateCompanyRequest) (*company.CompanyResponse, error)
 }
 type service struct{ repo Repository }
 
 func NewService(repo Repository) Service { return &service{repo: repo} }
-func (s *service) Update(publicID string, req core.UpdateCompanyRequest) (*core.CompanyResponse, error) {
+func (s *service) Update(publicID string, req company.UpdateCompanyRequest) (*company.CompanyResponse, error) {
 	c, err := s.repo.GetByPublicID(publicID)
 	if err != nil {
 		return nil, err
@@ -28,5 +29,7 @@ func (s *service) Update(publicID string, req core.UpdateCompanyRequest) (*core.
 	if err := s.repo.Update(c); err != nil {
 		return nil, err
 	}
-	return &core.CompanyResponse{PublicID: c.PublicID, Name: c.Name, Slug: c.Slug, Status: c.Status, CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt, CreatedBy: c.CreatedBy, UpdatedBy: c.UpdatedBy}, nil
+	var dto company.CompanyResponse
+	dto.FromModel(*c, false)
+	return &dto, nil
 }

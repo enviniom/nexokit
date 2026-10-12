@@ -1,18 +1,18 @@
 package list_company_domains
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/companies/core"
 	"github.com/gin-gonic/gin"
 )
 
 type fakeListDomainsService struct{}
 
-func (f *fakeListDomainsService) ListDomains(string) ([]core.CompanyDomainResponse, error) {
-	return []core.CompanyDomainResponse{{PublicID: "dom_01", Domain: "acme.com"}}, nil
+func (f *fakeListDomainsService) ListDomains(string) ([]company_domain.CompanyDomainResponse, error) {
+	return []company_domain.CompanyDomainResponse{{PublicID: "dom_01", Domain: "acme.com"}}, nil
 }
 
 func TestHandler_Handle(t *testing.T) {

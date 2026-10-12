@@ -3,6 +3,7 @@ package create_company_domain
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,11 +16,11 @@ import (
 
 type fakeCreateDomainService struct{ err error }
 
-func (f *fakeCreateDomainService) CreateDomain(string, core.CreateCompanyDomainRequest) (*core.CompanyDomainResponse, error) {
+func (f *fakeCreateDomainService) CreateDomain(string, company_domain.CreateCompanyDomainRequest) (*company_domain.CompanyDomainResponse, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &core.CompanyDomainResponse{PublicID: "dom_01"}, nil
+	return &company_domain.CompanyDomainResponse{PublicID: "dom_01"}, nil
 }
 
 func TestHandler_Handle(t *testing.T) {

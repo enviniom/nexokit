@@ -1,10 +1,10 @@
 package helpers
 
 import (
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"github.com/enviniom/nexokit/internal/modules/iam/core/permission"
 	"testing"
 
-	"github.com/enviniom/nexokit/internal/modules/companies"
 	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
@@ -14,7 +14,7 @@ import (
 func TestFixtures_SeedRelationshipAwareData(t *testing.T) {
 	t.Parallel()
 
-	db := NewSQLiteDB(t, &iamrole.IAMRole{}, &companies.Company{}, &iamuser.IAMUser{}, &permission.IAMPermission{})
+	db := NewSQLiteDB(t, &iamrole.IAMRole{}, &company.Company{}, &iamuser.IAMUser{}, &permission.IAMPermission{})
 
 	company := SeedCompany(t, db, "acme")
 	role := SeedRole(t, db, iamcore.AdminRoleSlug)

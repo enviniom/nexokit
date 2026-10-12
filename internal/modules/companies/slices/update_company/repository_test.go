@@ -2,6 +2,7 @@ package update_company
 
 import (
 	"errors"
+	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -13,8 +14,8 @@ import (
 func TestGormRepository_GetByPublicID_DelegatesToQueries(t *testing.T) {
 	// Query behavior is covered in companies/queries tests. This test verifies repository wiring/delegation semantics.
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	_ = db.AutoMigrate(&core.Company{})
-	_ = db.Create(&core.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}).Error
+	_ = db.AutoMigrate(&company.Company{})
+	_ = db.Create(&company.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}).Error
 
 	repo := NewRepository(db)
 	got, err := repo.GetByPublicID("cmp_01")
@@ -25,7 +26,7 @@ func TestGormRepository_GetByPublicID_DelegatesToQueries(t *testing.T) {
 
 func TestGormRepository_GetByPublicID_NotFound(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	_ = db.AutoMigrate(&core.Company{})
+	_ = db.AutoMigrate(&company.Company{})
 
 	repo := NewRepository(db)
 	_, err := repo.GetByPublicID("missing")
@@ -36,12 +37,12 @@ func TestGormRepository_GetByPublicID_NotFound(t *testing.T) {
 
 func TestGormRepository_Update_UniqueViolation(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	_ = db.AutoMigrate(&core.Company{})
-	_ = db.Create(&core.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}).Error
-	_ = db.Create(&core.Company{BaseModel: shared.BaseModel{PublicID: "cmp_02"}, Name: "Other", Slug: "other", Status: core.CompanyStatusActive}).Error
+	_ = db.AutoMigrate(&company.Company{})
+	_ = db.Create(&company.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive}).Error
+	_ = db.Create(&company.Company{BaseModel: shared.BaseModel{PublicID: "cmp_02"}, Name: "Other", Slug: "other", Status: core.CompanyStatusActive}).Error
 
 	repo := NewRepository(db)
-	company := &core.Company{BaseModel: shared.BaseModel{PublicID: "cmp_02"}, Name: "Other", Slug: "acme", Status: core.CompanyStatusActive}
+	company := &company.Company{BaseModel: shared.BaseModel{PublicID: "cmp_02"}, Name: "Other", Slug: "acme", Status: core.CompanyStatusActive}
 	err := repo.Update(company)
 	if !errors.Is(err, core.ErrDuplicateCompanySlug) {
 		t.Fatalf("expected ErrDuplicateCompanySlug, got %v", err)
@@ -50,8 +51,8 @@ func TestGormRepository_Update_UniqueViolation(t *testing.T) {
 
 func TestGormRepository_Update_ZeroRowsIsNotFound(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	_ = db.AutoMigrate(&core.Company{})
-	err := NewRepository(db).Update(&core.Company{BaseModel: shared.BaseModel{PublicID: "missing"}, Name: "Missing", Slug: "missing", Status: core.CompanyStatusActive})
+	_ = db.AutoMigrate(&company.Company{})
+	err := NewRepository(db).Update(&company.Company{BaseModel: shared.BaseModel{PublicID: "missing"}, Name: "Missing", Slug: "missing", Status: core.CompanyStatusActive})
 	if !errors.Is(err, core.ErrCompanyNotFound) {
 		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
 	}
