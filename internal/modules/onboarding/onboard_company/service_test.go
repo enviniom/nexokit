@@ -3,7 +3,9 @@ package onboard_company
 import (
 	"context"
 	"errors"
+	"github.com/enviniom/nexokit/internal/shared"
 	"testing"
+	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
 	"gorm.io/driver/sqlite"
@@ -211,4 +213,108 @@ func TestService_Onboard_DuplicateEmail_Rollback(t *testing.T) {
 	if !errors.Is(err, core.ErrDuplicateAdminEmail) {
 		t.Fatalf("expected duplicate email, got: %v", err)
 	}
+}
+
+// countingHasher verifies conflicts are rejected before credential provisioning.
+type countingHasher struct {
+	calls int
+	err   error
+}
+
+func (h *countingHasher) HashPassword(string) (string, error) {
+	h.calls++
+	return "hash", h.err
+}
+
+func onboardingCounts(t *testing.T, db *gorm.DB) []int64 {
+	t.Helper()
+	counts := make([]int64, 6)
+	for i, table := range []string{"companies", "company_domains", "roles", "users", "permissions", "role_permissions"} {
+		if err := db.Table(table).Count(&counts[i]).Error; err != nil {
+			t.Fatalf("count %s: %v", table, err)
+		}
+	}
+	return counts
+}
+
+func assertOnboardingCounts(t *testing.T, db *gorm.DB, want []int64) {
+	t.Helper()
+	got := onboardingCounts(t, db)
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("table index %d: count %d, want %d", i, got[i], want[i])
+		}
+	}
+}
+
+func TestService_Onboard_SoftDeletedKeysPreventProvisioning(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		want error
+	}{
+		{"slug", core.ErrDuplicateCompanySlug},
+		{"primary domain", core.ErrDuplicateCompanyDomain},
+		{"technical domain", core.ErrDuplicateTechnicalDomain},
+		{"email", core.ErrDuplicateAdminEmail},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := setupTestDB(t)
+			seedPermissions(t, db)
+			req := baseRequest()
+			deleted := shared.BaseModel{PublicID: "reserved_record", DeletedAt: gorm.DeletedAt{Time: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}}
+			var record any
+			switch tc.name {
+			case "slug":
+				record = &core.OnboardingCompany{BaseModel: deleted, Name: "Reserved", Slug: req.Slug, Status: core.CompanyStatusActive}
+			case "primary domain", "technical domain":
+				domain := "acme.example.com"
+				kind := core.DomainKindPrimary
+				if tc.name == "primary domain" {
+					req.Domain = &domain
+				} else {
+					req.GenerateTechnicalDomain = true
+					kind = core.DomainKindTechnical
+				}
+				record = &core.OnboardingCompanyDomain{BaseModel: deleted, CompanyID: 99, Domain: domain, Kind: kind, Status: core.DomainStatusActive}
+			case "email":
+				record = &core.OnboardingUser{BaseModel: deleted, Name: "Reserved", Email: req.AdminEmail, PasswordHash: "hash", RoleID: 99}
+			}
+			if err := db.Create(record).Error; err != nil {
+				t.Fatalf("seed reserved key: %v", err)
+			}
+			before := onboardingCounts(t, db)
+			hasher := &countingHasher{}
+			res, err := NewService(NewRepository(db), hasher, "example.com").Onboard(context.Background(), req)
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("expected %v, got %v", tc.want, err)
+			}
+			if res != nil {
+				t.Errorf("conflict returned successful response: %#v", res)
+			}
+			if hasher.calls != 0 {
+				t.Errorf("conflict reached password hashing %d times", hasher.calls)
+			}
+			assertOnboardingCounts(t, db, before)
+		})
+	}
+}
+
+func TestService_Onboard_HashFailureRollsBackProvisioning(t *testing.T) {
+	db := setupTestDB(t)
+	seedPermissions(t, db)
+	before := onboardingCounts(t, db)
+	failure := errors.New("test hashing failure")
+	hasher := &countingHasher{err: failure}
+	req := baseRequest()
+	domain := "acme.org"
+	req.Domain = &domain
+	req.GenerateTechnicalDomain = true
+	res, err := NewService(NewRepository(db), hasher, "example.com").Onboard(context.Background(), req)
+	if !errors.Is(err, failure) || res != nil {
+		t.Fatalf("expected propagated hash failure and nil response, got %v, %v", res, err)
+	}
+	if hasher.calls != 1 {
+		t.Fatalf("expected late hashing failure, calls=%d", hasher.calls)
+	}
+	assertOnboardingCounts(t, db, before)
 }

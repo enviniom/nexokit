@@ -2,7 +2,9 @@ package queries
 
 import (
 	"errors"
+	"gorm.io/gorm"
 	"testing"
+	"time"
 
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
 	"github.com/enviniom/nexokit/internal/shared"
@@ -20,6 +22,13 @@ func TestCheckSlugAvailable(t *testing.T) {
 		t.Fatalf("seed company: %v", err)
 	}
 
+	if err := db.Create(&core.OnboardingCompany{
+		BaseModel: shared.BaseModel{PublicID: "deleted_slug", DeletedAt: gorm.DeletedAt{Time: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Valid: true}},
+		Name:      "Deleted", Slug: "reserved", Status: core.CompanyStatusActive,
+	}).Error; err != nil {
+		t.Fatalf("seed soft-deleted record: %v", err)
+	}
+
 	tests := []struct {
 		name    string
 		slug    string
@@ -27,6 +36,7 @@ func TestCheckSlugAvailable(t *testing.T) {
 	}{
 		{name: "available", slug: "globex", wantErr: nil},
 		{name: "duplicate", slug: "acme", wantErr: core.ErrDuplicateCompanySlug},
+		{name: "soft-deleted slug remains reserved", slug: "reserved", wantErr: core.ErrDuplicateCompanySlug},
 	}
 
 	for _, tt := range tests {
