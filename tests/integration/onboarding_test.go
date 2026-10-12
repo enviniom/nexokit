@@ -1,4 +1,4 @@
-package onboard_company_test
+package integration_test
 
 import (
 	"encoding/json"
@@ -23,6 +23,9 @@ func (wiringHasher) HashPassword(string) (string, error) { return "test-hash", n
 
 // This verifies module wiring, not production authentication or PostgreSQL migrations.
 func TestRegister_ProvisionsCompanyThroughContainer(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
 	gin.SetMode(gin.TestMode)
 	db := helpers.NewSQLiteDB(t, &company.OnboardingCompany{}, &company_domain.OnboardingCompanyDomain{}, &permission.OnboardingPermission{}, &role.OnboardingRole{}, &user.OnboardingUser{})
 	if err := db.Exec("CREATE TABLE role_permissions (role_id integer not null, permission_id integer not null)").Error; err != nil {
