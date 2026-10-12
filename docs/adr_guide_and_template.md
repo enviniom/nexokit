@@ -4,7 +4,7 @@ Record why a consequential design was chosen; keep day-to-day implementation rul
 
 ## Location and lifecycle
 
-The planned destination is `docs/adr/`. This directory has not been created and no ADR records exist yet. Use sequential names such as `0001-short-title.md`, not year-based numbering.
+Store records in `docs/adr/`. Use sequential names such as `0001-short-title.md`, not year-based numbering.
 
 | Status | Meaning |
 |---|---|
@@ -13,7 +13,7 @@ The planned destination is `docs/adr/`. This directory has not been created and 
 | Superseded | Replaced; link its successor |
 | Deprecated | No longer applicable |
 
-Keep accepted records as history; add a successor when the decision changes. Update living guides to reflect accepted outcomes and actual rollout status.
+Keep accepted records as history; add a successor when the decision changes. Update living guides to reflect accepted structure and contracts; keep necessary rollout caveats in operational guidance.
 
 ## Template
 

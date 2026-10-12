@@ -29,7 +29,7 @@ These are commands for the adopter to run, not part of a documentation-only veri
 | IAM | Authentication, access/refresh tokens, sessions, users, roles, permissions and authenticated-user lookup |
 | onboarding | Root-controlled creation of a company and its initial identities |
 
-Removing a module is more than removing its folder: remove its imports, container fields/construction, injected dependencies and `RegisterModules` mounting in `internal/app/container.go`. Review `SyncPermissions`, tenant resolvers, auth lookup, CLI root creation, seeds, migrations, fixtures and tests. Authentication is internal to IAM under `slices/auth`, not an independently constructed or registered module. Its credential, session and token projections remain separate from IAM entity models. Current private routing relies on companies; CLI root creation relies on IAM. Choose an alternate identity/tenant policy before removing those capabilities.
+Removing a module is more than removing its folder: remove its imports, container fields/construction, injected dependencies and `RegisterModules` mounting in `internal/app/container.go`. Review `SyncPermissions`, tenant resolvers, auth lookup, CLI root creation, seeds, migrations, fixtures and tests. Authentication is internal to IAM under `slices/auth`, not an independently constructed or registered module. Its credential, session and token projections remain separate from IAM entity models. Private tenant resolution depends on companies; CLI root creation depends on IAM. Choose an alternate identity/tenant policy before removing those capabilities.
 
 For a fresh project, adjust initial schema and seeds coherently. For an existing deployed project, preserve migration history and add reviewed forward migrations rather than deleting already-applied files.
 
@@ -39,11 +39,11 @@ For a fresh project, adjust initial schema and seeds coherently. For an existing
 go run ./cmd/nexokit make module widgets --crud --migration --tenant
 ```
 
-`widgets` is an illustrative new domain, not a shipped module. New scaffolds include `core/widgets/model.go`/`dtos.go`, module `core/contracts.go`/`errors.go`, handler + repository packages under `slices/<use_case>/`, and root `container.go`/`routes.go`. Without `--crud`, only get/list slices and routes are generated. Existing legacy application modules are not migrated.
+`widgets` is an illustrative new domain, not a shipped module. New scaffolds include `core/widgets/model.go`/`dtos.go`, module `core/contracts.go`/`errors.go`, handler + repository packages under `slices/<use_case>/`, and root `container.go`/`routes.go`. Without `--crud`, only get/list slices and routes are generated. The command scaffolds a new module; it does not transform other modules.
 
 To adopt the generated module:
 
-1. Review the model, validation and placeholder migration; implement the actual schema (including tenant ownership/indexes for `--tenant`). The entity hook generates ULID public IDs; responses omit internal relationship/audit IDs.
+1. Define the model, validation and migration schema together, including tenant ownership/indexes for `--tenant`; generated SQL is a migration stub, not a deployable schema. The entity hook generates ULID public IDs; responses omit internal relationship/audit IDs.
 2. Construct `widgets.NewContainer(db)` in the app composition root and explicitly call `widgets.Register(group, container)`. Generation never edits the app or automatically mounts routes. Choose authentication, permission guards and trusted tenant middleware before registration; configure GORM `TranslateError` to classify database constraint failures.
 3. For tenant operations, select a company through trusted middleware, not JSON. Create/get/update/delete reject missing or global scope; lists alone permit explicitly trusted root-global scope. JSON `company_id` cannot select/reassign ownership and is not exposed in responses.
 4. Test normalization, safe error responses, own/foreign-company reads and writes, soft deletion and root-global policy. Add a service only when business policy/orchestration warrants it; simple CRUD stays two layers.

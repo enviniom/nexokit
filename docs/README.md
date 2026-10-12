@@ -1,6 +1,6 @@
 # NexoKit documentation
 
-NexoKit is a reusable Go API base with auth, companies, IAM and onboarding modules. Examples describe guidance unless explicitly identified as current behavior.
+NexoKit is a reusable Go API base with auth, companies, IAM and onboarding modules. These guides define intended structure and contracts; operational caveats identify deployment and security constraints.
 
 ## Start here
 
@@ -20,20 +20,20 @@ NexoKit is a reusable Go API base with auth, companies, IAM and onboarding modul
 3. [API validation and errors](api_validation_and_errors.md): envelopes, list inputs, sanitization, domain errors and safe logging.
 4. [Testing and quality](testing_and_quality.md): fakes, database tests, isolation and verification targets.
 
-[Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping) is the single owner of entity DTO placement/mapping and the temporary centralized contract convention; it describes entity-owned models/DTOs for Auth, IAM, Companies and onboarding. These guides own the cross-cutting rules. References link back instead of redefining those rules; present source and future design guidance must not be confused.
+[Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping) is the single owner of entity DTO placement/mapping and the centralized contract convention; it describes entity-owned models/DTOs for Auth, IAM, Companies and onboarding. These guides own the cross-cutting rules. References link back instead of redefining those rules; operational caveats remain separate from architectural requirements.
 
 ## Specialized references
 
 | Area | Reference | Unique detail |
 |---|---|---|
-| Runtime | [Request flow](references/runtime/request-flow.md) | Middleware order and actual private route scopes |
+| Runtime | [Request flow](references/runtime/request-flow.md) | Middleware order and private route policy |
 | Runtime | [CLI](references/runtime/cli.md) | Commands, flags, root creation and seed execution |
-| Security | [Auth tokens](references/security/auth-tokens.md) | Claims, refresh lifecycle and current safety limits |
+| Security | [Auth tokens](references/security/auth-tokens.md) | Claims, refresh lifecycle and operational security caveats |
 | Security | [Permissions and RBAC](references/security/permissions-and-rbac.md) | Guards and permission identities |
 | Security | [Permission sync](references/security/permissions-sync.md) | Startup discovery, persistence and admin assignment |
 | Infrastructure | [Multitenancy](references/infrastructure/multitenancy.md) | Context fields, root selection and repository isolation |
 | Infrastructure | [Domains](references/infrastructure/domains.md) | Host resolution and optional public middleware |
-| Infrastructure | [Cache](references/infrastructure/cache.md) | Redis/no-op behavior and readiness limitations |
-| Infrastructure | [Rate limiting](references/infrastructure/rate-limiting.md) | Keys, drivers, fallback and effective quota limitations |
+| Infrastructure | [Cache](references/infrastructure/cache.md) | Adapter contracts and operational readiness caveats |
+| Infrastructure | [Rate limiting](references/infrastructure/rate-limiting.md) | Scope, drivers, fallback and operational quota caveats |
 
-Keep these references separate: their runtime and security details are not daily architectural rules. Significant future decisions belong in `docs/adr/`; the [ADR guide](adr_guide_and_template.md) defines the process without claiming records already exist.
+Use the operational caveat sections in these references alongside the [deployment runbook](deployment.md) before relying on security or availability guarantees. Significant design decisions belong in `docs/adr/`; the [ADR guide](adr_guide_and_template.md) defines their naming and lifecycle.

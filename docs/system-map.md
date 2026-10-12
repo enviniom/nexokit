@@ -1,6 +1,6 @@
 # Application map
 
-NexoKit composes three modules into a Go/Gin API. Use this map to locate a change before reading the [slice conventions](architecture_and_vsa.md).
+The Go/Gin API organizes identity, tenant administration and onboarding into three modules. Use this map to locate a change before reading the [slice conventions](architecture_and_vsa.md).
 
 ## Entrypoints and startup
 
@@ -12,22 +12,22 @@ NexoKit composes three modules into a Go/Gin API. Use this map to locate a chang
 | `internal/app/container.go` | Constructs modules and injects capabilities; mounts module routes |
 | `internal/app/app.go` | Starts server; stops server, database, cache and limiter |
 
-Bootstrap creates the server but does not run migrations or start listening. `Start()` listens; `Stop()` closes resources in order and returns on the first close failure. Configuration optionally loads `.env` from the working directory; existing environment values take precedence.
+Keep resource construction in bootstrap, listening in `Start()` and resource shutdown in `Stop()`. Run migrations as a separate deployment step. Configuration optionally loads `.env` from the working directory; existing environment values take precedence. Shutdown failure handling belongs in the [deployment runbook](deployment.md#tls-and-supervision).
 
 ## Routing and modules
 
 All module routes are under `/api/v1`; health endpoints are unversioned. IAM URLs do **not** have an `/iam` prefix.
 
-| Module | Mounted paths | Responsibility / scope |
+| Module | Route paths | Responsibility / scope |
 |---|---|---|
 | IAM authentication | `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/me` | IAM-owned `slices/auth`: credentials, opaque refresh rotation/revocation and current session; only `/auth/me` applies bearer auth |
 | companies | `/companies`, `/companies/:id`, `/companies/:id/domains`, `/companies/:id/domains/:domain_id` | Company and domain administration; mostly root guards |
 | IAM | `/users`, `/roles`, `/permissions` and entity subroutes | Users, roles and permission catalog in `slices/{users,roles,permissions}`; capabilities in `slices/internal` via `slices/capabilities.go`; users require selected tenant, roles/permissions allow root-global scope |
 | onboarding | `POST /onboarding/companies` | Root-authenticated company onboarding, **not public self-signup** |
 
-IAM constructs authentication and registers its routes on the public v1 group, with rate limits on login/refresh and bearer auth on `/auth/me`. Authentication does not inherit global/tenant scope middleware.
+IAM owns authentication construction and registration on the public v1 group. Apply login/refresh limits and bearer auth on `/auth/me`; authentication routes do not inherit tenant-scope middleware.
 
-The app mounts `Auth` + `AllowRootGlobalScope` for companies, roles, permissions and onboarding; users use `Auth` + `RequireTenantScope`. Route-specific permission/role guards follow. See [request flow](references/runtime/request-flow.md) for the authoritative middleware sequence and root selection table.
+Use `Auth` + `AllowRootGlobalScope` for companies, roles, permissions and onboarding; use `Auth` + `RequireTenantScope` for users. Apply route-specific permission/role guards afterward. See [request flow](references/runtime/request-flow.md) for the authoritative middleware sequence and root selection table.
 
 ## Platform and infrastructure
 
@@ -42,7 +42,7 @@ The app mounts `Auth` + `AllowRootGlobalScope` for companies, roles, permissions
 | `internal/shared` | Shared persistence base fields |
 | `migrations/`, `seeds/` | Schema and explicit initialization functions |
 
-Capabilities are not all mounted features: `PublicTenant` exists but the current app container does not attach it to public business routes. Rate limiting is attached to auth login/refresh, not as a global router middleware. [Deployment](deployment.md) explains the operational implications.
+Select middleware explicitly for each route surface; a platform capability alone does not establish route policy. Public host resolution follows [domains](references/infrastructure/domains.md); throttling scope and effective quotas follow [rate limiting](references/infrastructure/rate-limiting.md). Read their operational caveats before deployment.
 
 ## Follow a change
 

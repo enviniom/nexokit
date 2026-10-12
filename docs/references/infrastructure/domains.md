@@ -1,6 +1,6 @@
 # Company domains and optional host resolution
 
-Companies own domain records and a resolver; this is general tenant infrastructure. Public host middleware exists but is **not mounted** by the current app container. Private header selection follows [multitenancy](multitenancy.md), not host matching.
+Companies own domain records and host resolution as tenant infrastructure. Register public host middleware explicitly on public tenant surfaces. Private header selection follows [multitenancy](multitenancy.md), not host matching.
 
 ## Domain resolution
 
@@ -10,13 +10,16 @@ When host resolution fails, only `APP_ENV=development` permits `X-Tenant` fallba
 
 Company domains carry primary/alias/technical kind and optional `RedirectToPrimary`. If an alias requests redirect and an active primary domain is found, middleware emits 308, preserving request URI/path/query. Scheme comes from the first `X-Forwarded-Proto` value, TLS or URL, then defaults to HTTP. Only trusted proxies should supply forwarded headers; see [deployment](../../deployment.md#tls-and-supervision).
 
-## Current safeguards and limitations
+## Administration policy
+
+Keep company domain administration root-guarded under `/api/v1/companies/:id/domains`. Onboarding may create an explicit primary domain and an optional technical domain derived from `APP_PLATFORM_DOMAIN`. Domain records do not provision DNS, verify domain ownership or issue TLS certificates; operators manage DNS, certificates and proxy routing separately.
+
+## Operational caveats
 
 - Ordinary GORM domain queries filter domain soft deletion. The resolver's join does **not explicitly filter `companies.deleted_at`**; do not claim a comprehensive deleted-company host rejection guarantee from it.
 - Company status is checked for host matching, not universally for credential login or private header lookup.
 - `PublicTenant` caches successful host/header lookups for five minutes in closure-local maps. No invalidation or synchronization is present; do not assume immediate domain revocation or concurrent-map safety.
-- Domain records do not provision DNS, verify domain ownership or issue TLS certificates. Operators must manage DNS, certificates and proxy routing separately.
 
-Before mounting public routes, address/test those isolation and concurrency concerns for the intended deployment. Company domain administration is currently root-guarded under `/api/v1/companies/:id/domains`; onboarding can create an explicit primary domain and an optional technical domain derived from `APP_PLATFORM_DOMAIN`.
+Before mounting public routes, address/test these isolation and concurrency concerns for the intended deployment. Middleware registration alone does not establish safe public host resolution.
 
 Sources: `internal/modules/companies/resolver.go`, `internal/modules/companies/core/company_domain/model.go`, `internal/modules/companies/routes.go`; `internal/middleware/tenant.go`; `internal/modules/onboarding/slices/onboard_company/service.go` and `repository.go`.

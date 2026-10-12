@@ -4,7 +4,7 @@ Run the project-local CLI from the repository/release root: `go run ./cmd/nexoki
 
 ## Commands and Make equivalents
 
-| Command | Actual effect | Make equivalent |
+| Command | Effect | Make equivalent |
 |---|---|---|
 | `help`, `--help`, `-h` | List top-level commands | — |
 | `serve` | Bootstrap/start API; interrupt/SIGTERM shutdown | `make dev` |
@@ -55,7 +55,7 @@ Plain CRUD uses handler + repository, not a pass-through service. DTO pointer va
 
 Tenant handlers resolve `tenant.FromGin`; missing/invalid scope returns 400 before persistence. Create/get/update/delete require a selected company. Create assigns `company_id` from trusted scope; JSON `company_id` is ignored and is never returned. Updates cannot reassign ownership. Every repository read/write explicitly applies scope; only list permits a trusted root-global context established by deliberate middleware policy. Lists support normalized pagination (maximum 100), name search, creation-date filters and an explicit sorting allowlist (`name`, `created_at`, `updated_at`); there is no status field/filter in this scaffold.
 
-Generation does **not** migrate existing modules or wire routes into the app. Construct the generated container and explicitly register it on a group with appropriate authentication, permissions and tenant middleware. Review the placeholder migration, schema and route policy before use; generated migration stubs are not a finished tenant schema. Existing target directories are refused rather than overwritten. See [adoption](../../starter-template.md).
+Generation is a scaffolding operation, separate from app composition and schema deployment. Construct the generated container and explicitly register it on a group with appropriate authentication, permissions and tenant middleware. Define and review the migration schema and route policy before use; generated SQL is a stub, not a deployable tenant schema. Existing target directories are refused rather than overwritten. See [adoption](../../starter-template.md).
 
 ## Root creation and password handling
 
@@ -63,7 +63,7 @@ Flags `--name`, `--email`, `--password` override `ROOT_USER_NAME`, `ROOT_USER_EM
 
 Non-local/non-test environments require typing `yes`, unless `--force` skips confirmation. Use that override only for controlled automation. The prompt uses ordinary scanner input and **does not hide the password**. Prefer secure environment injection; avoid `--password` in shell history/process listings, and do not log credentials.
 
-Persistence is implemented: the command connects to PostgreSQL and uses `password.Manager` plus `rootStorage`. It finds the IAM role with slug `root`, hashes the password, generates a public ID and inserts an active user linked to that role. Run migrations and required IAM seeds first; the command does not create the role. If any user already has that root role, it prints a skip message and returns success. The existence check and insert are separate operations, not a serialized/transactional concurrency guarantee—run root provisioning once, not concurrently.
+The command connects to PostgreSQL and uses `password.Manager` plus `rootStorage`. It finds the IAM role with slug `root`, hashes the password, generates a public ID and inserts an active user linked to that role. Run migrations and required IAM seeds first; the command does not create the role. If any user already has that root role, it prints a skip message and returns success. The existence check and insert are separate operations, not a serialized/transactional concurrency guarantee—run root provisioning once, not concurrently.
 
 Sources: `internal/cli/commands/createroot.go`, `root_storage.go`, `internal/cli/root/root.go`.
 

@@ -33,7 +33,7 @@ Ship `bin/api`, `bin/nexokit` and `migrations/` in a versioned release directory
 | `CACHE_DRIVER`, `REDIS_HOST/PORT/PASSWORD/DB`, `REDIS_DIAL_TIMEOUT_SECONDS` | `none` or `redis`; understand [cache/readiness limits](references/infrastructure/cache.md) |
 | `RATE_LIMIT_ENABLED/DRIVER/GLOBAL_RPM/LOGIN_RPM/REFRESH_RPM/WINDOW_SECONDS/CLEANUP_INTERVAL_MINUTES` | Review [effective quota limits](references/infrastructure/rate-limiting.md) before relying on defaults |
 
-Configuration loading **does not enforce** secret strength, mandatory production TLS/CORS or a nonempty PASETO key. The token manager hashes whatever key string is supplied. These are operator requirements, not boot-time guarantees. `nexokit config` is a masked partial display, not a full security check.
+**Operational security caveat:** Configuration loading **does not enforce** secret strength, mandatory production TLS/CORS or a nonempty PASETO key. The token manager hashes whatever key string is supplied. These are operator requirements, not boot-time guarantees. `nexokit config` is a masked partial display, not a full security check.
 
 ## Migrate and provision
 
@@ -62,7 +62,7 @@ Seeding needs source, Go, writable `.tmp/` and DB access; run it from a suitable
 
 Run `./bin/api` under systemd, a container supervisor or an equivalent service manager. Set the working directory, environment, restricted service user, restart policy, resource limits and writable log paths. The API listens on `:APP_PORT`; firewall the backend so only the proxy/internal network can reach it.
 
-Terminate TLS at a trusted reverse proxy/load balancer. Preserve intended Host and overwrite client-supplied `X-Forwarded-For` / `X-Forwarded-Proto`; do not merely append untrusted values. Current limiter reads the first forwarded IP directly, and optional public-domain redirects trust forwarded scheme. Enforce proxy trust at the network/proxy layer. Restrict CORS, protect admin endpoints and keep dependency services private.
+Terminate TLS at a trusted reverse proxy/load balancer. Preserve intended Host and overwrite client-supplied `X-Forwarded-For` / `X-Forwarded-Proto`; do not merely append untrusted values. **Operational security caveat:** The limiter reads the first forwarded IP directly, and optional public-domain redirects trust forwarded scheme. Enforce proxy trust at the network/proxy layer. Restrict CORS, protect admin endpoints and keep dependency services private.
 
 On SIGTERM/interrupt the API attempts graceful shutdown with the configured timeout. Monitor shutdown failures; `App.Stop` returns on the first component failure and does not guarantee every later resource was closed.
 
@@ -74,7 +74,7 @@ On SIGTERM/interrupt the API attempts graceful shutdown with the configured time
 | `GET /health/live` | Process responds; does not probe dependencies |
 | `GET /health/ready` | DB ping and optional cache read, five-second request timeout; 200 or 503 |
 
-Readiness exposes dependency error strings; keep it on internal monitoring paths rather than public diagnostics. Cache misses currently count as readiness errors, including Redis-to-no-op fallback with cache configured enabled. Do not promise successful readiness on healthy empty caches.
+**Operational readiness caveat:** Readiness exposes dependency error strings; keep it on internal monitoring paths rather than public diagnostics. Cache misses currently count as readiness errors, including Redis-to-no-op fallback with cache configured enabled. Do not promise successful readiness on healthy empty caches.
 
 After rollout, check probes **and** a real authenticated/tenant-scoped request; watch error rate, latency and database/log signals against your baseline. Route traffic only when the checks fit your actual cache configuration. The CLI `status` exit code is not a health guarantee. Forward rotating application, error and access logs to the chosen monitoring system.
 

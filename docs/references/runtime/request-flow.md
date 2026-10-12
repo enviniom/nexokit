@@ -1,10 +1,10 @@
 # Request flow
 
-This reference owns middleware ordering and actual route scopes. [Multitenancy](../infrastructure/multitenancy.md) owns tenant-context and repository isolation rules; [the application map](../../system-map.md) locates the composition sources.
+This reference owns middleware ordering and route-scope policy. [Multitenancy](../infrastructure/multitenancy.md) owns tenant-context and repository isolation rules; [the application map](../../system-map.md) locates the composition sources.
 
 ## Global middleware
 
-`internal/server/router.go` registers:
+Keep global middleware in `internal/server/router.go` in this order:
 
 ```text
 RequestID → DebugErrors → GinLogger → Logger → ErrorLogger → Recovery → CORS
@@ -14,7 +14,7 @@ Gin unwinds middleware after the handler in reverse order. Recovery attaches pan
 
 Health routes are unversioned. `Container.RegisterModules` mounts business routes below `/api/v1`.
 
-## Actual route paths
+## Route policy
 
 | Surface | Middleware before handler |
 |---|---|
@@ -29,7 +29,7 @@ Paths in this table are relative to `/api/v1`. Onboarding requires root and is n
 
 ## Authenticated context
 
-`middleware.Auth` validates bearer PASETO, resolves a fresh sanitized user through the injected IAM resolver, rejects inactive/missing users and stores `authctx.User`. IAM's resolver already loads role permissions into that user. `AttachPermissions` exists as a helper but is **not mounted** by the current app container; do not draw it as a required step in today's request chain.
+`middleware.Auth` validates bearer PASETO, resolves a fresh sanitized user through the injected IAM resolver, rejects inactive/missing users and stores `authctx.User`. IAM's resolver supplies role permissions with that user, so permission guards consume the authenticated context without a separate permission-attachment step.
 
 Tenant middleware runs after auth. Root users may select a company by public ID or slug via `X-Company-ID`. For `/users`, root must select a company (missing header is 400); on global-capable groups root may omit it. Non-root users are scoped to their authenticated company; their selection header is ignored. See the [complete decision table](../infrastructure/multitenancy.md#private-resolution).
 
@@ -41,7 +41,7 @@ Private tenant-owned handlers read `tenant.FromGin(c)`, then pass the context to
 
 ## Optional public tenant capability
 
-`middleware.PublicTenant` and `companies.Resolver.ResolveHost` exist but are not attached to business routes by the current composition. If adding a public tenant surface, explicitly wire the middleware and test it. Exact domain matching, development header fallback, redirects and current limitations belong in [domains](../infrastructure/domains.md).
+For a public tenant surface, explicitly register `middleware.PublicTenant` with `companies.Resolver.ResolveHost` and test host-based isolation. Do not substitute public host resolution for private authenticated selection. Exact domain matching, development header fallback, redirects and operational caveats belong in [domains](../infrastructure/domains.md).
 
 ## Review path
 
