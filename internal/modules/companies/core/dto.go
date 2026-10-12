@@ -63,7 +63,7 @@ type UpdateCompanyRequest struct {
 	Status string `json:"status"`
 }
 
-func (r CreateCompanyRequest) Validate() validator.ValidationErrors {
+func (r *CreateCompanyRequest) Validate() validator.ValidationErrors {
 	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	validator.Field(errs, "slug", r.Slug).Required().Apply(validator.MinLength(2))
@@ -73,7 +73,7 @@ func (r CreateCompanyRequest) Validate() validator.ValidationErrors {
 	return errs
 }
 
-func (r UpdateCompanyRequest) Validate() validator.ValidationErrors {
+func (r *UpdateCompanyRequest) Validate() validator.ValidationErrors {
 	errs := make(validator.ValidationErrors)
 	validator.Field(errs, "name", r.Name).Required().Apply(validator.MinLength(2))
 	validator.Field(errs, "slug", r.Slug).Required().Apply(validator.MinLength(2))
@@ -83,10 +83,10 @@ func (r UpdateCompanyRequest) Validate() validator.ValidationErrors {
 	return errs
 }
 
-func (r CreateCompanyDomainRequest) Validate() validator.ValidationErrors {
+func (r *CreateCompanyDomainRequest) Validate() validator.ValidationErrors {
+	r.Domain = str.NormalizeDomain(r.Domain)
 	errs := make(validator.ValidationErrors)
-	domain := str.NormalizeDomain(r.Domain)
-	validator.Field(errs, "domain", domain).Required().Apply(validator.MinLength(3))
+	validator.Field(errs, "domain", r.Domain).Required().Apply(validator.MinLength(3))
 	if !validCompanyDomainKind(r.Kind) {
 		errs.Add("kind", messages.MsgInvalidFormat)
 	}
@@ -99,10 +99,10 @@ func (r CreateCompanyDomainRequest) Validate() validator.ValidationErrors {
 	return errs
 }
 
-func (r UpdateCompanyDomainRequest) Validate() validator.ValidationErrors {
+func (r *UpdateCompanyDomainRequest) Validate() validator.ValidationErrors {
+	r.Domain = str.NormalizeDomain(r.Domain)
 	errs := make(validator.ValidationErrors)
-	domain := str.NormalizeDomain(r.Domain)
-	validator.Field(errs, "domain", domain).Required().Apply(validator.MinLength(3))
+	validator.Field(errs, "domain", r.Domain).Required().Apply(validator.MinLength(3))
 	if !validCompanyDomainKind(r.Kind) {
 		errs.Add("kind", messages.MsgInvalidFormat)
 	}

@@ -1,0 +1,39 @@
+# Companies and onboarding: verified normative alignment
+
+## Objective and authorization
+Audit both modules and their consumers, implement safe minimal corrections, and verify observable contracts against the repository normative documentation. User explicitly chose autonomous implementation and authorized this feature branch and Conventional Commits. No push, PR, merge, destructive Git, production service or data changes. Auth and IAM behavior are excluded.
+
+Branch: `refactor/companies-onboarding-verification`. Initial tree clean on `main`. RDD observed off (global); no review authority lifecycle will be invented.
+
+## Constraints and decisions
+- Preserve HTTP fields/envelopes/statuses, business rules, permissions, tenant isolation, schema and effective compatibility. No new tests in core, containers or routes.
+- Use IAM as an architectural reference, not a behavior template. Keep onboarding local persistence records independent of companies/IAM; no sibling-module imports.
+- Entity models/DTOs move to entity-owned packages; central contracts/errors remain in parent core; entity packages do not import parent core. Remove internal compatibility aliases after repository consumers migrate. Go `internal` import boundaries and exhaustive repository inventory support this internal refactor; no published external contract was evidenced.
+- Association exception explicitly approved by user: use a company_domain-owned minimal company association record, retaining `CompanyDomain.Company`, FK/reference semantics and `companies` table mapping; concrete Go field type may change to avoid bidirectional entity import cycle. Preserve schema/HTTP/tenant behavior; verify table name and association loading in permitted slice tests.
+- Preserve domain service normalization, name/slug behavior, optional JSON fields and nil/empty response shapes. DTOs own mapping; validation pointer receivers must not silently introduce new product normalization.
+- Unproven soft-delete conflict and admin uniqueness findings are hypotheses until reproduced. Preserve schema and current effective uniqueness policy; no new reuse semantics.
+- Single writer. Deterministic behavior corrections require observed RED/GREEN; structural moves use focused existing tests plus behavior/serialization tests where meaningful.
+- Shutdown is authorized only after verified completion, saved report and commits, with no running agents; unavailable permissions or blocked/unverified work prevent a successful shutdown claim.
+
+## Normative references
+`docs/architecture_and_vsa.md`, `docs/testing_and_quality.md`, `docs/boundaries_and_cqrs.md`, `docs/api_validation_and_errors.md`, `docs/references/infrastructure/multitenancy.md`, `docs/references/infrastructure/domains.md`, `docs/normative_traceability_matrix.md`.
+
+## Tasks and acceptance
+- [ ] T1 (in progress): Align companies entity models/DTO ownership and mapping, retire aliases and migrate all repository consumers. Preserve tenant/domain/HTTP behavior. Add slice-owned validation/mapping/serialization regression evidence; focused companies and affected integration tests pass. Update normative current-state docs with this unit. Commit pending.
+- [ ] T2 (pending): Reproduce onboarding soft-deleted uniqueness conflict risk and minimally correct proven conflict behavior without schema or product changes. Assert specific current migration constraints/table names in allowed tests as applicable. If risk is disproved, record evidence rather than invent a fix. Focused query/repository/HTTP tests pass, with observed RED/GREEN for any behavioral fix. Commit pending.
+- [ ] T3 (pending): Align onboarding entity record/DTO layout and discoverable slices, central contracts and consumers; avoid aliases and sibling imports. Preserve atomic bootstrap and HTTP contract. Add permitted slice/integration serialization and table-name coverage; focused onboarding/integration pass. Update current-state docs. Commit pending.
+- [ ] T4 (pending): Verify focused modules, integration, full suite, vet, formatting and diff/module checks; independently review final diff as assessment requires. Deliver prioritized findings with path:line, classification/impact/evidence/minimum recommendation, commits, scope/risk/checks and pending items. Save final review report; commit verification documentation. Shutdown only if completed safely.
+
+## Initial audit evidence
+- Normative: companies root aliases `internal/modules/companies/model.go:5-23`, `dto.go:3-11`; service mapping e.g. `slices/view_company/service.go:16-21`, `list_companies/service.go:26`; value receiver validation `core/dto.go:66,76,86,102`.
+- Normative: onboarding flat DTO/model `internal/modules/onboarding/core/dto.go:1-26`, `core/model.go`; local TableName assertions need verification.
+- Functional hypothesis: onboarding availability checks `queries/check_domain_available.go:10-14`, `check_slug_available.go:10-14` may disagree with soft-deleted unique rows. Admin error classification `onboard_company/repository.go:132-135` remains unproven, not an authorized new behavior requirement.
+- Consumers: companies resolver/queries/slices and `tests/fixtures`, `tests/helpers`, `tests/integration`; app composition retains its module container import. Onboarding does not import companies; its local record boundary must remain.
+
+## Verification evidence
+Explorers performed read-only audits; no executed tests claimed from exploration. Baseline: `go test ./internal/modules/companies/... ./internal/modules/onboarding/...` exit 0 (cached); `go test ./tests/integration/...` exit 0 (fresh 0.495s); `go vet ./...`, `gofmt -l .`, `git diff --check`, `make check-module-errors` all exit 0, no drift. No pre-existing failure observed. `go test ./...` NOT RUN: `internal/infra/cache/redis_test.go` writes fixed external keys against active localhost:6379, and rate-limit tests also connect; disposable status unknown. Verifier investigates safe network-isolated execution and is authorized a clearly labelled short suite if external tests skip. PostgreSQL/migration execution is not implied by SQLite integration success; no production/schema mutation authorized. Companies/onboarding lack production-wired HTTP integration flows; add only justified permitted regression coverage, record remaining gaps.
+
+## Progress and next step
+T1 partial: writer implemented pointer validation receivers in `companies/core/dto.go` and slice regression `slices/create_company_domain/validation_test.go`. RED: fresh companies tests failed because create/update kept `  ACME.COM  ` unchanged. GREEN: same fresh module run passed after correction; alternate normalized input, name/slug preservation, empty-domain and primary redirect checks passed. Fresh helpers/fixtures/integration, diff and module guard passed. No ownership/alias/consumer/doc migration performed; no stubs created. ASSESS unassessable (untracked scope), so independent verifier `mv4tdcll-a-vcps` checks this small work unit before parent commits. T1 remains unchecked.
+
+Association cycle resolved by explicit user approval of minimal local company record. Worker deletion prohibition resolved by normal edits/new files and eventual parent mechanical removal of verified redundant tracked stubs; do not ask worker to delete/rename. Resume remaining cohesive structural migration after validation unit evidence/commit. No full-suite success claimed. T2 follow-up confirms source/schema uniqueness mismatch for soft-deleted slug/domain/email; execute regression RED before narrow exact-key unscoped checks, with explicit use-case justification. Generic public-ID uniqueness misclassification deferred as optional. Parent owns task reconciliation, commits, full mirror and visible projection; final full-suite safety investigation proceeds read-only independently.
