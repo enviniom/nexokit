@@ -19,4 +19,4 @@ Company domains carry primary/alias/technical kind and optional `RedirectToPrima
 
 Before mounting public routes, address/test those isolation and concurrency concerns for the intended deployment. Company domain administration is currently root-guarded under `/api/v1/companies/:id/domains`; onboarding can create an explicit primary domain and an optional technical domain derived from `APP_PLATFORM_DOMAIN`.
 
-Sources: `internal/modules/companies/resolver.go`, `core/model.go`, `routes.go`; `internal/middleware/tenant.go`; onboarding service/repository.
+Sources: `internal/modules/companies/resolver.go`, `internal/modules/companies/core/company_domain/model.go`, `internal/modules/companies/routes.go`; `internal/middleware/tenant.go`; `internal/modules/onboarding/slices/onboard_company/service.go` and `repository.go`.

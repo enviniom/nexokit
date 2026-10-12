@@ -20,7 +20,7 @@ NexoKit is a reusable Go API base with auth, companies, IAM and onboarding modul
 3. [API validation and errors](api_validation_and_errors.md): envelopes, list inputs, sanitization, domain errors and safe logging.
 4. [Testing and quality](testing_and_quality.md): fakes, database tests, isolation and verification targets.
 
-[Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping) is the single owner of entity DTO placement/mapping and the temporary centralized contract convention; it distinguishes current Auth/IAM entity packages from the legacy flat Companies/onboarding layout. These guides own the cross-cutting rules. References link back instead of redefining those rules; present source and future design guidance must not be confused.
+[Architecture §4](architecture_and_vsa.md#4-models-dtos-and-mapping) is the single owner of entity DTO placement/mapping and the temporary centralized contract convention; it describes entity-owned models/DTOs for Auth, IAM, Companies and onboarding. These guides own the cross-cutting rules. References link back instead of redefining those rules; present source and future design guidance must not be confused.
 
 ## Specialized references
 
