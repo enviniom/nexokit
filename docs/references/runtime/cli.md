@@ -7,6 +7,7 @@ Run the project-local CLI from the repository/release root: `go run ./cmd/nexoki
 | Command | Effect | Make equivalent |
 |---|---|---|
 | `help`, `--help`, `-h` | List top-level commands | — |
+| `init --name <name> --module <module> [--dry-run \| --apply]` | One-time local identity preview; deliberate apply | — |
 | `serve` | Bootstrap/start API; interrupt/SIGTERM shutdown | `make dev` |
 | `config` | Print selected resolved configuration as JSON | — |
 | `status` | Build version, database reachability, SQL file count and Goose version | — |
@@ -21,7 +22,38 @@ Run the project-local CLI from the repository/release root: `go run ./cmd/nexoki
 | `seed` | Discover and execute seed functions | `make seed` |
 | `create-root [--name ...] [--email ...] [--password ...] [--force]` | Persist initial root IAM user | `make create-root` (no flag forwarding) |
 
-`make build` produces `bin/api` and `bin/nexokit`. Migration/seed paths are fixed relative to the working directory (`migrations/`, `seeds/`); there is no directory/config-file flag or migration dry-run flag. Except for module generation and root creation, commands define no custom flags. Top-level unknown commands fail; no arguments print usage and exit 1. `status` can report an unreachable database and still exit successfully—do not use it as a readiness gate.
+`make build` produces `bin/api` and `bin/nexokit`. Migration/seed paths are fixed relative to the working directory (`migrations/`, `seeds/`); there is no directory/config-file flag or migration dry-run flag. Except for initialization, module generation and root creation, commands define no custom flags. Top-level unknown commands fail; no arguments print usage and exit 1. `status` can report an unreachable database and still exit successfully—do not use it as a readiness gate.
+
+## One-time local initialization
+
+From a fresh starter's current repository root:
+
+```bash
+go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api
+go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --dry-run
+go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --apply
+```
+
+Both preview forms write nothing. Review the sorted changed paths and remaining
+known tool/provenance references before applying. `--name` and `--module` are
+required; unknown/duplicate flags, extra arguments and contradictory preview/apply
+flags fail. Go module paths with a domain and normal import components (including
+`/v2` or later) are accepted; traversal, control characters and injection are not.
+Display names permit letters/digits, spaces, dots, hyphens and underscores.
+
+Initialization rewrites the module, project imports (including embedded templates
+and generated-test source), README heading and example APP_NAME. `cmd/nexokit`
+and developer-tool attribution remain unchanged. It is a one-time local adoption,
+not a downloader or update contract; invalid, partial, repeated or symlinked
+starter identities fail safely. Candidates are preflighted and staged before
+commit; write errors trigger rollback with explicit failure reporting. Stop
+concurrent source writers during apply; this is not a cross-process transaction.
+
+Existing `.env`, dependencies and `go.sum` are untouched. After apply, configure
+PostgreSQL, PASETO, CORS and rate limits, then run `go build ./...` and
+`go test ./...`. Run migrations, seeds and root-account creation deliberately after
+configuration; none run automatically. Local defaults are not production security
+guarantees, and no production secrets are generated. See [adoption](../../starter-template.md).
 
 ## Module generation
 
@@ -73,7 +105,7 @@ Sources: `internal/cli/commands/createroot.go`, `root_storage.go`, `internal/cli
 
 ## Seeds
 
-Files must use `package seeds` and export a zero-argument function ending in `Seed` that returns exactly `error`. Discovery parses Go files; no matching functions is a successful no-op. Execution generates a runner under `.tmp/`, invokes `go run`, then cleans it up. The runner needs the source tree, Go toolchain, writable working directory and database access; a standalone binary is insufficient. After module renaming, update the hardcoded seeds import in `internal/cli/commands/seed.go` too.
+Files must use `package seeds` and export a zero-argument function ending in `Seed` that returns exactly `error`. Discovery parses Go files; no matching functions is a successful no-op. Execution generates a runner under `.tmp/`, invokes `go run`, then cleans it up. The runner needs the source tree, Go toolchain, writable working directory and database access; a standalone binary is insufficient. The one-time `init --apply` rewrites the seed runner's project import together with other source imports.
 
 Review seeds before executing them against production; there is no general dry-run, transaction or idempotence guarantee.
 

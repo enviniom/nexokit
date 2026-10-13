@@ -74,12 +74,27 @@ IAM owns authentication under `internal/modules/iam/slices/auth`, including cred
 
 ## Using NexoKit as a starter
 
-NexoKit is designed to be cloned or forked as a project starting point:
+Adopt a local clone or fork once, from its repository root (Go 1.26+ required):
 
-1. Fork the repo and rename the Go module.
-2. Keep the modules you need; delete or evolve the rest.
-3. Add your own migrations, seeds, and vertical slices.
-4. Deploy the binary with your environment variables.
+```bash
+go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api
+# Review the changed paths; preview writes nothing.
+go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --apply
+go build ./...
+go test ./...
+```
+
+`--dry-run` explicitly previews; it cannot be combined with `--apply`. This changes
+application identity and module imports, including generator templates and seed
+runner source. `cmd/nexokit` and the NexoKit developer-tool attribution stay intact.
+Your application is independently owned: no downloader or upstream update contract.
+An already initialized or partially renamed project is refused.
+
+Existing `.env` is never changed. After applying, configure PostgreSQL, `PASETO_KEY`,
+CORS and rate limits yourself; use the quick-start migration, seed and root-account
+commands only after reviewing configuration. Local defaults are not production
+safeguards; initialization neither generates production secrets nor provisions a
+database. Keep or evolve modules, migrations and vertical slices deliberately.
 
 See [`docs/starter-template.md`](docs/starter-template.md) for the full adoption guide.
 

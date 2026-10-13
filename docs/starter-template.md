@@ -4,10 +4,35 @@ Fork or clone the repository into your namespace; it is a starting application, 
 
 ## Quick path
 
-1. Rename `github.com/enviniom/nexokit` in `go.mod` and all project import strings to your module path. `go mod edit -module your/module/path` changes only `go.mod`; use your editor's project-wide replacement for imports, generator templates and the seed runner's hardcoded import. Search for remaining old-module occurrences before building.
-2. Update project identity in the root README and environment example (`APP_NAME`, URLs/domain and root-user defaults). Copy the example to local `.env` or inject environment values; keep secrets out of version control.
-3. Configure PostgreSQL, a strong `PASETO_KEY`, and deliberate CORS/rate-limit settings. See [deployment configuration](deployment.md#configuration-and-secrets); local defaults are not production safeguards.
-4. Start local dependencies and initialize from the repository root:
+Prerequisites: Go 1.26+ and the project dependencies available to Go. PostgreSQL is
+needed for the application and provisioning commands, **not** for `init`; Docker
+Compose is an optional local dependency runner. Redis/Valkey is optional when
+`CACHE_DRIVER=none`.
+
+1. From a fresh local clone/fork root, preview, review the sorted paths, then apply:
+
+```bash
+go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api
+# --dry-run is an optional explicit preview; neither preview form writes files.
+go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --apply
+go build ./...
+go test ./...
+```
+
+2. Application identity changes in the root README heading and example `APP_NAME`;
+   Go module imports, embedded generator templates, seed runner and generated-test
+   source change consistently. The developer tool remains `nexokit` in
+   `cmd/nexokit`; NexoKit attribution is retained. Names with spaces are supported:
+   use `--name "My API"`. This is one-time independent application ownership, not
+   downloading, updating or synchronizing an upstream project.
+3. Existing `.env` is left untouched. For a new local setup only, copy the updated
+   `.env.example` to `.env`, or inject environment values. Review URLs/domains and
+   root-user defaults yourself; keep secrets out of version control. Configure
+   PostgreSQL, a strong `PASETO_KEY`, and deliberate CORS/rate-limit settings. See
+   [deployment configuration](deployment.md#configuration-and-secrets); local
+   defaults are not production safeguards. `init` generates no production secrets
+   and makes no production-readiness guarantee.
+4. Review and deliberately execute local provisioning from the repository root:
 
 ```bash
 docker compose up -d
@@ -19,7 +44,31 @@ make dev
 
 5. Check `/health/live` and `/health/ready`, then exercise login and a protected route. Root user routes require `X-Company-ID`; see [request flow](references/runtime/request-flow.md).
 
-These are commands for the adopter to run, not part of a documentation-only verification.
+These are commands for the adopter to run. `init` never starts a database, runs
+migrations/seeds, creates root accounts, executes Git operations or changes
+`go.sum`/dependencies. Local private adoption does not select public distribution
+license terms.
+
+## Initialization safety
+
+Preview is the default; only `--apply` writes, and `--apply` plus `--dry-run` is an
+error. Unknown/duplicate flags and positional arguments are refused. The current
+root must retain the starter module, README heading, example APP_NAME and CLI
+source identity anchors; partial or repeated initialization is refused.
+
+Only known Go/template families under `cmd`, `internal`, `tests` and `seeds`, the
+module directive, README, example and selected adoption/CLI docs are considered.
+The CLI reports remaining known tool/provenance references instead of replacing
+every occurrence of `nexokit`. Git data, local environment files, logs, vendor,
+temporary/task artifacts and unrecognized files are excluded. Planned symlinks
+and symlink ancestors are refused rather than followed.
+
+Use a quiescent local copy: stop editors/watchers that write source during apply.
+All candidate contents, types and modes are checked before writes; replacements
+and rollback copies are staged with preserved modes. A failed commit restores
+completed replacements and reports any rollback failure. This is not a
+cross-process transaction or a power-loss recovery system. Review errors before
+retrying; no automatic repair or repeated-init/upgrade framework is provided.
 
 ## Choose capabilities deliberately
 

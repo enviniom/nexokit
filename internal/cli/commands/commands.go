@@ -6,6 +6,7 @@ import "github.com/enviniom/nexokit/internal/cli"
 // All returns all available CLI commands.
 func All() []cli.Command {
 	return []cli.Command{
+		&InitCommand{},
 		&ServeCommand{},
 		&ConfigCommand{},
 		&StatusCommand{},
