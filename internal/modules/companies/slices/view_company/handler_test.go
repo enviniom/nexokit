@@ -9,12 +9,21 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/enviniom/nexokit/internal/platform/authctx"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
 )
 
+func companyRootContext(c *gin.Context) {
+	authctx.SetGin(c, &authctx.User{IsRoot: true})
+	tenant.SetGin(c, tenant.NewRoot())
+}
+
 type fakeViewService struct{ resp *company.CompanyResponse }
 
-func (f *fakeViewService) GetByPublicID(string) (*company.CompanyResponse, error) { return f.resp, nil }
+func (f *fakeViewService) GetByPublicID(tenant.TenantContext, string) (*company.CompanyResponse, error) {
+	return f.resp, nil
+}
 
 func TestHandler_PublicProjection(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -31,6 +40,7 @@ func TestHandler_PublicProjection(t *testing.T) {
 				model.Domains = []company_domain.CompanyDomain{{BaseModel: shared.BaseModel{ID: 99, PublicID: "dom_01"}, CompanyID: 42, Domain: "acme.com", Kind: "alias", Status: "active", RedirectToPrimary: true}}
 			}
 			r := gin.New()
+			r.Use(companyRootContext)
 			r.GET("/companies/:id", NewHandler(NewService(&fakeViewRepo{company: model})).Handle)
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/companies/cmp_01", nil))
@@ -77,6 +87,8 @@ func TestHandler_PublicProjection(t *testing.T) {
 func TestHandler_Handle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	// Authentication and access policy have already run at the route boundary.
+	r.Use(func(c *gin.Context) { tenant.SetGin(c, tenant.NewScoped(7, "own")) })
 	r.GET("/companies/:id", NewHandler(&fakeViewService{resp: &company.CompanyResponse{PublicID: "cmp_01"}}).Handle)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/companies/cmp_01", nil))

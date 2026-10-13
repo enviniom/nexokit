@@ -4,10 +4,10 @@ import (
 	"errors"
 
 	"github.com/enviniom/nexokit/internal/cli/root"
-	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	"github.com/enviniom/nexokit/internal/platform/identity"
+	iamcore "github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/gorm"
 )

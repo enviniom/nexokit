@@ -2,7 +2,6 @@ package assign_permissions_to_role
 
 import (
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
-	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
@@ -26,18 +25,10 @@ func (h *Handler) Handle(c *gin.Context) {
 		response.BadRequest(c, messages.MsgBadRequest)
 		return
 	}
-	item, err := h.service.Assign(tc, c.Param("id"), req, permissionSlugsFromContext(c))
+	item, err := h.service.Assign(tc, c.Param("id"), req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
 	response.Success(c, messages.MsgSuccess, item)
-}
-
-func permissionSlugsFromContext(c *gin.Context) []string {
-	user, ok := authctx.FromGin(c)
-	if !ok || user == nil {
-		return nil
-	}
-	return user.Permissions
 }

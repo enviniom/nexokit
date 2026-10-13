@@ -6,10 +6,10 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"github.com/enviniom/nexokit/internal/modules/iam/core/permission"
 
-	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	platformPerms "github.com/enviniom/nexokit/internal/platform/permissions"
+	iamcore "github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/shared"
 )
 

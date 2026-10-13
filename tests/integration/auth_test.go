@@ -20,6 +20,7 @@ import (
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/password"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	platformRoles "github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/token"
 	"github.com/enviniom/nexokit/internal/shared"
 	"github.com/enviniom/nexokit/tests/helpers"
@@ -33,7 +34,7 @@ func TestAuthIntegration(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 	db := helpers.NewSQLiteDB(t, &iamrole.IAMRole{}, &permission.IAMPermission{}, &iamuser.IAMUser{}, &refresh_token.RefreshToken{})
-	adminRole := helpers.SeedRole(t, db, iamcore.AdminRoleSlug)
+	adminRole := helpers.SeedRole(t, db, platformRoles.AdminRoleSlug)
 	permissions := []permission.IAMPermission{
 		{BaseModel: shared.BaseModel{PublicID: "auth-permission-users-list"}, Slug: "users.list", Name: "List users", Module: "users", Action: "list"},
 		{BaseModel: shared.BaseModel{PublicID: "auth-permission-roles-view"}, Slug: "roles.view", Name: "View roles", Module: "roles", Action: "view"},
@@ -63,7 +64,7 @@ func TestAuthIntegration(t *testing.T) {
 	r := gin.New()
 	v1 := r.Group("/api/v1")
 	pass := func(c *gin.Context) { c.Next() }
-	iam.Register(v1, v1.Group(""), v1.Group(""), iamContainer, func(string) gin.HandlerFunc { return pass }, middleware.Auth(manager, integrationAuthUserLookup{resolver: iamContainer.AuthUserResolver}), pass, pass)
+	iam.Register(v1, v1.Group(""), v1.Group(""), iamContainer, func(string) gin.HandlerFunc { return pass }, func(string) gin.HandlerFunc { return pass }, middleware.Auth(manager, integrationAuthUserLookup{resolver: iamContainer.AuthUserResolver}), pass, pass)
 
 	t.Run("login success returns token pair", func(t *testing.T) {
 		w := requestJSON(r, http.MethodPost, "/api/v1/auth/login", map[string]string{"email": "active@example.com", "password": "secret123"})
@@ -264,7 +265,7 @@ func assertAuthUserJSON(t *testing.T, payload []byte, model iamuser.IAMUser, rol
 	if me {
 		expected["created_at"] = time.Time{}
 		expected["updated_at"] = time.Time{}
-		expected["role_slug"] = iamcore.AdminRoleSlug
+		expected["role_slug"] = platformRoles.AdminRoleSlug
 		expected["permissions"] = nil // Permission values are asserted separately; order is not contractual.
 	}
 	if len(fields) != len(expected) {

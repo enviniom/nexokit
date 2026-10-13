@@ -1,6 +1,9 @@
 package authctx
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/enviniom/nexokit/internal/platform/tenant"
+	"github.com/gin-gonic/gin"
+)
 
 const contextKey = "auth_user"
 
@@ -18,6 +21,12 @@ type User struct {
 	IsRoot      bool
 	IsActive    bool
 	Permissions []string
+}
+
+// HasTenantRole matches only a trusted role slug under an actor-owned tenant scope.
+// Display names and legacy Role values never establish this authority.
+func (u *User) HasTenantRole(tc tenant.TenantContext, slug string) bool {
+	return u != nil && u.RoleSlug == slug && slug != "" && !tc.IsRootScope && tc.CompanyID != 0 && u.CompanyID != nil && *u.CompanyID == tc.CompanyID
 }
 
 // HasCompany reports whether the authenticated user is assigned to a company.

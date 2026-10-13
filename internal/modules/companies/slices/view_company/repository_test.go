@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -24,7 +25,7 @@ func TestGormRepository_GetByPublicID_WithDomains(t *testing.T) {
 	}
 
 	repo := NewRepository(db)
-	got, err := repo.GetByPublicID("cmp_01")
+	got, err := repo.GetByPublicID(tenant.NewRoot(), "cmp_01")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,12 +34,46 @@ func TestGormRepository_GetByPublicID_WithDomains(t *testing.T) {
 	}
 }
 
+func TestGormRepository_TenantQueryBoundary(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = db.AutoMigrate(&company.Company{}, &company_domain.CompanyDomain{}); err != nil {
+		t.Fatal(err)
+	}
+	item := company.Company{BaseModel: shared.BaseModel{ID: 7, PublicID: "own"}, Name: "Own", Slug: "own"}
+	if err = db.Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, tt := range []struct {
+		name string
+		tc   tenant.TenantContext
+		want error
+	}{
+		{"own scope", tenant.NewScoped(7, "own"), nil},
+		{"foreign scope", tenant.NewScoped(8, "foreign"), core.ErrCompanyNotFound},
+		{"missing scope", tenant.TenantContext{}, core.ErrCompanyNotFound},
+		{"root global", tenant.NewRoot(), nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewRepository(db).GetByPublicID(tt.tc, "own")
+			if !errors.Is(err, tt.want) {
+				t.Fatalf("got %v, want %v", err, tt.want)
+			}
+			if tt.want != nil && got != nil {
+				t.Fatal("foreign company returned")
+			}
+		})
+	}
+}
+
 func TestGormRepository_GetByPublicID_NotFound(t *testing.T) {
 	db, _ := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	_ = db.AutoMigrate(&company.Company{})
 
 	repo := NewRepository(db)
-	_, err := repo.GetByPublicID("missing")
+	_, err := repo.GetByPublicID(tenant.NewRoot(), "missing")
 	if !errors.Is(err, core.ErrCompanyNotFound) {
 		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
 	}

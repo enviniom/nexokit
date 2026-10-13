@@ -11,9 +11,9 @@ import (
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/config"
 	"github.com/enviniom/nexokit/internal/infra/db"
-	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
+	iamcore "github.com/enviniom/nexokit/internal/platform/roles"
 	"gorm.io/gorm"
 )
 

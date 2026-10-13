@@ -4,6 +4,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	"github.com/enviniom/nexokit/internal/platform/identity"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 )
@@ -29,7 +30,7 @@ func NewService(repo Repository, hasher PasswordHasher) Service {
 }
 
 func (s *service) Create(tc tenant.TenantContext, req iamuser.CreateUserRequest) (*iamuser.UserResponse, error) {
-	rootRole, err := s.repo.GetRoleBySlug(core.RootRoleSlug)
+	rootRole, err := s.repo.GetRoleBySlug(roles.RootRoleSlug)
 	if err != nil {
 		return nil, err
 	}

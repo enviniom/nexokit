@@ -7,6 +7,7 @@ import (
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
 )
@@ -45,7 +46,7 @@ func (f fakeRepo) AssignRole(tenant.TenantContext, *iamuser.IAMUser, uint) (*iam
 func uintPtr(v uint) *uint { return &v }
 
 func rootRole() *iamrole.IAMRole {
-	return &iamrole.IAMRole{BaseModel: shared.BaseModel{ID: 99, PublicID: "role-root"}, Name: "Root", Slug: core.RootRoleSlug}
+	return &iamrole.IAMRole{BaseModel: shared.BaseModel{ID: 99, PublicID: "role-root"}, Name: "Root", Slug: roles.RootRoleSlug}
 }
 
 func regularUser() *iamuser.IAMUser {
@@ -180,7 +181,7 @@ func TestChangeRole(t *testing.T) {
 				rootRole: rootRole(),
 				assignableRole: &iamrole.IAMRole{
 					BaseModel: shared.BaseModel{ID: 99, PublicID: "role-root"},
-					Slug:      core.RootRoleSlug,
+					Slug:      roles.RootRoleSlug,
 				},
 			},
 			targetID: "user-1",

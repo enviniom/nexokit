@@ -7,6 +7,8 @@ import (
 	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/permissions"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/roles"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -62,7 +64,8 @@ func RequirePermission(slug string) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if isRoot(user) || hasPermission(user.Permissions, slug) {
+		tc, scoped := tenant.FromGin(c)
+		if isRoot(user) || (scoped && user.HasTenantRole(tc, roles.AdminRoleSlug)) || hasPermission(user.Permissions, slug) {
 			c.Next()
 			return
 		}
@@ -80,7 +83,7 @@ func RequireRole(slug string) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		if roleSlug(user) == slug {
+		if (slug == roles.RootRoleSlug && isRoot(user)) || (slug != roles.RootRoleSlug && roleSlug(user) == slug) {
 			c.Next()
 			return
 		}

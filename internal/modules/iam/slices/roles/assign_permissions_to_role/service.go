@@ -4,11 +4,13 @@ import (
 	"github.com/enviniom/nexokit/internal/infra/cache"
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
+	"strings"
 )
 
 type Service interface {
-	Assign(tc tenant.TenantContext, publicID string, req iamrole.AssignRolePermissionsRequest, actorPermissions []string) (*iamrole.RolePermissionAssignmentResponse, error)
+	Assign(tc tenant.TenantContext, publicID string, req iamrole.AssignRolePermissionsRequest) (*iamrole.RolePermissionAssignmentResponse, error)
 }
 type service struct {
 	repo  Repository
@@ -18,15 +20,15 @@ type service struct {
 func NewService(repo Repository, c cache.Cache) Service {
 	return &service{repo: repo, cache: c}
 }
-func (s *service) Assign(tc tenant.TenantContext, publicID string, req iamrole.AssignRolePermissionsRequest, actorPermissions []string) (*iamrole.RolePermissionAssignmentResponse, error) {
-	if !hasPermission(actorPermissions, "roles.assign_permissions") {
-		return nil, core.ErrRoleProtected
-	}
+func (s *service) Assign(tc tenant.TenantContext, publicID string, req iamrole.AssignRolePermissionsRequest) (*iamrole.RolePermissionAssignmentResponse, error) {
 	role, err := s.repo.GetByPublicID(tc, publicID)
 	if err != nil {
 		return nil, err
 	}
-	if role.Slug == core.AdminRoleSlug {
+	// Root and admin authority is implicit; other identities have editable grants.
+	name, slug := strings.TrimSpace(role.Name), strings.TrimSpace(role.Slug)
+	if strings.EqualFold(name, roles.RootRoleSlug) || strings.EqualFold(slug, roles.RootRoleSlug) ||
+		strings.EqualFold(name, roles.AdminRoleSlug) || strings.EqualFold(slug, roles.AdminRoleSlug) {
 		return nil, core.ErrSystemImmutable
 	}
 	catalog, err := s.repo.ListAllPermissions()
@@ -37,9 +39,6 @@ func (s *service) Assign(tc tenant.TenantContext, publicID string, req iamrole.A
 	if err != nil {
 		return nil, err
 	}
-	if role.IsSystem && s.repo.RemovesSystemPermission(role.Permissions, selected) {
-		return nil, core.ErrSystemImmutable
-	}
 	if err := s.repo.ReplacePermissions(tc, role.ID, ids); err != nil {
 		return nil, err
 	}
@@ -49,12 +48,4 @@ func (s *service) Assign(tc tenant.TenantContext, publicID string, req iamrole.A
 	var response iamrole.RolePermissionAssignmentResponse
 	response.FromSelection(role.PublicID, normalized, s.repo.BuildRolePermissionCatalog(catalog, selected))
 	return &response, nil
-}
-func hasPermission(items []string, slug string) bool {
-	for _, i := range items {
-		if i == "*" || i == slug {
-			return true
-		}
-	}
-	return false
 }

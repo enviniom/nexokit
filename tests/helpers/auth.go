@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
+	iamcore "github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/token"
 	"gorm.io/gorm"
 )

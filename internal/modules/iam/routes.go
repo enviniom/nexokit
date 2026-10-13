@@ -9,9 +9,9 @@ import (
 )
 
 // Register mounts IAM routes onto v1 router groups.
-func Register(v1, globalProtected, tenantProtected *gin.RouterGroup, c *Container, requirePermission func(string) gin.HandlerFunc, authMiddleware, loginRateLimit, refreshRateLimit gin.HandlerFunc) {
+func Register(v1, globalProtected, tenantProtected *gin.RouterGroup, c *Container, requirePermission func(string) gin.HandlerFunc, requireRole func(string) gin.HandlerFunc, authMiddleware, loginRateLimit, refreshRateLimit gin.HandlerFunc) {
 	auth.Register(v1, c.Auth, authMiddleware, loginRateLimit, refreshRateLimit)
 	users.Register(tenantProtected, c.Users, requirePermission)
 	roles.Register(globalProtected, c.Roles, requirePermission)
-	permissions.Register(globalProtected, c.Permissions, requirePermission)
+	permissions.Register(globalProtected, c.Permissions, requirePermission, requireRole)
 }

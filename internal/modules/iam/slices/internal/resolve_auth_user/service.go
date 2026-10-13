@@ -1,9 +1,9 @@
 package resolve_auth_user
 
 import (
-	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 )
 
 type Service interface {
@@ -36,7 +36,7 @@ func (s *service) ResolveAuthUser(publicID string) (*authctx.User, error) {
 		RoleSlug:    user.Role.Slug,
 		RoleID:      user.RoleID,
 		CompanyID:   user.CompanyID,
-		IsRoot:      user.Role.Slug == core.RootRoleSlug,
+		IsRoot:      user.Role.Slug == roles.RootRoleSlug,
 		IsActive:    user.IsActive,
 		Permissions: slugs,
 	}, nil

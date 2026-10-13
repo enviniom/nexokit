@@ -5,6 +5,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 )
 
@@ -15,7 +16,7 @@ type service struct{ repo Repository }
 
 func NewService(repo Repository) Service { return &service{repo: repo} }
 func (s *service) Create(tc tenant.TenantContext, req iamrole.CreateRoleRequest) (*iamrole.RoleResponse, error) {
-	if core.IsReservedRoleIdentity(req.Name, req.Slug) {
+	if roles.IsReservedRoleIdentity(req.Name, req.Slug) {
 		return nil, core.ErrReservedRoleIdentity
 	}
 	if ok, err := s.repo.ExistsRoleByName(tc, req.Name); err != nil {

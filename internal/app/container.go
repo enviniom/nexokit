@@ -63,7 +63,7 @@ func (c *Container) RegisterModules(v1 *gin.RouterGroup) {
 	companies.Register(globalProtected, c.Companies, middleware.RequirePermission, middleware.RequireRole)
 	tenantProtected := v1.Group("")
 	tenantProtected.Use(c.authMW, middleware.RequireTenantScope(c.Companies.Resolver()))
-	iam.Register(v1, globalProtected, tenantProtected, c.IAM, middleware.RequirePermission, c.authMW, c.loginRateLimitMW, c.refreshRateLimitMW)
+	iam.Register(v1, globalProtected, tenantProtected, c.IAM, middleware.RequirePermission, middleware.RequireRole, c.authMW, c.loginRateLimitMW, c.refreshRateLimitMW)
 	onboarding.Register(globalProtected, c.Onboarding, middleware.RequireRole)
 }
 

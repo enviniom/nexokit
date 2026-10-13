@@ -5,6 +5,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 )
 
@@ -22,10 +23,10 @@ func (s *service) Update(tc tenant.TenantContext, publicID string, req iamrole.U
 	if role.IsSystem {
 		return nil, core.ErrRoleProtected
 	}
-	if core.IsReservedRoleIdentity(role.Name, role.Slug) {
+	if roles.IsReservedRoleIdentity(role.Name, role.Slug) {
 		return nil, core.ErrRoleProtected
 	}
-	if core.IsReservedRoleIdentity(req.Name, req.Slug) {
+	if roles.IsReservedRoleIdentity(req.Name, req.Slug) {
 		return nil, core.ErrReservedRoleIdentity
 	}
 	if ok, err := s.repo.ExistsRoleByName(tc, req.Name, role.ID); err != nil {

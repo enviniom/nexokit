@@ -22,7 +22,6 @@ type Repository interface {
 	ReplacePermissions(tc tenant.TenantContext, roleID uint, permissionIDs []uint) error
 	InvalidateRoleMemberPermissionCache(tc tenant.TenantContext, roleID uint, c cache.Cache) error
 	ResolvePermissionSelection(catalog []permission.IAMPermission, slugs []string) ([]string, map[string]bool, []uint, error)
-	RemovesSystemPermission(existing []permission.IAMPermission, selected map[string]bool) bool
 	BuildRolePermissionCatalog(catalog []permission.IAMPermission, granted map[string]bool) []iamrole.RolePermissionGroupResponse
 }
 
@@ -123,13 +122,4 @@ func (r *GormRepository) ResolvePermissionSelection(catalog []permission.IAMPerm
 
 func (r *GormRepository) BuildRolePermissionCatalog(catalog []permission.IAMPermission, granted map[string]bool) []iamrole.RolePermissionGroupResponse {
 	return iamrole.BuildPermissionCatalog(catalog, granted)
-}
-
-func (r *GormRepository) RemovesSystemPermission(existing []permission.IAMPermission, selected map[string]bool) bool {
-	for _, p := range existing {
-		if p.IsSystem && !selected[p.Slug] {
-			return true
-		}
-	}
-	return false
 }

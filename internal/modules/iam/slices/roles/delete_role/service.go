@@ -2,6 +2,7 @@ package delete_role
 
 import (
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 )
 
@@ -16,7 +17,7 @@ func (s *service) Delete(tc tenant.TenantContext, publicID string) error {
 	if err != nil {
 		return err
 	}
-	if role.IsSystem || core.IsReservedRoleIdentity(role.Name, role.Slug) {
+	if role.IsSystem || roles.IsReservedRoleIdentity(role.Name, role.Slug) {
 		return core.ErrRoleProtected
 	}
 	count, err := s.repo.CountUsersByRoleID(role.ID)

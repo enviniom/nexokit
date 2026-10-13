@@ -23,15 +23,19 @@ Health routes are unversioned. `Container.RegisterModules` mounts business route
 | `POST /auth/logout` | Global; request refresh token drives revocation, no bearer middleware |
 | `GET /auth/me` | Global → Auth |
 | `/companies`, `/roles`, `/permissions`, `/onboarding/companies` | Global → Auth → AllowRootGlobalScope → route guard |
+| `GET /companies/:id` | Global → Auth → AllowRootGlobalScope → permission guard |
+| `PUT /permissions/:id` | Global → Auth → AllowRootGlobalScope → root role guard |
 | `/users` and user subroutes | Global → Auth → RequireTenantScope → permission guard |
 
-Paths in this table are relative to `/api/v1`. Onboarding requires root and is not a public signup endpoint. Companies use root guards except view, which uses a permission guard; IAM uses permission guards in its entity registrars.
+Paths in this table are relative to `/api/v1`. Onboarding requires root and is not a public signup endpoint. Companies use root guards except view, which uses a permission guard; IAM entity registrars use permission guards except global permission-catalog updates, which require root role middleware.
 
 ## Authenticated context
 
 `middleware.Auth` validates bearer PASETO, resolves a fresh sanitized user through the injected IAM resolver, rejects inactive/missing users and stores `authctx.User`. IAM's resolver supplies role permissions with that user, so permission guards consume the authenticated context without a separate permission-attachment step.
 
 Tenant middleware runs after auth. Root users may select a company by public ID or slug via `X-Company-ID`. For `/users`, root must select a company (missing header is 400); on global-capable groups root may omit it. Non-root users are scoped to their authenticated company; their selection header is ignored. See the [complete decision table](../infrastructure/multitenancy.md#private-resolution).
+
+Permission guards run after tenant resolution. The exact DB-hydrated admin role slug grants tenant-wide capability only when the non-global scope's nonzero company ID matches the actor. It does not bypass root-only role guards or role protections. Ordinary roles continue to use assigned permissions; root has an independent permission bypass. Company-view repositories apply tenant ownership in the query, including domain projection; foreign targets return not found. Root's explicit company selection is respected, including company view: selecting A cannot read B; selecting B can. Without a header, existing global-capable routes retain root-global scope. Handlers transport the trusted context without reauthorizing the actor.
 
 ## Login and persistence
 

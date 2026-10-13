@@ -10,7 +10,10 @@ import (
 
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
+	"github.com/enviniom/nexokit/internal/shared"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,7 +23,7 @@ type fakeHandlerService struct {
 	calls *int
 }
 
-func (f fakeHandlerService) Assign(tenant.TenantContext, string, iamrole.AssignRolePermissionsRequest, []string) (*iamrole.RolePermissionAssignmentResponse, error) {
+func (f fakeHandlerService) Assign(tenant.TenantContext, string, iamrole.AssignRolePermissionsRequest) (*iamrole.RolePermissionAssignmentResponse, error) {
 	if f.calls != nil {
 		(*f.calls)++
 	}
@@ -28,6 +31,27 @@ func (f fakeHandlerService) Assign(tenant.TenantContext, string, iamrole.AssignR
 		return nil, f.err
 	}
 	return f.item, nil
+}
+
+func TestHandlerTenantAdminWithoutGrants(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	id := uint(7)
+	repo := &fakeRepository{role: &iamrole.IAMRole{BaseModel: shared.BaseModel{ID: 11, PublicID: "custom"}, Slug: "custom", CompanyID: &id}, selected: map[string]bool{}, normalized: []string{}, ids: []uint{}}
+	h := NewHandler(NewService(repo, nil))
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Params = gin.Params{{Key: "id", Value: "custom"}}
+	tenant.SetGin(c, tenant.NewScoped(id, "own"))
+	authctx.SetGin(c, &authctx.User{RoleSlug: roles.AdminRoleSlug, CompanyID: &id})
+	c.Request = httptest.NewRequest("PATCH", "/roles/custom/permissions", bytes.NewBufferString(`{"permissions":[]}`))
+	c.Request.Header.Set("Content-Type", "application/json")
+	h.Handle(c)
+	if w.Code != 200 {
+		t.Fatalf("want 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if repo.replacedRoleID != 11 {
+		t.Fatal("assignment was not persisted")
+	}
 }
 
 func TestHandlerHandle(t *testing.T) {

@@ -35,7 +35,7 @@ func TestRegisterOwnsAuthenticationRoutes(t *testing.T) {
 	}
 	global := v1.Group("", stop(http.StatusForbidden))
 	tenant := v1.Group("", stop(http.StatusForbidden))
-	Register(v1, global, tenant, container, permission, stop(http.StatusUnauthorized), stop(http.StatusTooManyRequests), stop(http.StatusServiceUnavailable))
+	Register(v1, global, tenant, container, permission, permission, stop(http.StatusUnauthorized), stop(http.StatusTooManyRequests), stop(http.StatusServiceUnavailable))
 
 	for _, tc := range []struct {
 		name, method, path string

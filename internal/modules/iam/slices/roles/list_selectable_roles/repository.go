@@ -1,9 +1,9 @@
 package list_selectable_roles
 
 import (
-	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	platformRoles "github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"gorm.io/gorm"
 )
@@ -20,7 +20,7 @@ func (r *GormRepository) List(tc tenant.TenantContext) ([]response.SelectRespons
 	var roles []iamrole.IAMRole
 	if err := tenant.ApplyTenantScope(r.db, tc).
 		Preload("Company").
-		Where("slug <> ?", core.RootRoleSlug).
+		Where("slug <> ?", platformRoles.RootRoleSlug).
 		Order("name ASC").
 		Find(&roles).Error; err != nil {
 		return nil, err

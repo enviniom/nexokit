@@ -3,8 +3,8 @@ package helpers
 import (
 	"testing"
 
-	iamcore "github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	iamcore "github.com/enviniom/nexokit/internal/platform/roles"
 )
 
 func TestNewSQLiteDB_IsolatedPerCall(t *testing.T) {

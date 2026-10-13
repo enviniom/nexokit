@@ -1,8 +1,8 @@
 package create_role
 
 import (
-	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"testing"
 )
 
@@ -18,7 +18,7 @@ func TestIsReservedRoleIdentity(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := core.IsReservedRoleIdentity(tt.role, tt.slug); got != tt.wants {
+			if got := roles.IsReservedRoleIdentity(tt.role, tt.slug); got != tt.wants {
 				t.Fatalf("expected %v, got %v", tt.wants, got)
 			}
 		})

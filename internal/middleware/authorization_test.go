@@ -9,6 +9,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/enviniom/nexokit/internal/platform/response"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/gin-gonic/gin"
 )
 
@@ -143,6 +144,89 @@ func TestRequirePermission(t *testing.T) {
 		})
 	}
 }
+
+func TestTenantAdminPermission(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	id := uint(7)
+	cases := []struct {
+		name   string
+		user   *authctx.User
+		scope  *tenant.TenantContext
+		status int
+	}{
+		{"own tenant without grants", &authctx.User{RoleSlug: "admin", CompanyID: &id}, scopePtr(tenant.NewScoped(id, "own")), 200},
+		{"missing scope", &authctx.User{RoleSlug: "admin", CompanyID: &id}, nil, 403},
+		{"global scope", &authctx.User{RoleSlug: "admin", CompanyID: &id}, scopePtr(tenant.NewRoot()), 403},
+		{"foreign scope", &authctx.User{RoleSlug: "admin", CompanyID: &id}, scopePtr(tenant.NewScoped(8, "other")), 403},
+		{"zero scope", &authctx.User{RoleSlug: "admin", CompanyID: &id}, scopePtr(tenant.NewScoped(0, "")), 403},
+		{"no company", &authctx.User{RoleSlug: "admin"}, scopePtr(tenant.NewScoped(id, "own")), 403},
+		{"legacy spoof", &authctx.User{Role: "admin", CompanyID: &id}, scopePtr(tenant.NewScoped(id, "own")), 403},
+		{"ordinary denied", &authctx.User{RoleSlug: "user", CompanyID: &id}, scopePtr(tenant.NewScoped(id, "own")), 403},
+		{"ordinary granted", &authctx.User{RoleSlug: "user", CompanyID: &id, Permissions: []string{"users.create"}}, scopePtr(tenant.NewScoped(id, "own")), 200},
+		{"root global", &authctx.User{IsRoot: true}, scopePtr(tenant.NewRoot()), 200},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				authctx.SetGin(c, tt.user)
+				if tt.scope != nil {
+					tenant.SetGin(c, *tt.scope)
+				}
+			})
+			r.GET("/", RequirePermission("users.create"), func(c *gin.Context) { c.Status(200) })
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+			if w.Code != tt.status {
+				t.Fatalf("want %d, got %d: %s", tt.status, w.Code, w.Body.String())
+			}
+		})
+	}
+	t.Run("admin cannot use root-only route", func(t *testing.T) {
+		r := gin.New()
+		r.Use(func(c *gin.Context) {
+			authctx.SetGin(c, &authctx.User{RoleSlug: "admin", CompanyID: &id})
+			tenant.SetGin(c, tenant.NewScoped(id, "own"))
+		})
+		r.GET("/", RequireRole("root"), func(c *gin.Context) { c.Status(200) })
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+		if w.Code != 403 {
+			t.Fatalf("want 403, got %d", w.Code)
+		}
+	})
+}
+func TestRootRoleGuardRequiresTrustedRoot(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tt := range []struct {
+		name   string
+		actor  *authctx.User
+		status int
+	}{
+		{"missing actor", nil, 401},
+		{"legacy root text", &authctx.User{Role: "root"}, 403},
+		{"slug without trusted root", &authctx.User{RoleSlug: "root"}, 403},
+		{"admin with catalog grant", &authctx.User{RoleSlug: "admin", Permissions: []string{"permissions.manage"}}, 403},
+		{"trusted root", &authctx.User{RoleSlug: "root", IsRoot: true}, 200},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				if tt.actor != nil {
+					authctx.SetGin(c, tt.actor)
+				}
+			})
+			r.PUT("/permissions/:id", RequireRole("root"), func(c *gin.Context) { c.Status(200) })
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, httptest.NewRequest("PUT", "/permissions/custom", nil))
+			if w.Code != tt.status {
+				t.Fatalf("got %d, want %d", w.Code, tt.status)
+			}
+		})
+	}
+}
+
+func scopePtr(tc tenant.TenantContext) *tenant.TenantContext { return &tc }
 
 func TestRequireRole(t *testing.T) {
 	gin.SetMode(gin.TestMode)

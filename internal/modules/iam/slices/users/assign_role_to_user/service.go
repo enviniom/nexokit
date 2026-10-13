@@ -3,6 +3,7 @@ package assign_role_to_user
 import (
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 )
 
@@ -30,7 +31,7 @@ func (s *service) ChangeRole(tc tenant.TenantContext, targetPublicID, actorPubli
 		return nil, err
 	}
 
-	rootRole, err := s.repo.GetRoleBySlug(core.RootRoleSlug)
+	rootRole, err := s.repo.GetRoleBySlug(roles.RootRoleSlug)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +43,7 @@ func (s *service) ChangeRole(tc tenant.TenantContext, targetPublicID, actorPubli
 	if err != nil {
 		return nil, err
 	}
-	if targetRole.Slug == core.RootRoleSlug {
+	if targetRole.Slug == roles.RootRoleSlug {
 		return nil, core.ErrForbiddenRoleAssignment
 	}
 	if targetUser.CompanyID != nil && targetRole.CompanyID != nil && *targetUser.CompanyID != *targetRole.CompanyID {

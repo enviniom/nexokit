@@ -1,14 +1,20 @@
 package assign_permissions_to_role
 
 import (
+	"bytes"
 	"errors"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/enviniom/nexokit/internal/middleware"
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamrole "github.com/enviniom/nexokit/internal/modules/iam/core/role"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"github.com/enviniom/nexokit/internal/shared"
+	"github.com/gin-gonic/gin"
 )
 
 func TestReplacementTenantBoundary(t *testing.T) {
@@ -114,6 +120,50 @@ func TestMemberCacheTenantBoundary(t *testing.T) {
 						t.Fatal("foreign member cache invalidated")
 					}
 				}
+			}
+		})
+	}
+}
+
+// Use the same middleware order as the production private role routes.
+func TestRoleAssignmentRouteActorBoundary(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	own := uint(7)
+	for _, tt := range []struct {
+		name   string
+		actor  *authctx.User
+		status int
+	}{
+		{"unauthenticated", nil, 401},
+		{"spoofed display role", &authctx.User{Role: "admin", RoleSlug: "custom", CompanyID: &own}, 403},
+		{"admin without company", &authctx.User{RoleSlug: roles.AdminRoleSlug}, 403},
+		{"ordinary actor without grant", &authctx.User{RoleSlug: roles.UserRoleSlug, CompanyID: &own}, 403},
+		{"tenant admin without grants", &authctx.User{RoleSlug: roles.AdminRoleSlug, CompanyID: &own}, 200},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				if tt.actor != nil {
+					authctx.SetGin(c, tt.actor)
+				}
+			})
+			group := r.Group("", middleware.AllowRootGlobalScope(nil))
+			called := false
+			group.PUT("/roles/:id/permissions", middleware.RequirePermission("roles.assign_permissions"), func(c *gin.Context) {
+				tc, ok := tenant.FromGin(c)
+				if !ok || tc.CompanyID != own || tc.IsRootScope {
+					t.Fatal("actor-owned tenant scope missing")
+				}
+				called = true
+				NewHandler(&fakeHandlerService{item: &iamrole.RolePermissionAssignmentResponse{}}).Handle(c)
+			})
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("PUT", "/roles/custom/permissions", bytes.NewBufferString(`{"permissions":[]}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Company-ID", "foreign")
+			r.ServeHTTP(w, req)
+			if w.Code != tt.status || called != (tt.status == 200) {
+				t.Fatalf("status=%d called=%v, want %d", w.Code, called, tt.status)
 			}
 		})
 	}

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/enviniom/nexokit/internal/modules/iam/core/permission"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
+	"github.com/enviniom/nexokit/internal/modules/iam/core/permission"
+	"github.com/enviniom/nexokit/internal/platform/authctx"
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,6 +30,33 @@ func (f fakeService) Update(_ string, _ permission.UpdatePermissionRequest) (*pe
 	return f.item, nil
 }
 
+func TestHandlerTransportsWithoutActorPolicy(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tt := range []struct {
+		name   string
+		actor  *authctx.User
+		status int
+	}{
+		{"no actor projection needed", nil, 200},
+		{"actor projection does not authorize here", &authctx.User{Role: "root", RoleSlug: "root"}, 200},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			calls := 0
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			if tt.actor != nil {
+				authctx.SetGin(c, tt.actor)
+			}
+			c.Request = httptest.NewRequest("PUT", "/permissions/custom", bytes.NewBufferString(`{"name":"Changed"}`))
+			c.Request.Header.Set("Content-Type", "application/json")
+			NewHandler(fakeService{calls: &calls, item: &permission.PermissionResponse{}}).Handle(c)
+			if w.Code != tt.status || calls != 1 {
+				t.Fatalf("status=%d calls=%d, want %d and one", w.Code, calls, tt.status)
+			}
+		})
+	}
+}
+
 func TestHandlerRejectsInvalidRequests(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, tt := range []struct {
@@ -45,6 +73,7 @@ func TestHandlerRejectsInvalidRequests(t *testing.T) {
 			h := NewHandler(fakeService{calls: &calls})
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
+			authctx.SetGin(c, &authctx.User{IsRoot: true})
 			c.Request = httptest.NewRequest(http.MethodPut, "/iam/permissions/perm-1", bytes.NewBufferString(tt.body))
 			c.Request.Header.Set("Content-Type", "application/json")
 			h.Handle(c)
@@ -97,6 +126,7 @@ func TestHandlerHandle(t *testing.T) {
 			h := NewHandler(tt.service)
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
+			authctx.SetGin(c, &authctx.User{IsRoot: true})
 			c.Params = gin.Params{{Key: "id", Value: "perm-1"}}
 			c.Request = httptest.NewRequest(http.MethodPut, "/iam/permissions/perm-1", bytes.NewReader(body))
 			c.Request.Header.Set("Content-Type", "application/json")

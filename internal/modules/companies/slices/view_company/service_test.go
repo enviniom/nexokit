@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/enviniom/nexokit/internal/modules/companies/core/company"
 	"github.com/enviniom/nexokit/internal/modules/companies/core/company_domain"
+	"github.com/enviniom/nexokit/internal/platform/tenant"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/modules/companies/core"
@@ -15,7 +16,7 @@ type fakeViewRepo struct {
 	err     error
 }
 
-func (f *fakeViewRepo) GetByPublicID(string) (*company.Company, error) {
+func (f *fakeViewRepo) GetByPublicID(tenant.TenantContext, string) (*company.Company, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -26,7 +27,7 @@ func TestService_GetByPublicID_MapsDomains(t *testing.T) {
 	repo := &fakeViewRepo{company: &company.Company{BaseModel: shared.BaseModel{PublicID: "cmp_01"}, Name: "Acme", Slug: "acme", Status: core.CompanyStatusActive, Domains: []company_domain.CompanyDomain{{BaseModel: shared.BaseModel{PublicID: "dom_01"}, Domain: "acme.com", Status: core.CompanyDomainStatusActive, Kind: core.CompanyDomainKindPrimary}}}}
 	svc := NewService(repo)
 
-	got, err := svc.GetByPublicID("cmp_01")
+	got, err := svc.GetByPublicID(tenant.NewRoot(), "cmp_01")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -39,7 +40,7 @@ func TestService_GetByPublicID_ReturnsNotFound(t *testing.T) {
 	repo := &fakeViewRepo{err: core.ErrCompanyNotFound}
 	svc := NewService(repo)
 
-	_, err := svc.GetByPublicID("missing")
+	_, err := svc.GetByPublicID(tenant.NewRoot(), "missing")
 	if !errors.Is(err, core.ErrCompanyNotFound) {
 		t.Fatalf("expected ErrCompanyNotFound, got %v", err)
 	}

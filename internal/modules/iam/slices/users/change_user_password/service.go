@@ -3,6 +3,7 @@ package change_user_password
 import (
 	"github.com/enviniom/nexokit/internal/modules/iam/core"
 	iamuser "github.com/enviniom/nexokit/internal/modules/iam/core/user"
+	"github.com/enviniom/nexokit/internal/platform/roles"
 	"github.com/enviniom/nexokit/internal/platform/tenant"
 )
 
@@ -33,7 +34,7 @@ func (s *service) Change(tc tenant.TenantContext, publicID, actorPublicID string
 		return err
 	}
 
-	rootRole, err := s.repo.GetRoleBySlug(core.RootRoleSlug)
+	rootRole, err := s.repo.GetRoleBySlug(roles.RootRoleSlug)
 	if err != nil {
 		return err
 	}
