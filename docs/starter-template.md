@@ -65,6 +65,24 @@ migrations/seeds, creates root accounts, executes Git operations or changes
 `go.sum`/dependencies. Local private adoption does not select public distribution
 license terms.
 
+## Internal local-environment foundation
+
+The internal initializer plan can opt into creating `.env` from its snapshotted,
+identity-updated example with caller-supplied development settings. This is not
+wired into the CLI questionnaire yet. Existing regular `.env` files are skipped
+using metadata only; symlinks and nonregular destinations are refused. New files
+use mode `0600` and exclusive hard-link publication, preserving unrelated template
+lines. A filesystem without hard-link support fails closed instead of falling
+back to an overwriting rename.
+`APP_ENV` is forced to `development` and `DATABASE_URL` is cleared so `DB_*` applies.
+No password or key is invented by this layer.
+
+Environment creation participates in staged identity updates and rollback. Use a
+quiescent local copy: this is not a cross-process or power-loss transaction.
+Rollback failures report recovery paths, never environment values. If temporary
+file removal fails, a protected `0600` staging file can remain at the reported
+path; review and remove that file locally without displaying its contents.
+
 ## Automatic CI
 
 GitHub Actions runs tests, build, vet, formatting and module error-boundary checks

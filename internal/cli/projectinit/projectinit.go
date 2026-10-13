@@ -28,10 +28,14 @@ type snapshot struct {
 
 // Plan exposes paths, never potentially sensitive file contents.
 type Plan struct {
-	Changes   []Change
-	Remaining []string
-	root      string
-	files     []snapshot
+	Changes     []Change
+	Remaining   []string
+	root        string
+	files       []snapshot
+	environment []byte
+	// Test seam for exclusive publication; production always uses os.Link.
+	publishEnvironment func(string, string) error
+	createTemporary    func(string, string) (*os.File, error)
 }
 
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9 ._-]{0,99}$`)
@@ -284,6 +288,15 @@ func New(root, name, module string) (*Plan, error) {
 // Run on a quiescent local copy: this is not a cross-process filesystem transaction.
 func (p *Plan) Apply() error { return p.apply(os.Rename) }
 func (p *Plan) apply(rename func(string, string) error) (result error) {
+	if p.environment != nil {
+		exists, err := p.EnvironmentExists()
+		if err != nil {
+			return err
+		}
+		if exists {
+			return errors.New("environment destination appeared since preview")
+		}
+	}
 	for _, f := range p.files {
 		before, mode, e := readRegular(filepath.Join(p.root, f.path))
 		if e != nil {
@@ -310,7 +323,11 @@ func (p *Plan) apply(rename func(string, string) error) (result error) {
 		}
 	}()
 	stage := func(f snapshot, data []byte) (string, error) {
-		file, e := os.CreateTemp(filepath.Dir(filepath.Join(p.root, f.path)), ".nexokit-init-*")
+		create := p.createTemporary
+		if create == nil {
+			create = os.CreateTemp
+		}
+		file, e := create(filepath.Dir(filepath.Join(p.root, f.path)), ".nexokit-init-*")
 		if e != nil {
 			return "", e
 		}
@@ -334,6 +351,46 @@ func (p *Plan) apply(rename func(string, string) error) (result error) {
 			return fmt.Errorf("backup %s: %w", f.path, e)
 		}
 		stages = append(stages, staged{f, next, backup})
+	}
+	if p.environment != nil {
+		next, err := stage(snapshot{path: ".env", mode: 0600}, p.environment)
+		if err != nil {
+			return errors.New("stage environment failed")
+		}
+		owned, err := os.Lstat(next)
+		if err != nil {
+			return errors.New("environment stage metadata failed")
+		}
+		if err = safePath(p.root); err != nil {
+			return errors.New("environment ancestor refused")
+		}
+		publish := p.publishEnvironment
+		if publish == nil {
+			publish = os.Link
+		}
+		destination := filepath.Join(p.root, ".env")
+		if err = publish(next, destination); err != nil {
+			return errors.New("exclusive environment publication failed")
+		}
+		defer func() {
+			if result == nil {
+				return
+			}
+			current, err := os.Lstat(destination)
+			if os.IsNotExist(err) {
+				return
+			}
+			if err != nil || !os.SameFile(owned, current) {
+				result = errors.Join(result, errors.New("ROLLBACK FAILED .env: destination ownership changed; inspect .env manually"))
+				return
+			}
+			if err = safePath(p.root); err == nil {
+				err = os.Remove(destination)
+			}
+			if err != nil {
+				result = errors.Join(result, errors.New("ROLLBACK FAILED .env: remove transaction-owned .env manually"))
+			}
+		}()
 	}
 	for i, s := range stages {
 		e := safePath(filepath.Join(p.root, s.file.path))
