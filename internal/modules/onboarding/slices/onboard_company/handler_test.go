@@ -13,8 +13,8 @@ import (
 
 	"github.com/enviniom/nexokit/internal/modules/onboarding/core"
 	companyentity "github.com/enviniom/nexokit/internal/modules/onboarding/core/company"
-	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/authctx"
+	"github.com/enviniom/nexokit/internal/platform/messages"
 	"github.com/enviniom/nexokit/internal/platform/response"
 	"github.com/gin-gonic/gin"
 )

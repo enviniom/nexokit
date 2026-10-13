@@ -49,6 +49,14 @@ migrations/seeds, creates root accounts, executes Git operations or changes
 `go.sum`/dependencies. Local private adoption does not select public distribution
 license terms.
 
+## Automatic CI
+
+GitHub Actions runs tests, build, vet, formatting and module error-boundary checks
+on pushes and pull requests to all branches; manual dispatch remains available.
+Hosted execution requires a push or pull request (or manual dispatch on GitHub)
+and has not been run locally. You control whether and when to publish; local
+checks do not prove a hosted run succeeded.
+
 ## Initialization safety
 
 Preview is the default; only `--apply` writes, and `--apply` plus `--dry-run` is an
