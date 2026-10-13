@@ -22,8 +22,8 @@ Root retains global authority, admin has full authority within its tenant withou
 - Preserve existing changes, including staged content; source edits remain unstaged unless the user stages them.
 
 ## Tasks
-- [ ] T1 — Implement and verify admin tenant authority and the clarified root/role policy. **Implementation and independent functional/architectural verification passed; committing the verified work unit.**
-- [ ] T2 — Commit the verified permissions work unit after final verification. **In progress: explicitly authorized; verifier passed, synchronize scoped staging with tested worktree before commit.**
+- [x] T1 — Implement and verify admin tenant authority and the clarified root/role policy. **Verified and committed in `a662622` (`fix(auth): grant tenant admins full scoped authority`).**
+- [x] T2 — Commit the verified permissions work unit after final verification. **Completed: scoped staging synchronized with tested worktree; commit `a662622`.**
 
 ## Acceptance and checks
 - Admin with zero grants can manage its tenant, including `user` and custom/system role permissions.
@@ -60,4 +60,4 @@ User confirmed staging company view handler/test while reviewing; earlier index-
 All required focused packages, fresh verbose integration filter, `go test ./...`, `go build ./...`, `go vet ./...`, `make check-module-errors`, and diff checks passed. Fresh integration: five top-level tests PASS, zero failures/skips. Readback confirmed override plumbing and obsolete helper/actor removed, selected-root tenant respected, user/system grant removal persisted, protected/foreign joins unchanged and ordinary no-grant actor denied. No candidate-caused blockers. Baseline onboarding format debt and package-only IAM files remain separate. Added integration still excludes bearer transport. Index observation hashes used by verifier were not comparable to index-file checksums; no attribution/recovery needed. Scoped staging must reflect tested worktree, including removal of obsolete override hunks staged in three files.
 
 ## Next step
-User explicitly authorized commit and completing starter preparation. Stage only the scoped verified permissions work unit, commit with tests/docs, record identity, then implement starter bootstrap as a separate tracked work unit. No push/PR authorized.
+Permissions work unit completed and committed as `a662622` after independent verification. Commit changed 56 scoped files (+860/-139 including tests/docs/tracking); much of the path count is mechanical role-constant relocation. Continue starter bootstrap as a separate tracked feature. No push/PR authorized.
