@@ -3,14 +3,29 @@ package cache
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestRedisCache(t *testing.T) {
 	addr := requireRedisAddr(t)
 	ctx := context.Background()
+	prefix := "test:redis-cache:" + uuid.NewString() + ":"
+	cleanup := newTestRedisCache(t, addr)
+	t.Cleanup(func() {
+		defer func() {
+			if err := cleanup.Close(); err != nil {
+				t.Errorf("cleanup close failed: %v", err)
+			}
+		}()
+		for _, key := range []string{"roundtrip", "missing", "ttl", "delete", "exists", "not-found", "after-close"} {
+			if err := cleanup.Delete(ctx, prefix+key); err != nil {
+				t.Errorf("cleanup delete %q failed: %v", prefix+key, err)
+			}
+		}
+	})
 
 	tests := []struct {
 		name string
@@ -19,11 +34,11 @@ func TestRedisCache(t *testing.T) {
 		{
 			name: "get roundtrip",
 			run: func(t *testing.T, rc *RedisCache) {
-				if err := rc.Set(ctx, "k:roundtrip", []byte("value"), time.Minute); err != nil {
+				if err := rc.Set(ctx, prefix+"roundtrip", []byte("value"), time.Minute); err != nil {
 					t.Fatalf("set failed: %v", err)
 				}
 
-				got, err := rc.Get(ctx, "k:roundtrip")
+				got, err := rc.Get(ctx, prefix+"roundtrip")
 				if err != nil {
 					t.Fatalf("get failed: %v", err)
 				}
@@ -35,7 +50,7 @@ func TestRedisCache(t *testing.T) {
 		{
 			name: "get miss returns ErrCacheMiss",
 			run: func(t *testing.T, rc *RedisCache) {
-				_, err := rc.Get(ctx, "k:missing")
+				_, err := rc.Get(ctx, prefix+"missing")
 				if !errors.Is(err, ErrCacheMiss) {
 					t.Fatalf("expected ErrCacheMiss, got %v", err)
 				}
@@ -44,13 +59,13 @@ func TestRedisCache(t *testing.T) {
 		{
 			name: "ttl expiry",
 			run: func(t *testing.T, rc *RedisCache) {
-				if err := rc.Set(ctx, "k:ttl", []byte("value"), time.Second); err != nil {
+				if err := rc.Set(ctx, prefix+"ttl", []byte("value"), time.Second); err != nil {
 					t.Fatalf("set failed: %v", err)
 				}
 
 				time.Sleep(2 * time.Second)
 
-				_, err := rc.Get(ctx, "k:ttl")
+				_, err := rc.Get(ctx, prefix+"ttl")
 				if !errors.Is(err, ErrCacheMiss) {
 					t.Fatalf("expected ErrCacheMiss after expiry, got %v", err)
 				}
@@ -59,14 +74,14 @@ func TestRedisCache(t *testing.T) {
 		{
 			name: "delete",
 			run: func(t *testing.T, rc *RedisCache) {
-				if err := rc.Set(ctx, "k:delete", []byte("value"), time.Minute); err != nil {
+				if err := rc.Set(ctx, prefix+"delete", []byte("value"), time.Minute); err != nil {
 					t.Fatalf("set failed: %v", err)
 				}
-				if err := rc.Delete(ctx, "k:delete"); err != nil {
+				if err := rc.Delete(ctx, prefix+"delete"); err != nil {
 					t.Fatalf("delete failed: %v", err)
 				}
 
-				_, err := rc.Get(ctx, "k:delete")
+				_, err := rc.Get(ctx, prefix+"delete")
 				if !errors.Is(err, ErrCacheMiss) {
 					t.Fatalf("expected ErrCacheMiss after delete, got %v", err)
 				}
@@ -75,11 +90,11 @@ func TestRedisCache(t *testing.T) {
 		{
 			name: "exists true false",
 			run: func(t *testing.T, rc *RedisCache) {
-				if err := rc.Set(ctx, "k:exists", []byte("value"), time.Minute); err != nil {
+				if err := rc.Set(ctx, prefix+"exists", []byte("value"), time.Minute); err != nil {
 					t.Fatalf("set failed: %v", err)
 				}
 
-				exists, err := rc.Exists(ctx, "k:exists")
+				exists, err := rc.Exists(ctx, prefix+"exists")
 				if err != nil {
 					t.Fatalf("exists failed: %v", err)
 				}
@@ -87,7 +102,7 @@ func TestRedisCache(t *testing.T) {
 					t.Fatal("expected exists=true")
 				}
 
-				exists, err = rc.Exists(ctx, "k:not-found")
+				exists, err = rc.Exists(ctx, prefix+"not-found")
 				if err != nil {
 					t.Fatalf("exists failed: %v", err)
 				}
@@ -106,7 +121,7 @@ func TestRedisCache(t *testing.T) {
 					t.Fatalf("second close should be idempotent: %v", err)
 				}
 
-				if err := rc.Set(ctx, "k:after-close", []byte("value"), time.Minute); err == nil {
+				if err := rc.Set(ctx, prefix+"after-close", []byte("value"), time.Minute); err == nil {
 					t.Fatal("expected error after close")
 				}
 			},
@@ -137,7 +152,7 @@ func newTestRedisCache(t *testing.T, addr string) *RedisCache {
 		t.Skipf("redis not available at %s: %v", addr, err)
 	}
 
-	key := fmt.Sprintf("test:flush:%d", time.Now().UnixNano())
+	key := "test:probe:" + uuid.NewString()
 	if err := rc.Delete(context.Background(), key); err != nil {
 		t.Fatalf("pre-flight delete failed: %v", err)
 	}
