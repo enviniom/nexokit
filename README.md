@@ -77,12 +77,19 @@ IAM owns authentication under `internal/modules/iam/slices/auth`, including cred
 Adopt a local clone or fork once, from its repository root (Go 1.26+ required):
 
 ```bash
+go run ./cmd/nexokit init
+# Or use explicit flags for automation:
 go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api
 # Review the changed paths; preview writes nothing.
 go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --apply
 go build ./...
 go test ./...
 ```
+
+Bare `init` asks for application display name and GitHub username, derives the
+module (`My API` + `user-name` → `github.com/user-name/my-api`), previews, and asks
+for explicit confirmation (default No). It creates no GitHub repository and asks
+for no credentials. Flag calls never prompt; both identity flags are required.
 
 `--dry-run` explicitly previews; it cannot be combined with `--apply`. This changes
 application identity and module imports, including generator templates and seed

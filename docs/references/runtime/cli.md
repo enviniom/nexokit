@@ -7,6 +7,7 @@ Run the project-local CLI from the repository/release root: `go run ./cmd/nexoki
 | Command | Effect | Make equivalent |
 |---|---|---|
 | `help`, `--help`, `-h` | List top-level commands | — |
+| `init` | Ask display name and GitHub username; derive module, preview, confirm (default No) | — |
 | `init --name <name> --module <module> [--dry-run \| --apply]` | One-time local identity preview; deliberate apply | — |
 | `serve` | Bootstrap/start API; interrupt/SIGTERM shutdown | `make dev` |
 | `config` | Print selected resolved configuration as JSON | — |
@@ -29,12 +30,24 @@ Run the project-local CLI from the repository/release root: `go run ./cmd/nexoki
 From a fresh starter's current repository root:
 
 ```bash
+go run ./cmd/nexokit init
+# Explicit flags for automation:
 go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api
 go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --dry-run
 go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --apply
 ```
 
-Both preview forms write nothing. Review the sorted changed paths and remaining
+Bare `init` asks for application display name and GitHub username, not a module.
+`My API` and `user-name` produce `github.com/user-name/my-api`; the trimmed display
+name is preserved. The lowercase ASCII slug collapses spaces/dots/underscores/
+hyphens and trims separators. GitHub usernames must be 1–39 ASCII alphanumeric
+or hyphen characters, without leading/trailing/consecutive hyphens. No GitHub
+API, credentials or remote repository creation is involved. After preview,
+`Apply this plan? [y/N]` accepts trimmed case-insensitive `yes`/`y`; No, blank or
+EOF cancels successfully. Invalid confirmation fails without writes.
+
+Flag calls never read stdin; both identity flags are required, including with
+`--dry-run`. Both preview forms write nothing. Review the sorted changed paths and remaining
 known tool/provenance references before applying. `--name` and `--module` are
 required; unknown/duplicate flags, extra arguments and contradictory preview/apply
 flags fail. Go module paths with a domain and normal import components (including

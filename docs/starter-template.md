@@ -12,12 +12,22 @@ Compose is an optional local dependency runner. Redis/Valkey is optional when
 1. From a fresh local clone/fork root, preview, review the sorted paths, then apply:
 
 ```bash
+go run ./cmd/nexokit init
+# Or use explicit flags for automation:
 go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api
 # --dry-run is an optional explicit preview; neither preview form writes files.
 go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --apply
 go build ./...
 go test ./...
 ```
+
+Bare `init` asks for application display name and GitHub username. It derives
+`github.com/user-name/my-api` from `My API` and `user-name`, shows the plan, then
+asks `Apply this plan? [y/N]`. Only `yes`/`y` (case insensitive) applies; No,
+blank or EOF cancels without writes. No GitHub repository is created, no network
+lookup is performed, and no credentials are requested. The repository slug is
+lowercase ASCII, with runs of spaces/dots/underscores/hyphens collapsed to a
+hyphen. Unsupported characters and invalid GitHub usernames are rejected.
 
 2. Application identity changes in the root README heading and example `APP_NAME`;
    Go module imports, embedded generator templates, seed runner and generated-test
@@ -59,7 +69,9 @@ checks do not prove a hosted run succeeded.
 
 ## Initialization safety
 
-Preview is the default; only `--apply` writes, and `--apply` plus `--dry-run` is an
+Flag calls never prompt: both `--name` and `--module` are required, even with
+`--dry-run`. Preview is the flag default; only `--apply` writes (or explicit Yes
+in bare interactive mode), and `--apply` plus `--dry-run` is an
 error. Unknown/duplicate flags and positional arguments are refused. The current
 root must retain the starter module, README heading, example APP_NAME and CLI
 source identity anchors; partial or repeated initialization is refused.

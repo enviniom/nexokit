@@ -20,6 +20,9 @@ func (*InitCommand) Description() string {
 	return "Initialize local application identity (preview by default)"
 }
 func (*InitCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) error {
+	if len(args) == 0 {
+		return runInteractiveInit(ctx, stdio)
+	}
 	flags := flag.NewFlagSet("init", flag.ContinueOnError)
 	flags.SetOutput(stdio.Err)
 	name := flags.String("name", "", "Application display name")
@@ -56,6 +59,15 @@ func (*InitCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) err
 	if e != nil {
 		return e
 	}
+	printInitPreview(stdio, plan)
+	if !*apply {
+		stdio.Println("No files written. Review this plan, then repeat with --apply.")
+		return nil
+	}
+	return applyInit(ctx, stdio, plan)
+}
+
+func printInitPreview(stdio cli.Stdio, plan *projectinit.Plan) {
 	stdio.Println("Preview: one-time local application initialization")
 	for _, change := range plan.Changes {
 		stdio.Printf("  %s\n", change.Path)
@@ -64,9 +76,11 @@ func (*InitCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) err
 	for _, path := range plan.Remaining {
 		stdio.Printf("  %s\n", path)
 	}
-	if !*apply {
-		stdio.Println("No files written. Review this plan, then repeat with --apply.")
-		return nil
+}
+
+func applyInit(ctx context.Context, stdio cli.Stdio, plan *projectinit.Plan) error {
+	if e := ctx.Err(); e != nil {
+		return e
 	}
 	if e := plan.Apply(); e != nil {
 		return e

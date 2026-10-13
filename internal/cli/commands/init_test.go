@@ -15,7 +15,11 @@ import (
 func TestInitFlags(t *testing.T) {
 	for _, args := range [][]string{nil, {"--name", "App"}, {"--module", "example.com/a"}, {"--name", "App", "--module", "example.com/a", "--apply", "--dry-run"}, {"--unknown"}, {"--name"}, {"--name", "App", "--module", "example.com/a", "extra"}, {"--name", "App", "--name", "Other", "--module", "example.com/a"}} {
 		var out bytes.Buffer
-		if e := (&InitCommand{}).Run(context.Background(), args, cli.Stdio{Out: &out, Err: &out}); e == nil {
+		stdio := cli.Stdio{Out: &out, Err: &out}
+		if len(args) > 0 {
+			stdio.In = forbiddenInput{}
+		}
+		if e := (&InitCommand{}).Run(context.Background(), args, stdio); e == nil {
 			t.Errorf("accepted %v", args)
 		}
 	}
@@ -35,7 +39,7 @@ func TestInitPreviewAndApply(t *testing.T) {
 	args := []string{"--name", "App", "--module", "example.com/a"}
 	for _, extra := range [][]string{nil, {"--dry-run"}, {"--apply"}} {
 		var out bytes.Buffer
-		if e := (&InitCommand{}).Run(context.Background(), append(append([]string{}, args...), extra...), cli.Stdio{Out: &out, Err: &out}); e != nil {
+		if e := (&InitCommand{}).Run(context.Background(), append(append([]string{}, args...), extra...), cli.Stdio{In: forbiddenInput{}, Out: &out, Err: &out}); e != nil {
 			t.Fatal(e)
 		}
 		b, e := os.ReadFile("go.mod")
