@@ -1,18 +1,13 @@
-.PHONY: dev build test test-unit test-integration test-coverage migrate-up migrate-down migrate-create migrate-status migrate-reset seed create-root lint fmt vet install-hooks uninstall-hooks check-env check-module-errors
+.PHONY: dev init build test test-unit test-integration test-coverage migrate-up migrate-down migrate-create migrate-status migrate-reset seed create-root lint fmt vet install-hooks uninstall-hooks check-env check-module-errors
 
-# Load .env if present for Makefile variable expansion.
-# Export only the variables the app/CLI reads, avoiding accidental env bleed.
--include .env
-
-export APP_NAME APP_ENV APP_URL APP_PORT
-export DATABASE_URL DB_HOST DB_PORT DB_NAME DB_USER DB_PASSWORD DB_SSL_MODE DB_MAX_OPEN_CONNS DB_MAX_IDLE_CONNS DB_CONN_MAX_LIFETIME_SECONDS
-export CORS_ALLOWED_ORIGINS
-export LOG_LEVEL LOG_FORMAT LOG_FILE LOG_MAX_SIZE LOG_MAX_BACKUPS LOG_MAX_AGE LOG_COMPRESS LOG_GIN_FILE LOG_ERROR_FILE
-export SHUTDOWN_TIMEOUT_SECONDS
-export CACHE_DRIVER
+# The application loads .env as dotenv data; Make never parses or exports it.
+# Externally supplied environment variables are inherited normally.
 
 dev:
 	go run ./cmd/nexokit serve
+
+init:
+	go run ./cmd/nexokit init
 
 build:
 	go build -o bin/api ./cmd/api
@@ -32,17 +27,9 @@ test-coverage:
 	go tool cover -func=coverage.out
 
 migrate-up:
-	@if [ -z "$(DATABASE_URL)" ] && [ -z "$(DB_HOST)" ]; then \
-		echo "error: database configuration missing. Set DATABASE_URL or DB_* variables."; \
-		exit 1; \
-	fi
 	go run ./cmd/nexokit migrate up
 
 migrate-down:
-	@if [ -z "$(DATABASE_URL)" ] && [ -z "$(DB_HOST)" ]; then \
-		echo "error: database configuration missing. Set DATABASE_URL or DB_* variables."; \
-		exit 1; \
-	fi
 	go run ./cmd/nexokit migrate down
 
 migrate-create:
@@ -50,17 +37,9 @@ migrate-create:
 	go run ./cmd/nexokit migrate create $$name
 
 migrate-status:
-	@if [ -z "$(DATABASE_URL)" ] && [ -z "$(DB_HOST)" ]; then \
-		echo "error: database configuration missing. Set DATABASE_URL or DB_* variables."; \
-		exit 1; \
-	fi
 	go run ./cmd/nexokit migrate status
 
 migrate-reset:
-	@if [ -z "$(DATABASE_URL)" ] && [ -z "$(DB_HOST)" ]; then \
-		echo "error: database configuration missing. Set DATABASE_URL or DB_* variables."; \
-		exit 1; \
-	fi
 	go run ./cmd/nexokit migrate reset
 
 seed:

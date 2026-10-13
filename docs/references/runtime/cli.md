@@ -23,6 +23,13 @@ Run the project-local CLI from the repository/release root: `go run ./cmd/nexoki
 | `seed` | Discover and execute seed functions | `make seed` |
 | `create-root [--name ...] [--email ...] [--password ...] [--force]` | Persist initial root IAM user | `make create-root` (no flag forwarding) |
 
+Make wrappers leave `.env` parsing to the application's dotenv loader, preserving
+quoted credentials rather than interpreting them as Make or shell syntax.
+Inherited environment values, including explicitly empty values, override dotenv;
+the wrappers do not print environment values. Bare `make` runs `dev`, and
+`make init` forwards to `go run ./cmd/nexokit init`. Migration configuration
+validation and errors come from the CLI, not a separate Make environment guard.
+
 `make build` produces `bin/api` and `bin/nexokit`. Migration/seed paths are fixed relative to the working directory (`migrations/`, `seeds/`); there is no directory/config-file flag or migration dry-run flag. Except for initialization, module generation and root creation, commands define no custom flags. Top-level unknown commands fail; no arguments print usage and exit 1. `status` can report an unreachable database and still exit successfully—do not use it as a readiness gate.
 
 ## One-time local initialization

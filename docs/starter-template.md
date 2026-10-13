@@ -52,6 +52,12 @@ make create-root
 make dev
 ```
 
+Make delegates `.env` loading to the application, not Make or shell evaluation.
+Use dotenv quoting for credentials containing spaces, quotes, `#` or `$`;
+externally supplied environment values (including empty ones) take precedence.
+The wrappers do not print environment values. Bare `make` still runs `make dev`;
+`make init` delegates to the same interactive initializer shown above.
+
 5. Check `/health/live` and `/health/ready`, then exercise login and a protected route. Root user routes require `X-Company-ID`; see [request flow](references/runtime/request-flow.md).
 
 These are commands for the adopter to run. `init` never starts a database, runs
