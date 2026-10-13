@@ -36,6 +36,7 @@ type Plan struct {
 	// Test seam for exclusive publication; production always uses os.Link.
 	publishEnvironment func(string, string) error
 	createTemporary    func(string, string) (*os.File, error)
+	removeTemporary    func(string) error
 }
 
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9 ._-]{0,99}$`)
@@ -317,8 +318,12 @@ func (p *Plan) apply(rename func(string, string) error) (result error) {
 			if path == "" {
 				continue
 			}
-			if e := os.Remove(path); e != nil && !os.IsNotExist(e) {
-				result = errors.Join(result, fmt.Errorf("cleanup %s: %w", path, e))
+			remove := p.removeTemporary
+			if remove == nil {
+				remove = os.Remove
+			}
+			if e := remove(path); e != nil && !os.IsNotExist(e) {
+				result = errors.Join(result, fmt.Errorf("cleanup failed: %s; inspect protected residue manually", path))
 			}
 		}
 	}()

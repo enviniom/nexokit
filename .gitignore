@@ -22,6 +22,8 @@ cmd/nexokit/nexokit
 .env
 .env.local
 .env.*.local
+# Protected initializer staging/recovery files (may contain secrets)
+.nexokit-init-*
 
 # Logs
 logs/

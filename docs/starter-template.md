@@ -25,7 +25,8 @@ Bare `init` asks for application display name and GitHub username. It derives
 `github.com/user-name/my-api` from `My API` and `user-name`, shows the plan, then
 asks `Apply this plan? [y/N]`. Only `yes`/`y` (case insensitive) applies; No,
 blank or EOF cancels without writes. No GitHub repository is created, no network
-lookup is performed, and no credentials are requested. The repository slug is
+lookup is performed, and no GitHub credentials are requested. With no `.env`,
+the local-development questionnaire below runs before that single confirmation. The repository slug is
 lowercase ASCII, with runs of spaces/dots/underscores/hyphens collapsed to a
 hyphen. Unsupported characters and invalid GitHub usernames are rejected.
 
@@ -35,8 +36,10 @@ hyphen. Unsupported characters and invalid GitHub usernames are rejected.
    `cmd/nexokit`; NexoKit attribution is retained. Names with spaces are supported:
    use `--name "My API"`. This is one-time independent application ownership, not
    downloading, updating or synchronizing an upstream project.
-3. Existing `.env` is left untouched. For a new local setup only, copy the updated
-   `.env.example` to `.env`, or inject environment values. Review URLs/domains and
+3. Existing regular `.env` is preserved unread and configuration prompts are skipped.
+   Bare interactive init creates an absent `.env` from the updated example with
+   your local settings and a fresh development key. Flag calls remain identity-only;
+   for those calls, copy the example manually or inject environment values. Review URLs/domains and
    root-user defaults yourself; keep secrets out of version control. Configure
    PostgreSQL, a strong `PASETO_KEY`, and deliberate CORS/rate-limit settings. See
    [deployment configuration](deployment.md#configuration-and-secrets); local
@@ -65,17 +68,33 @@ migrations/seeds, creates root accounts, executes Git operations or changes
 `go.sum`/dependencies. Local private adoption does not select public distribution
 license terms.
 
-## Internal local-environment foundation
+## Local-development questionnaire
 
-The internal initializer plan can opt into creating `.env` from its snapshotted,
-identity-updated example with caller-supplied development settings. This is not
-wired into the CLI questionnaire yet. Existing regular `.env` files are skipped
+Only bare interactive `init` / `make init` creates `.env`. After name/username it
+asks, in order: `DB_HOST` (localhost), `DB_PORT` (5432), `DB_NAME` (app slug),
+`DB_USER` (postgres), password (no shared default), `DB_SSL_MODE` (disable),
+`APP_PORT` (8080), `APP_URL` (http://localhost with the selected port), then
+`CORS_ALLOWED_ORIGINS` (http://localhost:3000). Enter selects a displayed default;
+Enter at password intentionally chooses an empty local password. Password spaces
+are preserved. SSL modes are disable/allow/prefer/require/verify-ca/verify-full;
+ports must be 1–65535 and URLs/origins must be credential-free HTTP(S). CORS accepts
+comma-separated explicit origins, not a wildcard default.
+
+Real terminal password entry uses no-echo input; piped input is consumed without
+CLI echo but is not protected from shell history or the input producer. Do not
+pretype passwords: already buffered terminal input is refused. Cancellation is
+checked before/after synchronous reads, not while waiting for input. A fresh
+32-byte random key is encoded as 64 hex characters in memory; password/key are
+never previewed. Invalid input or entropy failure writes nothing. One default-No
+confirmation covers identity and environment writes together.
+
+The initializer creates `.env` from its snapshotted, identity-updated example. Existing regular `.env` files are skipped
 using metadata only; symlinks and nonregular destinations are refused. New files
 use mode `0600` and exclusive hard-link publication, preserving unrelated template
 lines. A filesystem without hard-link support fails closed instead of falling
 back to an overwriting rename.
 `APP_ENV` is forced to `development` and `DATABASE_URL` is cleared so `DB_*` applies.
-No password or key is invented by this layer.
+The plan layer does not invent credentials; the interactive wizard supplies them.
 
 Environment creation participates in staged identity updates and rollback. Use a
 quiescent local copy: this is not a cross-process or power-loss transaction.

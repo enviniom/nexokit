@@ -89,7 +89,11 @@ go test ./...
 Bare `init` asks for application display name and GitHub username, derives the
 module (`My API` + `user-name` → `github.com/user-name/my-api`), previews, and asks
 for explicit confirmation (default No). It creates no GitHub repository and asks
-for no credentials. Flag calls never prompt; both identity flags are required.
+for no GitHub credentials. If `.env` is absent, it asks for local PostgreSQL,
+app and CORS settings and creates a development-only `.env` with a fresh random
+PASETO key. Password input is hidden on real terminals; password/key previews are
+redacted. One confirmation covers all writes. Flag calls never prompt or create
+`.env`; both identity flags are required.
 
 `--dry-run` explicitly previews; it cannot be combined with `--apply`. This changes
 application identity and module imports, including generator templates and seed
@@ -97,7 +101,8 @@ runner source. `cmd/nexokit` and the NexoKit developer-tool attribution stay int
 Your application is independently owned: no downloader or upstream update contract.
 An already initialized or partially renamed project is refused.
 
-Existing `.env` is never changed. After applying, configure PostgreSQL, `PASETO_KEY`,
+Existing regular `.env` is preserved unread and skips configuration questions;
+symlinks/nonregular destinations are refused. After applying, review PostgreSQL, `PASETO_KEY`,
 CORS and rate limits yourself; use the quick-start migration, seed and root-account
 commands only after reviewing configuration. Local defaults are not production
 safeguards; initialization neither generates production secrets nor provisions a

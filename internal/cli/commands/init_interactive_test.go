@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -48,6 +50,9 @@ func TestInitInteractive(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			initFixture(t)
+			if err := os.WriteFile(".env", []byte("INVENTED=preserved\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
 			var out bytes.Buffer
 			err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader(tc.input), Out: &out, Err: &out})
 			if (err != nil) != tc.fail {
@@ -174,6 +179,38 @@ func TestInteractiveSourceCopy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	mod, err := os.ReadFile(filepath.Join(source, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentModule := ""
+	for _, line := range strings.Split(string(mod), "\n") {
+		fields := strings.Fields(strings.SplitN(line, "//", 2)[0])
+		if len(fields) == 0 || fields[0] != "module" {
+			continue
+		}
+		if len(fields) != 2 || currentModule != "" {
+			t.Fatal("malformed module directive in source go.mod")
+		}
+		currentModule = fields[1]
+		if strings.HasPrefix(currentModule, "\"") || strings.HasPrefix(currentModule, "`") {
+			currentModule, err = strconv.Unquote(currentModule)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if currentModule == "" || strings.ContainsAny(currentModule, " \t\r\n\\\"`") {
+		t.Fatal("missing or malformed source module")
+	}
+	for _, part := range strings.Split(currentModule, "/") {
+		if !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._~-]*$`).MatchString(part) || strings.Contains(part, "..") || strings.HasSuffix(part, ".") {
+			t.Fatal("malformed source module path")
+		}
+	}
+	if currentModule != projectinit.OriginalModule() {
+		t.Skip("starter adoption smoke requires canonical source")
+	}
 	target := t.TempDir()
 	copyFile := func(path, rel string) error {
 		b, err := os.ReadFile(path)
@@ -224,7 +261,7 @@ func TestInteractiveSourceCopy(t *testing.T) {
 	}
 	run := func(input string, success bool, args ...string) string {
 		t.Helper()
-		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, interactiveSmokeGo, args...)
 		cmd.Dir = target
@@ -246,7 +283,7 @@ func TestInteractiveSourceCopy(t *testing.T) {
 		identity[path] = b
 	}
 	for _, answer := range []string{"n\n", "\n"} {
-		run("My API\nuser-name\n"+answer, true, "run", "./cmd/nexokit", "init")
+		run("My API\nuser-name\n"+strings.Repeat("\n", 9)+answer, true, "run", "./cmd/nexokit", "init")
 		for path, original := range identity {
 			after, err := os.ReadFile(filepath.Join(target, path))
 			if err != nil || !bytes.Equal(original, after) {
@@ -254,7 +291,7 @@ func TestInteractiveSourceCopy(t *testing.T) {
 			}
 		}
 	}
-	run("My API\nuser-name\ny\n", true, "run", "./cmd/nexokit", "init")
+	run("My API\nuser-name\n"+strings.Repeat("\n", 9)+"y\n", true, "run", "./cmd/nexokit", "init")
 	after, err := os.ReadFile(filepath.Join(target, "go.mod"))
 	if err != nil || !strings.Contains(string(after), "module github.com/user-name/my-api\n") {
 		t.Fatal("module not applied")

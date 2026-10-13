@@ -1,12 +1,16 @@
 package projectinit
 
 import (
+	"context"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestInitializedSourceCopy deliberately excludes the protected original example.
@@ -18,6 +22,38 @@ func TestInitializedSourceCopy(t *testing.T) {
 	source, e := filepath.Abs("../../..")
 	if e != nil {
 		t.Fatal(e)
+	}
+	mod, err := os.ReadFile(filepath.Join(source, "go.mod"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentModule := ""
+	for _, line := range strings.Split(string(mod), "\n") {
+		fields := strings.Fields(strings.SplitN(line, "//", 2)[0])
+		if len(fields) == 0 || fields[0] != "module" {
+			continue
+		}
+		if len(fields) != 2 || currentModule != "" {
+			t.Fatal("malformed module directive in source go.mod")
+		}
+		currentModule = fields[1]
+		if strings.HasPrefix(currentModule, "\"") || strings.HasPrefix(currentModule, "`") {
+			currentModule, err = strconv.Unquote(currentModule)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if currentModule == "" || strings.ContainsAny(currentModule, " \t\r\n\\\"`") {
+		t.Fatal("missing or malformed source module")
+	}
+	for _, part := range strings.Split(currentModule, "/") {
+		if !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._~-]*$`).MatchString(part) || strings.Contains(part, "..") || strings.HasSuffix(part, ".") {
+			t.Fatal("malformed source module path")
+		}
+	}
+	if currentModule != OriginalModule() {
+		t.Skip("starter adoption smoke requires canonical source")
 	}
 	target := t.TempDir()
 	copyFile := func(path, rel string) error {
@@ -75,7 +111,9 @@ func TestInitializedSourceCopy(t *testing.T) {
 	put(t, target, ".env.example", "APP_NAME=nexokit\n")
 	run := func(wantSuccess bool, args ...string) string {
 		t.Helper()
-		cmd := exec.Command("go", args...)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "go", args...)
 		cmd.Dir = target
 		cmd.Env = append(os.Environ(), "GOWORK=off", "GOPROXY=off", "GOSUMDB=off", "NEXOKIT_INIT_SMOKE=1")
 		output, e := cmd.CombinedOutput()

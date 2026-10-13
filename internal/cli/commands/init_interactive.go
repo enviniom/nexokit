@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -30,11 +29,18 @@ func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 		if canceled := ctx.Err(); canceled != nil {
 			return "", canceled
 		}
+		line = strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
+		if !safeLocalValue(line) {
+			return "", errors.New("invalid input")
+		}
 		return strings.TrimSpace(line), err
 	}
 	name, err := read("Application display name: ")
 	if err != nil {
-		return fmt.Errorf("application input: %w", err)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return errors.New("application input failed; no files written")
 	}
 	slug, err := repositorySlug(name)
 	if err != nil {
@@ -42,7 +48,7 @@ func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 	}
 	username, err := read("GitHub username: ")
 	if err != nil {
-		return fmt.Errorf("GitHub username input: %w", err)
+		return errors.New("GitHub username input failed; no files written")
 	}
 	if !validGitHubUsername(username) {
 		return errors.New("invalid GitHub username")
@@ -59,11 +65,31 @@ func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 	if err != nil {
 		return err
 	}
+	exists, err := plan.EnvironmentExists()
+	if err != nil {
+		return err
+	}
+	if exists {
+		stdio.Println("Existing .env preserved unread; local configuration questions skipped.")
+	} else {
+		values, err := collectLocalEnvironment(stdio, slug, read, func() (string, error) {
+			return readInitPassword(ctx, stdio, reader)
+		}, initEntropy)
+		if err != nil {
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if err := plan.AddEnvironment(values); err != nil {
+			return err
+		}
+	}
 	stdio.Printf("Generated Go module: %s\n", module)
 	printInitPreview(stdio, plan)
 	answer, err := read("Apply this plan? [y/N]: ")
 	if err != nil && !errors.Is(err, io.EOF) {
-		return err
+		return errors.New("confirmation input failed; no files written")
 	}
 	// EOF is always a cancellation, including an unterminated affirmative answer.
 	if errors.Is(err, io.EOF) || answer == "" || strings.EqualFold(answer, "no") || strings.EqualFold(answer, "n") {
@@ -73,7 +99,11 @@ func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 	if !strings.EqualFold(answer, "yes") && !strings.EqualFold(answer, "y") {
 		return errors.New("invalid confirmation; no files written")
 	}
-	return applyInit(ctx, stdio, plan)
+	if err := applyInit(ctx, stdio, plan); err != nil {
+		return err
+	}
+	stdio.Println("Next: configure your local database deliberately, run migrations, and set up root access manually. Not production provisioning.")
+	return nil
 }
 
 func validGitHubUsername(username string) bool {

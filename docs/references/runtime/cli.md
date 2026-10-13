@@ -7,7 +7,7 @@ Run the project-local CLI from the repository/release root: `go run ./cmd/nexoki
 | Command | Effect | Make equivalent |
 |---|---|---|
 | `help`, `--help`, `-h` | List top-level commands | — |
-| `init` | Ask display name and GitHub username; derive module, preview, confirm (default No) | — |
+| `init` | Ask identity and, if `.env` absent, local settings; combined preview/confirmation (default No) | `make init` |
 | `init --name <name> --module <module> [--dry-run \| --apply]` | One-time local identity preview; deliberate apply | — |
 | `serve` | Bootstrap/start API; interrupt/SIGTERM shutdown | `make dev` |
 | `config` | Print selected resolved configuration as JSON | — |
@@ -53,7 +53,15 @@ API, credentials or remote repository creation is involved. After preview,
 `Apply this plan? [y/N]` accepts trimmed case-insensitive `yes`/`y`; No, blank or
 EOF cancels successfully. Invalid confirmation fails without writes.
 
-Flag calls never read stdin; both identity flags are required, including with
+Only bare interactive init asks local PostgreSQL/app/CORS settings and creates
+an absent `.env` with a fresh 32-byte random development PASETO key (64 hex).
+Existing regular `.env` is preserved unread and skips all settings/password/key
+questions; symlink/nonregular destinations fail closed. See the
+[questionnaire defaults and password limitations](../../starter-template.md#local-development-questionnaire).
+Password/key are redacted; one default-No confirmation precedes all writes.
+No database connections, provisioning, migrations or root creation occur.
+
+Flag calls never read stdin or create `.env`; both identity flags are required, including with
 `--dry-run`. Both preview forms write nothing. Review the sorted changed paths and remaining
 known tool/provenance references before applying. `--name` and `--module` are
 required; unknown/duplicate flags, extra arguments and contradictory preview/apply
@@ -69,7 +77,11 @@ starter identities fail safely. Candidates are preflighted and staged before
 commit; write errors trigger rollback with explicit failure reporting. Stop
 concurrent source writers during apply; this is not a cross-process transaction.
 
-Existing `.env`, dependencies and `go.sum` are untouched. After apply, configure
+Existing `.env`, dependencies and `go.sum` are untouched. New interactive `.env`
+uses exclusive creation and mode `0600`; unsupported hard-links fail closed.
+Stop concurrent writers: this is not a power-loss transaction. Cleanup can fail,
+leaving a protected `0600` temporary file at the reported path; inspect/remove it
+locally without printing contents. After apply, review
 PostgreSQL, PASETO, CORS and rate limits, then run `go build ./...` and
 `go test ./...`. Run migrations, seeds and root-account creation deliberately after
 configuration; none run automatically. Local defaults are not production security

@@ -245,3 +245,37 @@ func TestEnvironmentStageFailure(t *testing.T) {
 		t.Fatal("stage leak")
 	}
 }
+
+func TestEnvironmentCleanupFailureProtectedResidue(t *testing.T) {
+	root := fixture(t)
+	p, err := New(root, "Local App", "example.com/local/app")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = p.AddEnvironment(map[string]string{"DB_PASSWORD": "invented-private-cleanup"}); err != nil {
+		t.Fatal(err)
+	}
+	residue := ""
+	p.removeTemporary = func(path string) error {
+		b, err := os.ReadFile(path)
+		if err == nil && strings.Contains(string(b), "invented-private-cleanup") {
+			residue = path
+			return errors.New("invented-private-cleanup")
+		}
+		return os.Remove(path)
+	}
+	err = p.Apply()
+	if err == nil || residue == "" || !strings.Contains(err.Error(), residue) || strings.Contains(err.Error(), "invented-private-cleanup") {
+		t.Fatal("cleanup failure not redacted/recoverable")
+	}
+	info, e := os.Stat(residue)
+	if e != nil || info.Mode().Perm() != 0600 {
+		t.Fatal("residue not protected")
+	}
+	// Cleanup failure occurs after successful identity/environment publication;
+	// never delete an adopter destination as a side effect of temporary cleanup.
+	if _, e = os.Stat(filepath.Join(root, ".env")); e != nil {
+		t.Fatal("cleanup deleted published environment")
+	}
+	p.removeTemporary = nil
+}
