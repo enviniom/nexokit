@@ -16,7 +16,7 @@ Baseline: clean `feat/tenant-admin-access` at `c06e9cf`; previous initializer `e
 - Technical prompts/docs/tests default English like current project.
 
 ## Tasks
-- [ ] I1 — Implement interactive init with automated identity derivation, safety tests and adoption docs; independently verify and close as one work-unit commit. **In progress: independent verification PASS, no blockers; preparing scoped work-unit commit.**
+- [x] I1 — Implement interactive init with automated identity derivation, safety tests and adoption docs; independently verify and close as one work-unit commit. **Verified and committed in `1769aa8` (`feat(cli): derive starter identity through interactive init`).**
 
 ## Acceptance
 - Bare init prompts for name and GitHub username only for identity, derives expected module, then previews and asks explicit confirmation.
@@ -41,8 +41,8 @@ Previous Redis-dependent subtests require localhost Redis and may skip; report e
 - Worker reported real-DB migrate/root tests and recursive nested source-copy smokes skipped; Redis tests passed. Independent outer skips: TestMigrateCommand_Up, TestCreateRootCommand_IdempotentRealDB, TestMigrateCommand_DBConnect (no database configuration). Nested run additionally skips TestInteractiveSourceCopy/TestInitializedSourceCopy only to prevent recursion; remaining unit tests run. Redis tests passed with available service; no services provisioned by agents, no hosted deployment checks.
 - Authored diff 458 changed lines, above advisory review budget to preserve safety/runtime tests and docs; no multi-area product expansion.
 - ASSESS unassessable on untracked paths, RDD off => high-risk separate verifier. `mv669tq9-d-p4jz` independently PASS: fresh secret-free source-copy full verbose tests (536 top-level PASS, zero FAIL), build/vet/global format/actual module guard. Real stdin no/blank preserved identity hashes; yes applied expected module/name, help and repeated-init rejection worked; renamed build/short tests passed. Flag caller with closed stdin and panic-on-read tests passed. Original Git status stable, no dependencies/planner changes.
-- Work-unit commit: pending.
+- Work-unit commit: `1769aa8`, eight scoped files +499/-7 including tests/docs/tracking.
 - Rollback boundary: interactive branch/input helpers/tests and matching adoption docs only; existing planner/flag functionality remains independently valid.
 
 ## Next step
-Verification complete, no blockers. Commit scoped behavior/tests/docs and record identity, then use bare `go run ./cmd/nexokit init` in a fresh application copy. Prompts request application name/GitHub username, derive module and default-No confirmation; no remote creation. Real PostgreSQL migrate/root/provisioning/PASETO/production configuration and hosted CI not verified. Synchronous blocked stdin cannot be immediately canceled; checks run before/after reads. Per-command smoke timeout 120s passed here but could be fragile on slow hosts. Pre-commit hook absent; no push/PR.
+Feature verified and committed, no blockers. Use bare `go run ./cmd/nexokit init` in a fresh application copy. Prompts request application name/GitHub username, derive module and default-No confirmation; no remote creation. Real PostgreSQL migrate/root/provisioning/PASETO/production configuration and hosted CI not verified. Synchronous blocked stdin cannot be immediately canceled; checks run before/after reads. Per-command smoke timeout 120s passed here but could be fragile on slow hosts. Pre-commit hook absent; no push/PR.
