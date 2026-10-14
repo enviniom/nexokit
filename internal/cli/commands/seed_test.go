@@ -119,6 +119,76 @@ func MainSeed() error { return nil }
 	}
 }
 
+func TestSeedRunnerCurrentModuleAndPinnedEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	bin := filepath.Join(dir, "bin")
+	if err := os.Mkdir(bin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	script := `#!/bin/sh
+[ "$#" = 2 ] && [ "$1" = run ] && [ "$2" = . ] || exit 21
+[ "${ROOT_USER_PASSWORD+x}" != x ] || exit 22
+[ "$DATABASE_URL" = "" ] && [ "$DB_NAME" = selected ] || exit 23
+[ "${PGHOST+x}" != x ] || exit 24
+[ "$DB_HOST" = selected.invalid ] && [ "$DB_PORT" = 5439 ] && [ "$DB_USER" = fake ] && [ "$DB_SSL_MODE" = disable ] || exit 25
+expected=$(printf '%s' 'invented #$ '"'"'quotes'"'"' \ end')
+[ "$DB_PASSWORD" = "$expected" ] || exit 26
+cp main.go "` + filepath.Join(dir, "observed.go") + `"
+printf 'seed output\n'
+`
+	if err := os.WriteFile(filepath.Join(bin, "go"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("DATABASE_URL", "postgres://wrong.invalid/wrong")
+	t.Setenv("ROOT_USER_PASSWORD", "invented-root-secret")
+	t.Setenv("PGHOST", "wrong.invalid")
+	// Simulate adoption after compilation; the legacy generator still has its
+	// original import but the runtime runner must consult this current module.
+	if err := os.WriteFile("go.mod", []byte("module \"example.test/adopted\"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var out, stderr bytes.Buffer
+	values := selectedBootstrapValues()
+	values["DB_NAME"] = "selected"
+	values["DB_PASSWORD"] = "invented #$ 'quotes' \\ end"
+	values["ROOT_USER_PASSWORD"] = "invented-root-secret"
+	err := runSeedsWithEnvironment(context.Background(), []seedFunc{{name: "RolesSeed"}}, cli.Stdio{Out: &out, Err: &stderr}, values)
+	if err != nil || out.String() != "seed output\n" || stderr.Len() != 0 {
+		t.Fatalf("runner: %v stdout %q stderr %q", err, out.String(), stderr.String())
+	}
+	data, err := os.ReadFile("observed.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"example.test/adopted/seeds"`) || strings.Contains(string(data), "invented-root-secret") || strings.Contains(string(data), "github.com/enviniom/nexokit/seeds") {
+		t.Fatal("runner module or credentials")
+	}
+	entries, err := os.ReadDir(".tmp")
+	if err != nil || len(entries) != 0 {
+		t.Fatal("runner not cleaned")
+	}
+	if err := os.Mkdir("seeds", 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("seeds/roles.go", []byte("package seeds\nfunc RolesSeed() error {return nil}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	out.Reset()
+	stderr.Reset()
+	err = (&SeedCommand{}).Run(ctx, nil, cli.Stdio{Out: &out, Err: &stderr})
+	if err == nil || !strings.Contains(err.Error(), "seed runner failed") || out.String() != "Running 1 seed(s)...\n" || stderr.Len() != 0 {
+		t.Fatal("standalone cancellation or streaming changed")
+	}
+	entries, err = os.ReadDir(".tmp")
+	if err != nil || len(entries) != 0 {
+		t.Fatal("canceled runner not cleaned")
+	}
+}
+
 func TestDiscoverSeedFunctions_MissingDir(t *testing.T) {
 	funcs, err := discoverSeedFunctions("/nonexistent/path")
 	if err != nil {

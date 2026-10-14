@@ -9,8 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
-	"time"
 
 	"github.com/enviniom/nexokit/internal/cli"
 )
@@ -114,13 +114,24 @@ func isNoArgErrorFunc(fn *ast.FuncDecl) bool {
 // in package seeds and export functions, so we synthesise a runner that
 // imports them and invokes each one in order.
 func runSeeds(ctx context.Context, funcs []seedFunc, stdio cli.Stdio) error {
-	runnerDir := filepath.Join(".tmp", fmt.Sprintf("seed-runner-%d", time.Now().UnixNano()))
-	if err := os.MkdirAll(runnerDir, 0755); err != nil {
+	return runSeedsWithEnvironment(ctx, funcs, stdio, nil)
+}
+
+func runSeedsWithEnvironment(ctx context.Context, funcs []seedFunc, stdio cli.Stdio, values map[string]string) error {
+	module, err := currentSeedModule()
+	if err != nil {
+		return fmt.Errorf("seed runner failed: module validation failed")
+	}
+	if err := os.MkdirAll(".tmp", 0700); err != nil {
+		return fmt.Errorf("failed to create runner directory")
+	}
+	runnerDir, err := os.MkdirTemp(".tmp", "seed-runner-")
+	if err != nil {
 		return fmt.Errorf("failed to create runner directory: %w", err)
 	}
 	defer os.RemoveAll(runnerDir)
 
-	mainGo := generateRunnerSource(funcs)
+	mainGo := generateRunnerSourceForModule(funcs, module)
 
 	runnerFile := filepath.Join(runnerDir, "main.go")
 	if err := os.WriteFile(runnerFile, []byte(mainGo), 0644); err != nil {
@@ -131,6 +142,9 @@ func runSeeds(ctx context.Context, funcs []seedFunc, stdio cli.Stdio) error {
 	cmd.Dir = runnerDir
 	cmd.Stdout = stdio.Out
 	cmd.Stderr = stdio.Err
+	if values != nil {
+		cmd.Env = seedEnvironment(os.Environ(), values)
+	}
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("seed runner failed: %w", err)
 	}
@@ -138,9 +152,66 @@ func runSeeds(ctx context.Context, funcs []seedFunc, stdio cli.Stdio) error {
 	return nil
 }
 
+// currentSeedModule reads the adopted module at execution, not compilation.
+func currentSeedModule() (string, error) {
+	data, err := os.ReadFile("go.mod")
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || fields[0] != "module" {
+			continue
+		}
+		name := fields[1]
+		if strings.HasPrefix(name, "\"") {
+			name, err = strconv.Unquote(name)
+			if err != nil {
+				return "", err
+			}
+		}
+		if name == "" || strings.ContainsAny(name, " \t\r\n\"\\") || strings.HasPrefix(name, "/") || strings.Contains(name, "..") {
+			return "", fmt.Errorf("invalid module")
+		}
+		for _, r := range name {
+			if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune(".-_~/", r)) {
+				return "", fmt.Errorf("invalid module")
+			}
+		}
+		return name, nil
+	}
+	return "", fmt.Errorf("missing module")
+}
+
+// seedEnvironment removes inherited DB routing and root credentials before
+// appending the complete effective configuration. Standalone seed keeps its
+// existing environment because it calls the runner without this override.
+func seedEnvironment(inherited []string, values map[string]string) []string {
+	result := []string{}
+	for _, entry := range inherited {
+		key, _, _ := strings.Cut(entry, "=")
+		_, overridden := values[key]
+		if overridden || key == "DATABASE_URL" || strings.HasPrefix(key, "DB_") || strings.HasPrefix(key, "PG") || strings.HasPrefix(key, "ROOT_") {
+			continue
+		}
+		result = append(result, entry)
+	}
+	for key, value := range values {
+		if strings.HasPrefix(key, "ROOT_") || (strings.HasPrefix(key, "PG") && key != "PGPASSWORD" && key != "PGPASSFILE" && key != "PGSSLMODE" && key != "PGPORT") {
+			continue
+		}
+		result = append(result, key+"="+value)
+	}
+	return result
+}
+
 // generateRunnerSource returns the Go source for a main package that calls
 // every discovered seed function. It is a pure function and can be unit-tested.
 func generateRunnerSource(funcs []seedFunc) string {
+	return generateRunnerSourceForModule(funcs, "github.com/enviniom/nexokit")
+}
+
+func generateRunnerSourceForModule(funcs []seedFunc, module string) string {
 	var calls strings.Builder
 	for _, fn := range funcs {
 		calls.WriteString(fmt.Sprintf("\tif err := seeds.%s(); err != nil {\n", fn.name))
@@ -156,11 +227,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/enviniom/nexokit/seeds"
+	%s
 )
 
 func main() {
 %s
 }
-`, calls.String())
+`, strconv.Quote(module+"/seeds"), calls.String())
 }

@@ -2,13 +2,31 @@ package commands
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/enviniom/nexokit/internal/config"
 )
 
-func TestToDisplayConfig_MasksSecrets(t *testing.T) {
+// Restore the process environment so later tests keep their toolchain and
+// explicitly selected temporary/cache directories.
+func clearConfigTestEnvironment(t *testing.T) {
+	t.Helper()
+	saved := os.Environ()
 	os.Clearenv()
+	t.Cleanup(func() {
+		os.Clearenv()
+		for _, entry := range saved {
+			key, value, _ := strings.Cut(entry, "=")
+			if err := os.Setenv(key, value); err != nil {
+				t.Errorf("restore environment variable %s: %v", key, err)
+			}
+		}
+	})
+}
+
+func TestToDisplayConfig_MasksSecrets(t *testing.T) {
+	clearConfigTestEnvironment(t)
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
@@ -25,7 +43,7 @@ func TestToDisplayConfig_MasksSecrets(t *testing.T) {
 }
 
 func TestToDisplayConfig_PreservesNonSecrets(t *testing.T) {
-	os.Clearenv()
+	clearConfigTestEnvironment(t)
 	os.Setenv("APP_NAME", "testapp")
 	os.Setenv("APP_PORT", "9090")
 
