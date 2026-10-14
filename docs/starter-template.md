@@ -4,31 +4,29 @@ Fork or clone the repository into your namespace; it is a starting application, 
 
 ## Quick path
 
-Prerequisites: Go 1.26+ and the project dependencies available to Go. PostgreSQL is
-needed for the application and provisioning commands, **not** for `init`; Docker
-Compose is an optional local dependency runner. Redis/Valkey is optional when
-`CACHE_DRIVER=none`.
+Prerequisites: Go 1.26.3+ (current `go.mod`) and the project dependencies available to Go. PostgreSQL is
+required during `init`: use an already reachable instance and an appropriate empty
+database with migration permissions. The initializer provisions no services.
+Redis/Valkey is optional: `CACHE_DRIVER=none` and the default in-memory rate limiter
+need no Redis. Configuring Redis is a deliberate separate choice.
 
-1. From a fresh local clone/fork root, preview, review the sorted paths, then apply:
+1. From a fresh local clone/fork root, run the single setup entrypoint:
 
 ```bash
-go run ./cmd/nexokit init
-# Or use explicit flags for automation:
-go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api
-# --dry-run is an optional explicit preview; neither preview form writes files.
-go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --apply
+make init
+# Only after setup succeeds:
 go build ./...
 go test ./...
 ```
 
-Bare `init` asks for application display name and GitHub username. It derives
-`github.com/user-name/my-api` from `My API` and `user-name`, shows the plan, then
-asks `Apply this plan? [y/N]`. Only `yes`/`y` (case insensitive) applies; No,
-blank or EOF cancels without writes. No GitHub repository is created, no network
-lookup is performed, and no GitHub credentials are requested. With no `.env`,
-the local-development questionnaire below runs before that single confirmation. The repository slug is
-lowercase ASCII, with runs of spaces/dots/underscores/hyphens collapsed to a
-hyphen. Unsupported characters and invalid GitHub usernames are rejected.
+Interactive `init` asks for display name and GitHub username, deriving
+`github.com/user-name/my-api` from `My API` and `user-name`. It creates no GitHub
+repository and requests no GitHub credentials. It collects environment choices,
+configuration and root credentials, shows a redacted plan with the effective
+nonsecret database target, then requests one confirmation, default No. Declining
+leaves files and database unchanged. Approval applies identity/environment, then
+runs **migrations → seeds → root creation** before reporting success. It does not
+start the full application before tables, seeds and root exist.
 
 2. Application identity changes in the root README heading and example `APP_NAME`;
    Go module imports, embedded generator templates, seed runner and generated-test
@@ -36,22 +34,16 @@ hyphen. Unsupported characters and invalid GitHub usernames are rejected.
    `cmd/nexokit`; NexoKit attribution is retained. Names with spaces are supported:
    use `--name "My API"`. This is one-time independent application ownership, not
    downloading, updating or synchronizing an upstream project.
-3. Existing regular `.env` is preserved unread and configuration prompts are skipped.
-   Bare interactive init creates an absent `.env` from the updated example with
-   your local settings and a fresh development key. Flag calls remain identity-only;
-   for those calls, copy the example manually or inject environment values. Review URLs/domains and
-   root-user defaults yourself; keep secrets out of version control. Configure
-   PostgreSQL, a strong `PASETO_KEY`, and deliberate CORS/rate-limit settings. See
-   [deployment configuration](deployment.md#configuration-and-secrets); local
-   defaults are not production safeguards. `init` generates no production secrets
-   and makes no production-readiness guarantee.
-4. Review and deliberately execute local provisioning from the repository root:
+3. If a regular `.env` exists, explicitly choose **keep** or **backup and rebuild**.
+   Keep preserves its bytes and mode, using its exact database URL/components;
+   validate and deliberately update incompatible configuration yourself, rather
+   than expecting silent replacement. Rebuild retains a protected backup and
+   creates fresh development configuration from the example (details below).
+   Review CORS/rate limits deliberately; local defaults are not production
+   safeguards. See [deployment configuration](deployment.md#configuration-and-secrets).
+4. Start the application only after successful setup and validation:
 
 ```bash
-docker compose up -d
-make migrate-up
-make seed
-make create-root
 make dev
 ```
 
@@ -63,15 +55,15 @@ The wrappers do not print environment values. Bare `make` still runs `make dev`;
 
 5. Check `/health/live` and `/health/ready`, then exercise login and a protected route. Root user routes require `X-Company-ID`; see [request flow](references/runtime/request-flow.md).
 
-These are commands for the adopter to run. `init` never starts a database, runs
-migrations/seeds, creates root accounts, executes Git operations or changes
-`go.sum`/dependencies. Local private adoption does not select public distribution
-license terms.
+These are commands for the adopter to run. `init` runs migrations, seeds and root
+creation, but never provisions a database, executes Git operations or changes
+`go.sum`/dependencies. It is once-only, not a maintenance/upgrade command. Local
+private adoption does not select public distribution license terms.
 
 ## Local-development questionnaire
 
-Only bare interactive `init` / `make init` creates `.env`. After name/username it
-asks, in order: `DB_HOST` (localhost), `DB_PORT` (5432), `DB_NAME` (app slug),
+Interactive `init` / `make init` creates an absent `.env`, or rebuilds one only
+when explicitly selected. For new/rebuilt configuration it collects: `DB_HOST` (localhost), `DB_PORT` (5432), `DB_NAME` (app slug),
 `DB_USER` (postgres), password (no shared default), `DB_SSL_MODE` (disable),
 `APP_PORT` (8080), `APP_URL` (http://localhost with the selected port), then
 `CORS_ALLOWED_ORIGINS` (http://localhost:3000). Enter selects a displayed default;
@@ -86,15 +78,22 @@ pretype passwords: already buffered terminal input is refused. Cancellation is
 checked before/after synchronous reads, not while waiting for input. A fresh
 32-byte random key is encoded as 64 hex characters in memory; password/key are
 never previewed. Invalid input or entropy failure writes nothing. One default-No
-confirmation covers identity and environment writes together.
+confirmation covers identity/environment and database setup together. Root name
+and email are required; email must parse as a mail address. The root password is
+required, at least 8 bytes, with uppercase, lowercase and a digit (the domain
+validator's rules). There is no default root password. Never store it in dotenv,
+command arguments or committed demo scripts.
 
-The initializer creates `.env` from its snapshotted, identity-updated example. Existing regular `.env` files are skipped
-using metadata only; symlinks and nonregular destinations are refused. New files
-use mode `0600` and exclusive hard-link publication, preserving unrelated template
-lines. A filesystem without hard-link support fails closed instead of falling
-back to an overwriting rename.
+The initializer creates `.env` from its snapshotted, identity-updated example,
+preserving unknown content and comments. Existing regular files require the keep
+or rebuild choice; symlinks and nonregular destinations are refused. Rebuild
+retains `.env.backup-<32 lowercase hex characters>` at mode `0600`; only that
+narrow backup-name pattern is ignored by Git. New/rebuilt files use mode `0600`
+and exclusive hard-link publication. Keep leaves bytes/mode unchanged. A
+filesystem without hard-link support fails closed instead of overwriting.
 `APP_ENV` is forced to `development` and `DATABASE_URL` is cleared so `DB_*` applies.
-The plan layer does not invent credentials; the interactive wizard supplies them.
+These development overrides apply to new/rebuilt configuration, not kept files.
+The plan layer does not invent root credentials.
 
 Environment creation participates in staged identity updates and rollback. Use a
 quiescent local copy: this is not a cross-process or power-loss transaction.
@@ -113,8 +112,18 @@ checks do not prove a hosted run succeeded.
 ## Initialization safety
 
 Flag calls never prompt: both `--name` and `--module` are required, even with
-`--dry-run`. Preview is the flag default; only `--apply` writes (or explicit Yes
-in bare interactive mode), and `--apply` plus `--dry-run` is an
+`--dry-run`. Preview is stdin-free/write-free and is the flag default:
+
+```bash
+go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api
+go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --dry-run
+```
+
+`--apply` performs complete initial setup without stdin. It requires selected
+configuration and explicit process inputs `ROOT_USER_NAME`, `ROOT_USER_EMAIL`,
+`ROOT_USER_PASSWORD`; supply secrets through protected process injection, not
+literal shell commands/history or password argv. Applying with an existing
+environment requires `--env-action keep` or `--env-action rebuild`. `--apply` plus `--dry-run` is an
 error. Unknown/duplicate flags and positional arguments are refused. The current
 root must retain the starter module, README heading, example APP_NAME and CLI
 source identity anchors; partial or repeated initialization is refused.
@@ -131,7 +140,31 @@ All candidate contents, types and modes are checked before writes; replacements
 and rollback copies are staged with preserved modes. A failed commit restores
 completed replacements and reports any rollback failure. This is not a
 cross-process transaction or a power-loss recovery system. Review errors before
-retrying; no automatic repair or repeated-init/upgrade framework is provided.
+recovery; no automatic repair or repeated-init/upgrade framework is provided.
+
+## Failure recovery and maintenance
+
+Setup stops at the failing stage; later stages do not run. Configuration/identity
+preflight failure before apply leaves the project unadopted. Once identity has
+been applied, a database-stage failure requires manual recovery, **not another
+init**: the adoption guard refuses repeated setup. Goose failures are reported
+generically without exposing connection secrets.
+
+There is no universal atomic rollback across files, migrations, arbitrary seed
+code and root creation. Migrations or seeds may already have persisted changes.
+Retain and inspect protected recovery backups locally without displaying secrets;
+check the failing stage and actual database state before choosing the appropriate
+existing maintenance command:
+
+| Command | Deliberate recovery/maintenance action |
+|---|---|
+| `make migrate-status` / `nexokit migrate status` | Inspect migration state |
+| `make migrate-up` / `nexokit migrate up` | Apply remaining migrations |
+| `make seed` / `nexokit seed` | Execute reviewed seeds; consider prior side effects |
+| `make create-root` / `nexokit create-root` | Create a missing root after seeds; refuses an existing root, never resets its password |
+
+These are distinct explicit operations, not extra quick-start steps or permission
+to rerun init. Start `make dev` only after schema, seeds and root are ready.
 
 ## Choose capabilities deliberately
 

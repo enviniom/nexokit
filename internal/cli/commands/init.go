@@ -17,7 +17,7 @@ type InitCommand struct{}
 
 func (*InitCommand) Name() string { return "init" }
 func (*InitCommand) Description() string {
-	return "Initialize local application identity (preview by default)"
+	return "Initialize once: identity, environment, migrations, seeds and root (flags preview by default)"
 }
 func (*InitCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) error {
 	if len(args) == 0 {
@@ -27,7 +27,8 @@ func (*InitCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) err
 	flags.SetOutput(stdio.Err)
 	name := flags.String("name", "", "Application display name")
 	module := flags.String("module", "", "Independent Go module path")
-	apply := flags.Bool("apply", false, "Write the validated plan")
+	apply := flags.Bool("apply", false, "Perform complete one-time setup; requires explicit settings and ROOT_USER_NAME/ROOT_USER_EMAIL/ROOT_USER_PASSWORD process inputs")
+	envAction := flags.String("env-action", "", "Existing environment choice: keep or rebuild (required with --apply when present)")
 	flags.Bool("dry-run", false, "Explicit preview without writes")
 	seen := map[string]bool{}
 	for _, arg := range args {
@@ -43,10 +44,13 @@ func (*InitCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) err
 		return e
 	}
 	if flags.NArg() != 0 || *name == "" || *module == "" {
-		return errors.New("usage: init --name <application> --module <module> [--dry-run | --apply]")
+		return errors.New("usage: init --name <application> --module <module> [--env-action keep|rebuild] [--dry-run | --apply]")
 	}
 	if seen["apply"] && seen["dry-run"] {
 		return errors.New("--apply and --dry-run are mutually exclusive")
+	}
+	if *envAction != "" && *envAction != "keep" && *envAction != "rebuild" {
+		return errors.New("--env-action must be keep or rebuild")
 	}
 	if e := ctx.Err(); e != nil {
 		return e
@@ -55,16 +59,49 @@ func (*InitCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) err
 	if e != nil {
 		return e
 	}
+	if e := projectinit.CheckUninitialized(root); e != nil {
+		return e
+	}
 	plan, e := projectinit.New(root, *name, *module)
 	if e != nil {
 		return e
 	}
-	printInitPreview(stdio, plan)
 	if !*apply {
-		stdio.Println("No files written. Review this plan, then repeat with --apply.")
+		printInitPreview(stdio, plan)
+		stdio.Println("No files written. Review this plan, then repeat with --apply and complete setup inputs.")
 		return nil
 	}
-	return applyInit(ctx, stdio, plan)
+	exists, e := plan.EnvironmentExists()
+	if e != nil {
+		return e
+	}
+	if exists && *envAction == "" {
+		return errors.New("existing environment requires --env-action keep|rebuild; no files written")
+	}
+	if !exists && *envAction == "keep" {
+		return errors.New("cannot keep an absent environment; no files written")
+	}
+	if !exists || *envAction == "rebuild" {
+		values, e := initFlagEnvironment()
+		if e != nil {
+			return e
+		}
+		if e := plan.ConfigureEnvironment(values); e != nil {
+			return e
+		}
+	}
+	selected, e := plan.SelectEnvironment()
+	if e != nil {
+		return e
+	}
+	input := initRootFromEnvironment()
+	target, e := validateInitSetup(selected.Values, input)
+	if e != nil {
+		return e
+	}
+	printInitPreview(stdio, plan)
+	printInitSetupPreview(stdio, target)
+	return executeInitSetup(ctx, stdio, plan, selected, input)
 }
 
 func printInitPreview(stdio cli.Stdio, plan *projectinit.Plan) {
@@ -76,17 +113,4 @@ func printInitPreview(stdio cli.Stdio, plan *projectinit.Plan) {
 	for _, path := range plan.Remaining {
 		stdio.Printf("  %s\n", path)
 	}
-}
-
-func applyInit(ctx context.Context, stdio cli.Stdio, plan *projectinit.Plan) error {
-	if e := ctx.Err(); e != nil {
-		return e
-	}
-	if e := plan.Apply(); e != nil {
-		return e
-	}
-	stdio.Println("Applied. Application identity changed; cmd/nexokit remains the developer tool.")
-	stdio.Println("Existing .env is unchanged. Configure PostgreSQL, PASETO_KEY, CORS and rate limits deliberately.")
-	stdio.Println("Next: go build ./...; go test ./...; then run migrate up, seed and create-root yourself after configuring the database.")
-	return nil
 }

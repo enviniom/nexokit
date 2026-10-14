@@ -10,10 +10,11 @@ import (
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/cli/projectinit"
+	"github.com/enviniom/nexokit/internal/cli/root"
 )
 
-func TestInitFlags(t *testing.T) {
-	for _, args := range [][]string{nil, {"--name", "App"}, {"--module", "example.com/a"}, {"--name", "App", "--module", "example.com/a", "--apply", "--dry-run"}, {"--unknown"}, {"--name"}, {"--name", "App", "--module", "example.com/a", "extra"}, {"--name", "App", "--name", "Other", "--module", "example.com/a"}} {
+func TestInitCommandFlags(t *testing.T) {
+	for _, args := range [][]string{nil, {"--name", "App"}, {"--module", "example.com/a"}, {"--name", "App", "--module", "example.com/a", "--apply", "--dry-run"}, {"--unknown"}, {"--name"}, {"--name", "App", "--module", "example.com/a", "extra"}, {"--name", "App", "--name", "Other", "--module", "example.com/a"}, {"--name", "App", "--module", "example.com/a", "--env-action", "invalid"}, {"--name", "App", "--module", "example.com/a", "--env-action", "keep", "--env-action", "rebuild"}, {"--root-password", "not-an-accepted-secret-flag"}} {
 		var out bytes.Buffer
 		stdio := cli.Stdio{Out: &out, Err: &out}
 		if len(args) > 0 {
@@ -24,7 +25,16 @@ func TestInitFlags(t *testing.T) {
 		}
 	}
 }
-func TestInitPreviewAndApply(t *testing.T) {
+func TestInitCommandPreviewAndApply(t *testing.T) {
+	initSetupProcessSettings(t)
+	t.Setenv("DB_SSL_MODE", "disable")
+	calls := 0
+	old := initSetupPrepare
+	t.Cleanup(func() { initSetupPrepare = old })
+	initSetupPrepare = func(context.Context, map[string]string, root.CreateRootInput) (*preparedInitBootstrap, error) {
+		calls++
+		return &preparedInitBootstrap{}, nil
+	}
 	root := t.TempDir()
 	for path, text := range map[string]string{"go.mod": "module " + projectinit.OriginalModule() + "\n", "README.md": "# NexoKit\n", ".env.example": "APP_NAME=nexokit\n", "cmd/nexokit/main.go": "package main\nimport _ \"" + projectinit.OriginalModule() + "/internal/cli\"\n"} {
 		full := filepath.Join(root, path)
@@ -55,6 +65,9 @@ func TestInitPreviewAndApply(t *testing.T) {
 				t.Fatal("preview wrote or missing output")
 			}
 		}
+	}
+	if calls != 1 {
+		t.Fatalf("previews/apply prepared %d times; want exactly one", calls)
 	}
 	var out bytes.Buffer
 	if e := (&InitCommand{}).Run(context.Background(), args, cli.Stdio{Out: &out, Err: &out}); e == nil {

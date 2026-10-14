@@ -12,13 +12,20 @@ import (
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/cli/projectinit"
+	"github.com/enviniom/nexokit/internal/cli/root"
 	"github.com/joho/godotenv"
 )
 
-func TestInteractiveCreatesLocalEnvironment(t *testing.T) {
+func TestInitCommandCreatesLocalEnvironment(t *testing.T) {
+	old := initSetupPrepare
+	t.Cleanup(func() { initSetupPrepare = old })
+	initSetupPrepare = func(context.Context, map[string]string, root.CreateRootInput) (*preparedInitBootstrap, error) {
+		return &preparedInitBootstrap{}, nil
+	}
+
 	initFixture(t)
 	var out bytes.Buffer
-	input := "My API\nuser-name\n\n\n\n\n  invented password  \n\n\n\n\ny\n"
+	input := "My API\nuser-name\n\n\n\n\n  invented password  \n\n\n\n\nRoot\nroot@example.test\nInventedRoot123\ny\n"
 	if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader(input), Out: &out, Err: &out}); err != nil {
 		t.Fatal(err)
 	}
@@ -89,12 +96,12 @@ func TestLocalEnvironmentValidationAndEntropy(t *testing.T) {
 	}
 }
 
-func TestInteractiveCancelAndEntropyFailure(t *testing.T) {
+func TestInitCommandCancelAndEntropyFailure(t *testing.T) {
 	for _, answer := range []string{"n\n", "\n", "", "y"} {
 		t.Run("cancel "+answer, func(t *testing.T) {
 			initFixture(t)
 			var out bytes.Buffer
-			input := "App\nuser\n" + strings.Repeat("\n", 9) + answer
+			input := "App\nuser\n" + strings.Repeat("\n", 9) + "Root\nroot@example.test\nInventedRoot123\n" + answer
 			if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader(input), Out: &out}); err != nil {
 				t.Fatal(err)
 			}
@@ -146,23 +153,28 @@ func TestCustomLocalEnvironmentFreshKeys(t *testing.T) {
 	}
 }
 
-func TestExistingEnvironmentSkipsEntropyAndInput(t *testing.T) {
+func TestInitCommandKeptEnvironmentSkipsWizardEntropy(t *testing.T) {
 	initFixture(t)
-	if err := os.WriteFile(".env", []byte("invented existing private content"), 0000); err != nil {
+	kept := "DB_HOST=localhost\nDB_PORT=5432\nDB_NAME=synthetic\nDB_USER=synthetic\nDB_PASSWORD=synthetic-only\nDB_SSL_MODE=disable\nPASETO_KEY=" + strings.Repeat("ab", 32) + "\n"
+	if err := os.WriteFile(".env", []byte(kept), 0640); err != nil {
 		t.Fatal(err)
 	}
 	previous := initEntropy
 	initEntropy = failingInput{}
 	t.Cleanup(func() { initEntropy = previous })
 	var out bytes.Buffer
-	if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader("App\nuser\ny\n"), Out: &out}); err != nil {
+	if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader("App\nuser\nkeep\nRoot\nroot@example.test\nInventedRoot123\nn\n"), Out: &out}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "preserved unread") || strings.Contains(out.String(), "DB_PASSWORD") || strings.Contains(out.String(), "private content") {
-		t.Fatal("existing environment not skipped")
+	if !strings.Contains(out.String(), "Keeping existing") || strings.Contains(out.String(), "DB_PASSWORD") || strings.Contains(out.String(), "synthetic-only") {
+		t.Fatal("kept environment wizard/secret handling incorrect")
+	}
+	data, err := os.ReadFile(".env")
+	if err != nil || string(data) != kept {
+		t.Fatal("kept environment bytes changed")
 	}
 	info, err := os.Stat(".env")
-	if err != nil || info.Mode().Perm() != 0000 {
-		t.Fatal("existing environment changed")
+	if err != nil || info.Mode().Perm() != 0640 {
+		t.Fatal("kept environment mode changed")
 	}
 }

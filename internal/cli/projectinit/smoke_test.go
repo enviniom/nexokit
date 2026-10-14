@@ -129,10 +129,22 @@ func TestInitializedSourceCopy(t *testing.T) {
 	if get(t, target, "go.mod") != before {
 		t.Fatal("CLI preview wrote")
 	}
-	run(true, append(args, "--apply")...)
+	// Full CLI setup now requires explicit configuration and root credentials.
+	// This offline source-adoption smoke must not connect to a database.
+	run(false, append(args, "--apply")...)
+	if get(t, target, "go.mod") != before {
+		t.Fatal("missing setup inputs wrote identity")
+	}
+	plan, err := New(target, "Starter Smoke", "example.com/team/starter-smoke")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := plan.Apply(); err != nil {
+		t.Fatal(err)
+	}
 	run(true, "run", "./cmd/nexokit", "help")
 	output := run(false, args...)
-	if !strings.Contains(output, "starter identity") && !strings.Contains(output, "not an uninitialized NexoKit module") {
+	if !strings.Contains(output, "init cannot rerun") {
 		t.Fatal("repeat did not fail identity check")
 	}
 	for _, dir := range []string{"cmd", "internal", "tests", "seeds"} {

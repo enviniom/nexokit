@@ -6,7 +6,7 @@ NexoKit is an opinionated modular Go starter for SaaS APIs. It ships with authen
 
 | Layer | Choice |
 |-------|--------|
-| Language | Go 1.26+ |
+| Language | Go 1.26.3+ (see `go.mod`) |
 | HTTP framework | Gin |
 | ORM | GORM (runtime queries only) |
 | Database | PostgreSQL |
@@ -23,16 +23,34 @@ The codebase is organized as a modular monolith: `cmd/` entrypoints wire `intern
 
 ## Quick start
 
+Prerequisites: installed Go 1.26.3+ (the current `go.mod` requirement), dependencies
+available to Go, and an already reachable PostgreSQL instance with an appropriate
+empty database and credentials permitted to migrate it. Setup does not provision
+PostgreSQL or other services. Redis is optional: use `CACHE_DRIVER=none` and the
+default in-memory rate limiter unless you deliberately configure Redis.
+
+From a fresh clone/fork root:
+
 ```bash
-cp .env.example .env
-docker compose up -d
-make migrate-up
-make seed
-make create-root
+make init
+# After setup completes:
+go build ./...
+go test ./...
 make dev
 ```
 
-The API boots on `http://localhost:8080` (or `APP_PORT` from `.env`).
+`make init` is the single, once-only setup entrypoint. It collects project identity,
+local configuration (or an explicit keep/backup-and-rebuild choice for an existing
+`.env`) and root credentials, previews the nonsecret database target, then asks for
+**one confirmation, default No**. On approval it applies identity/environment,
+runs **migrations → seeds → root creation**, and only then reports completion.
+Enter the root password at the protected terminal prompt, never in command arguments
+or dotenv. Start the full application only after these stages succeed.
+
+The API boots on `http://localhost:8080` (or the selected `APP_PORT`). Do not rerun
+`init` on an adopted project; see [setup and recovery](docs/starter-template.md).
+Keeping an existing environment preserves its bytes and mode and uses its database
+configuration; it may require deliberate validation/configuration updates before setup.
 
 ## Everyday commands
 
@@ -41,11 +59,12 @@ The API boots on `http://localhost:8080` (or `APP_PORT` from `.env`).
 | `make dev` | Run the API server in development mode |
 | `make build` | Build `bin/api` and `bin/nexokit` |
 | `make test` | Run all tests |
-| `make migrate-up` | Apply pending migrations |
+| `make init` | Adopt and complete initial setup once; not a maintenance command |
+| `make migrate-up` | Explicit maintenance/recovery: apply pending migrations |
 | `make migrate-down` | Rollback the last migration batch |
 | `make migrate-create` | Create a new migration file |
-| `make seed` | Run seed files from `seeds/` |
-| `make create-root` | Create the initial root user |
+| `make seed` | Explicit maintenance/recovery: run seed files from `seeds/` |
+| `make create-root` | Explicit recovery: create a missing root; refuses an existing root |
 | `make fmt` | Format all Go files |
 | `make lint` | Run `go vet` + module boundary checks |
 
@@ -74,39 +93,34 @@ IAM owns authentication under `internal/modules/iam/slices/auth`, including cred
 
 ## Using NexoKit as a starter
 
-Adopt a local clone or fork once, from its repository root (Go 1.26+ required):
+Use the interactive `make init` quick start above for complete setup. For a safe,
+stdin-free and write-free identity preview:
 
 ```bash
-go run ./cmd/nexokit init
-# Or use explicit flags for automation:
 go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api
-# Review the changed paths; preview writes nothing.
-go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --apply
-go build ./...
-go test ./...
+go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --dry-run
 ```
 
-Bare `init` asks for application display name and GitHub username, derives the
-module (`My API` + `user-name` → `github.com/user-name/my-api`), previews, and asks
-for explicit confirmation (default No). It creates no GitHub repository and asks
-for no GitHub credentials. If `.env` is absent, it asks for local PostgreSQL,
-app and CORS settings and creates a development-only `.env` with a fresh random
-PASETO key. Password input is hidden on real terminals; password/key previews are
-redacted. One confirmation covers all writes. Flag calls never prompt or create
-`.env`; both identity flags are required.
+Bare `init` derives the module from display name and GitHub username; it creates
+no GitHub repository and requests no GitHub credentials. Flag calls require both
+`--name` and `--module`. Their default is preview; `--dry-run` is explicit preview
+and cannot be combined with `--apply`. Flag `--apply` performs complete initial
+setup without stdin: provide selected configuration and explicit process inputs
+`ROOT_USER_NAME`, `ROOT_USER_EMAIL`, `ROOT_USER_PASSWORD` through protected secret
+injection, not literal shell-history examples or password arguments. For an
+existing environment, applying requires `--env-action keep` or `--env-action rebuild` explicitly.
 
-`--dry-run` explicitly previews; it cannot be combined with `--apply`. This changes
-application identity and module imports, including generator templates and seed
-runner source. `cmd/nexokit` and the NexoKit developer-tool attribution stay intact.
-Your application is independently owned: no downloader or upstream update contract.
-An already initialized or partially renamed project is refused.
+Backup/rebuild retains a protected `.env.backup-<32 lowercase hex characters>`
+(mode `0600`, ignored by a narrow Git pattern) and creates a new `0600` environment
+from the example, preserving unknown content/comments with a fresh development
+PASETO key and empty `DATABASE_URL`. Keep does not silently replace configuration.
+Symlinks/nonregular destinations are refused.
 
-Existing regular `.env` is preserved unread and skips configuration questions;
-symlinks/nonregular destinations are refused. After applying, review PostgreSQL, `PASETO_KEY`,
-CORS and rate limits yourself; use the quick-start migration, seed and root-account
-commands only after reviewing configuration. Local defaults are not production
-safeguards; initialization neither generates production secrets nor provisions a
-database. Keep or evolve modules, migrations and vertical slices deliberately.
+Identity/module imports change; `cmd/nexokit` and original NexoKit tool provenance
+remain. Your application is independently owned, with no downloader/upstream
+update contract. Adopted or partially renamed projects are refused. Local defaults
+are not production safeguards; no database provisioning or production-readiness
+promise is made. Keep or evolve modules, migrations and vertical slices deliberately.
 
 See [`docs/starter-template.md`](docs/starter-template.md) for the full adoption guide.
 

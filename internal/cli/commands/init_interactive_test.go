@@ -16,6 +16,7 @@ import (
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/cli/projectinit"
+	"github.com/enviniom/nexokit/internal/cli/root"
 )
 
 func initFixture(t *testing.T) {
@@ -33,24 +34,31 @@ func initFixture(t *testing.T) {
 	t.Chdir(root)
 }
 
-func TestInitInteractive(t *testing.T) {
+func TestInitCommandInteractive(t *testing.T) {
+	old := initSetupPrepare
+	t.Cleanup(func() { initSetupPrepare = old })
+	initSetupPrepare = func(context.Context, map[string]string, root.CreateRootInput) (*preparedInitBootstrap, error) {
+		return &preparedInitBootstrap{}, nil
+	}
+	prefix := "My API\nuser-name\nkeep\nRoot\nroot@example.test\nInventedRoot123\n"
+
 	for _, tc := range []struct {
 		name, input string
 		apply, fail bool
 	}{
-		{"yes", "My API\nuser-name\n Y \n", true, false},
-		{"no", "My API\nuser-name\nn\n", false, false},
-		{"blank", "My API\nuser-name\n\n", false, false},
-		{"confirmation EOF", "My API\nuser-name\n", false, false},
-		{"unterminated yes", "My API\nuser-name\ny", false, false},
-		{"unknown", "My API\nuser-name\nmaybe\n", false, true},
+		{"yes", prefix + " Y \n", true, false},
+		{"no", prefix + "n\n", false, false},
+		{"blank", prefix + "\n", false, false},
+		{"confirmation EOF", prefix, false, false},
+		{"unterminated yes", prefix + "y", false, false},
+		{"unknown", prefix + "maybe\n", false, true},
 		{"missing name", "\n", false, true},
 		{"missing user", "My API\n", false, true},
 		{"unsafe name", "My/API\nuser\ny\n", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			initFixture(t)
-			if err := os.WriteFile(".env", []byte("INVENTED=preserved\n"), 0600); err != nil {
+			if err := os.WriteFile(".env", []byte("DB_HOST=localhost\nDB_PORT=5432\nDB_NAME=synthetic\nDB_USER=synthetic\nDB_PASSWORD=synthetic-only\nDB_SSL_MODE=disable\nPASETO_KEY="+strings.Repeat("ab", 32)+"\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
 			var out bytes.Buffer
@@ -107,7 +115,7 @@ type forbiddenInput struct{}
 
 func (forbiddenInput) Read([]byte) (int, error) { panic("flag command read stdin") }
 
-func TestInitInteractiveFailures(t *testing.T) {
+func TestInitCommandInteractiveFailures(t *testing.T) {
 	for _, username := range []string{"-user", "user-", "u--ser", "@user", "user/name", "https://github.com/user", "üser", strings.Repeat("a", 40), "u\tser"} {
 		t.Run(username, func(t *testing.T) {
 			initFixture(t)
@@ -282,8 +290,28 @@ func TestInteractiveSourceCopy(t *testing.T) {
 		}
 		identity[path] = b
 	}
+
+	t.Chdir(target)
+	oldPrepare := initSetupPrepare
+	t.Cleanup(func() { initSetupPrepare = oldPrepare })
+	var phases []string
+	initSetupPrepare = func(context.Context, map[string]string, root.CreateRootInput) (*preparedInitBootstrap, error) {
+		p := &preparedInitBootstrap{}
+		for _, name := range []string{"migrations", "seeds", "root"} {
+			stage := name
+			p.stages = append(p.stages, bootstrapStage{name: stage, run: func(context.Context) error { phases = append(phases, stage); return nil }})
+		}
+		return p, nil
+	}
+	commandInput := "My API\nuser-name\n" + strings.Repeat("\n", 9) + "Root\nroot@example.test\nInventedRoot123\n"
 	for _, answer := range []string{"n\n", "\n"} {
-		run("My API\nuser-name\n"+strings.Repeat("\n", 9)+answer, true, "run", "./cmd/nexokit", "init")
+		var out bytes.Buffer
+		if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader(commandInput + answer), Out: &out, Err: &out}); err != nil {
+			t.Fatal(err)
+		}
+		if len(phases) != 0 {
+			t.Fatal("cancellation ran database stages")
+		}
 		for path, original := range identity {
 			after, err := os.ReadFile(filepath.Join(target, path))
 			if err != nil || !bytes.Equal(original, after) {
@@ -291,7 +319,13 @@ func TestInteractiveSourceCopy(t *testing.T) {
 			}
 		}
 	}
-	run("My API\nuser-name\n"+strings.Repeat("\n", 9)+"y\n", true, "run", "./cmd/nexokit", "init")
+	var initOut bytes.Buffer
+	if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader(commandInput + "y\n"), Out: &initOut, Err: &initOut}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(phases, ",") != "migrations,seeds,root" || !strings.Contains(initOut.String(), "Setup complete") {
+		t.Fatal("public setup did not complete in order")
+	}
 	after, err := os.ReadFile(filepath.Join(target, "go.mod"))
 	if err != nil || !strings.Contains(string(after), "module github.com/user-name/my-api\n") {
 		t.Fatal("module not applied")

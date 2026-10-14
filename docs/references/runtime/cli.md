@@ -7,8 +7,8 @@ Run the project-local CLI from the repository/release root: `go run ./cmd/nexoki
 | Command | Effect | Make equivalent |
 |---|---|---|
 | `help`, `--help`, `-h` | List top-level commands | — |
-| `init` | Ask identity and, if `.env` absent, local settings; combined preview/confirmation (default No) | `make init` |
-| `init --name <name> --module <module> [--dry-run \| --apply]` | One-time local identity preview; deliberate apply | — |
+| `init` | Complete one-time setup: identity, environment choice, migrations, seeds and root; confirmation defaults to No | `make init` |
+| `init --name <name> --module <module> [--dry-run \| --apply] [--env-action keep\|rebuild]` | Stdin-free preview or explicit complete setup with process configuration/root inputs | — |
 | `serve` | Bootstrap/start API; interrupt/SIGTERM shutdown | `make dev` |
 | `config` | Print selected resolved configuration as JSON | — |
 | `status` | Build version, database reachability, SQL file count and Goose version | — |
@@ -25,8 +25,10 @@ Run the project-local CLI from the repository/release root: `go run ./cmd/nexoki
 
 Make wrappers leave `.env` parsing to the application's dotenv loader, preserving
 quoted credentials rather than interpreting them as Make or shell syntax.
-Inherited environment values, including explicitly empty values, override dotenv;
-the wrappers do not print environment values. Bare `make` runs `dev`, and
+For ordinary commands, inherited environment values, including explicitly empty values,
+override dotenv; the wrappers do not print environment values. Initialization instead
+pins every database stage to its selected configuration or explicitly kept dotenv,
+so an inherited database URL cannot silently redirect the wizard. Bare `make` runs `dev`, and
 `make init` forwards to `go run ./cmd/nexokit init`. Migration configuration
 validation and errors come from the CLI, not a separate Make environment guard.
 
@@ -53,19 +55,28 @@ API, credentials or remote repository creation is involved. After preview,
 `Apply this plan? [y/N]` accepts trimmed case-insensitive `yes`/`y`; No, blank or
 EOF cancels successfully. Invalid confirmation fails without writes.
 
-Only bare interactive init asks local PostgreSQL/app/CORS settings and creates
-an absent `.env` with a fresh 32-byte random development PASETO key (64 hex).
-Existing regular `.env` is preserved unread and skips all settings/password/key
-questions; symlink/nonregular destinations fail closed. See the
+Interactive init asks whether to keep an existing regular `.env` or back it up
+and rebuild it from the example. Keep preserves bytes/mode and uses that exact
+database configuration. Absent/rebuilt environments collect local PostgreSQL,
+app and CORS settings and a fresh 32-byte development PASETO key (64 hex).
+Root credentials are collected separately; no default root password is supplied.
+Real-terminal password input is hidden. See the
 [questionnaire defaults and password limitations](../../starter-template.md#local-development-questionnaire).
-Password/key are redacted; one default-No confirmation precedes all writes.
-No database connections, provisioning, migrations or root creation occur.
+Passwords/key are redacted. One default-No confirmation precedes mutations and
+external database preflight; successful setup applies identity/environment then
+runs **migrations → seeds → root creation** before reporting completion.
+PostgreSQL must already be reachable; init does not provision services or start
+the full application before tables exist.
 
-Flag calls never read stdin or create `.env`; both identity flags are required, including with
-`--dry-run`. Both preview forms write nothing. Review the sorted changed paths and remaining
-known tool/provenance references before applying. `--name` and `--module` are
-required; unknown/duplicate flags, extra arguments and contradictory preview/apply
-flags fail. Go module paths with a domain and normal import components (including
+Flag calls never read stdin; both identity flags are required, including with
+`--dry-run`. Default/explicit previews write nothing and do not connect to the DB.
+`--apply` performs complete setup and requires explicit configuration and process
+inputs `ROOT_USER_NAME`, `ROOT_USER_EMAIL`, `ROOT_USER_PASSWORD`, not password argv
+or dotenv. Use protected secret injection, not literal shell-history examples.
+For an existing environment, explicitly select `--env-action keep` or
+`--env-action rebuild`. Review changed paths and the effective nonsecret target.
+Unknown/duplicate flags, extra arguments and contradictory preview/apply flags
+fail. Go module paths with a domain and normal import components (including
 `/v2` or later) are accepted; traversal, control characters and injection are not.
 Display names permit letters/digits, spaces, dots, hyphens and underscores.
 
@@ -77,15 +88,23 @@ starter identities fail safely. Candidates are preflighted and staged before
 commit; write errors trigger rollback with explicit failure reporting. Stop
 concurrent source writers during apply; this is not a cross-process transaction.
 
-Existing `.env`, dependencies and `go.sum` are untouched. New interactive `.env`
-uses exclusive creation and mode `0600`; unsupported hard-links fail closed.
+Dependencies and `go.sum` are untouched. Keep leaves `.env` unchanged; rebuild
+retains a protected `.env.backup-<32 lowercase hex characters>` and publishes new
+configuration from the example. Backup/new files use mode `0600`; unknown example
+content/comments are retained, development mode is selected and `DATABASE_URL`
+is empty for new/rebuilt configuration. Unsupported hard-links fail closed.
 Stop concurrent writers: this is not a power-loss transaction. Cleanup can fail,
 leaving a protected `0600` temporary file at the reported path; inspect/remove it
-locally without printing contents. After apply, review
-PostgreSQL, PASETO, CORS and rate limits, then run `go build ./...` and
-`go test ./...`. Run migrations, seeds and root-account creation deliberately after
-configuration; none run automatically. Local defaults are not production security
-guarantees, and no production secrets are generated. See [adoption](../../starter-template.md).
+locally without printing contents.
+
+Setup stops at the failing stage, without later stages or a false completion
+message. There is no atomic rollback across files, Goose, arbitrary seeds and
+root creation; database changes may persist. Once identity has been applied, init
+cannot be repeated. Review the failing stage and use the separate migration,
+seed and create-root maintenance commands for deliberate recovery. Existing root
+credentials are not overwritten. After successful setup run `go build ./...`,
+`go test ./...`, then start the application. Local defaults are not production
+security guarantees. See [adoption and recovery](../../starter-template.md).
 
 ## Module generation
 
@@ -137,7 +156,7 @@ Sources: `internal/cli/commands/createroot.go`, `root_storage.go`, `internal/cli
 
 ## Seeds
 
-Files must use `package seeds` and export a zero-argument function ending in `Seed` that returns exactly `error`. Discovery parses Go files; no matching functions is a successful no-op. Execution generates a runner under `.tmp/`, invokes `go run`, then cleans it up. The runner needs the source tree, Go toolchain, writable working directory and database access; a standalone binary is insufficient. The one-time `init --apply` rewrites the seed runner's project import together with other source imports.
+Files must use `package seeds` and export a zero-argument function ending in `Seed` that returns exactly `error`. Discovery parses Go files; no matching functions is a successful no-op. Execution generates a runner under `.tmp/`, invokes `go run`, then cleans it up. The runner needs the source tree, Go toolchain, writable working directory and database access; a standalone binary is insufficient. The runner derives its seed import from the current `go.mod`, including when the original running initializer has just adopted a new module. During initial setup, its child database configuration is pinned to the same selected target as migrations and root creation; root-password process inputs are removed.
 
 Review seeds before executing them against production; there is no general dry-run, transaction or idempotence guarantee.
 

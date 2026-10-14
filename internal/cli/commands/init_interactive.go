@@ -10,10 +10,18 @@ import (
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/cli/projectinit"
+	"github.com/enviniom/nexokit/internal/cli/root"
 )
 
 func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 	if err := ctx.Err(); err != nil {
+		return err
+	}
+	directory, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	if err := projectinit.CheckUninitialized(directory); err != nil {
 		return err
 	}
 	if stdio.In == nil {
@@ -57,11 +65,7 @@ func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	root, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	plan, err := projectinit.New(root, name, module)
+	plan, err := projectinit.New(directory, name, module)
 	if err != nil {
 		return err
 	}
@@ -69,9 +73,22 @@ func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 	if err != nil {
 		return err
 	}
+	rebuild := !exists
 	if exists {
-		stdio.Println("Existing .env preserved unread; local configuration questions skipped.")
-	} else {
+		choice, err := read("Existing .env: KEEP or BACKUP+REBUILD? [keep]: ")
+		if err != nil {
+			return errors.New("environment choice input failed; no files written")
+		}
+		switch strings.ToLower(choice) {
+		case "", "keep":
+			stdio.Println("Keeping existing .env bytes and mode; using its exact configuration.")
+		case "rebuild", "backup+rebuild":
+			rebuild = true
+		default:
+			return errors.New("invalid environment choice; no files written")
+		}
+	}
+	if rebuild {
 		values, err := collectLocalEnvironment(stdio, slug, read, func() (string, error) {
 			return readInitPassword(ctx, stdio, reader)
 		}, initEntropy)
@@ -81,12 +98,34 @@ func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if err := plan.AddEnvironment(values); err != nil {
+		if err := plan.ConfigureEnvironment(values); err != nil {
 			return err
 		}
 	}
+	selected, err := plan.SelectEnvironment()
+	if err != nil {
+		return err
+	}
+	rootName, err := read("Root name: ")
+	if err != nil {
+		return errors.New("root input failed; no files written")
+	}
+	rootEmail, err := read("Root email: ")
+	if err != nil {
+		return errors.New("root input failed; no files written")
+	}
+	rootPassword, err := readInitRootPassword(ctx, stdio, reader)
+	if err != nil {
+		return err
+	}
+	input := root.CreateRootInput{Name: rootName, Email: rootEmail, Password: rootPassword}
+	target, err := validateInitSetup(selected.Values, input)
+	if err != nil {
+		return err
+	}
 	stdio.Printf("Generated Go module: %s\n", module)
 	printInitPreview(stdio, plan)
+	printInitSetupPreview(stdio, target)
 	answer, err := read("Apply this plan? [y/N]: ")
 	if err != nil && !errors.Is(err, io.EOF) {
 		return errors.New("confirmation input failed; no files written")
@@ -99,11 +138,7 @@ func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 	if !strings.EqualFold(answer, "yes") && !strings.EqualFold(answer, "y") {
 		return errors.New("invalid confirmation; no files written")
 	}
-	if err := applyInit(ctx, stdio, plan); err != nil {
-		return err
-	}
-	stdio.Println("Next: configure your local database deliberately, run migrations, and set up root access manually. Not production provisioning.")
-	return nil
+	return executeInitSetup(ctx, stdio, plan, selected, input)
 }
 
 func validGitHubUsername(username string) bool {
