@@ -1,6 +1,9 @@
 package projectinit
 
 import (
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
@@ -40,6 +43,10 @@ func (p *Plan) AddEnvironment(values map[string]string) error {
 	if exists {
 		return nil
 	}
+	return p.prepareEnvironment(values)
+}
+
+func (p *Plan) prepareEnvironment(values map[string]string) error {
 	known := map[string]bool{}
 	for _, k := range environmentKeys {
 		known[k] = true
@@ -131,6 +138,63 @@ func (p *Plan) AddEnvironment(values map[string]string) error {
 		sort.Slice(p.Changes, func(i, j int) bool { return p.Changes[i].Path < p.Changes[j].Path })
 	}
 	p.environment = []byte(result)
+	return nil
+}
+
+// ConfigureEnvironment plans creation or an explicitly selected backup/rebuild.
+// Planning is write-free; Apply publishes the previewed backup path exclusively.
+func (p *Plan) ConfigureEnvironment(values map[string]string) error {
+	if p.environment != nil {
+		return errors.New("environment already planned")
+	}
+	exists, err := p.EnvironmentExists()
+	if err != nil {
+		return err
+	}
+	var original *snapshot
+	var identity os.FileInfo
+	backup := ""
+	if exists {
+		path := filepath.Join(p.root, ".env")
+		data, mode, e := readRegular(path)
+		if e != nil {
+			return errors.New("environment snapshot refused")
+		}
+		identity, e = os.Lstat(path)
+		if e != nil {
+			return errors.New("environment metadata refused")
+		}
+		original = &snapshot{path: ".env", before: data, mode: mode}
+		var nonce [16]byte
+		if _, e = rand.Read(nonce[:]); e != nil {
+			return errors.New("backup name unavailable")
+		}
+		backup = ".env.backup-" + hex.EncodeToString(nonce[:])
+		if _, e = os.Lstat(filepath.Join(p.root, backup)); !os.IsNotExist(e) {
+			return errors.New("backup destination refused")
+		}
+	}
+	if err = p.prepareEnvironment(values); err != nil {
+		return err
+	}
+	p.environmentOriginal, p.environmentIdentity, p.environmentBackup = original, identity, backup
+	if backup != "" {
+		p.Changes = append(p.Changes, Change{Path: backup})
+		sort.Slice(p.Changes, func(i, j int) bool { return p.Changes[i].Path < p.Changes[j].Path })
+	}
+	return nil
+}
+
+func (p *Plan) checkEnvironmentOriginal() error {
+	path := filepath.Join(p.root, ".env")
+	data, mode, err := readRegular(path)
+	if err != nil {
+		return errors.New("environment changed since preview")
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !os.SameFile(info, p.environmentIdentity) || mode != p.environmentOriginal.mode || !bytes.Equal(data, p.environmentOriginal.before) {
+		return errors.New("environment changed since preview")
+	}
 	return nil
 }
 

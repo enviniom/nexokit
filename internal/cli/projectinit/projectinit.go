@@ -28,11 +28,14 @@ type snapshot struct {
 
 // Plan exposes paths, never potentially sensitive file contents.
 type Plan struct {
-	Changes     []Change
-	Remaining   []string
-	root        string
-	files       []snapshot
-	environment []byte
+	Changes             []Change
+	Remaining           []string
+	root                string
+	files               []snapshot
+	environment         []byte
+	environmentOriginal *snapshot
+	environmentIdentity os.FileInfo
+	environmentBackup   string
 	// Test seam for exclusive publication; production always uses os.Link.
 	publishEnvironment func(string, string) error
 	createTemporary    func(string, string) (*os.File, error)
@@ -294,7 +297,14 @@ func (p *Plan) apply(rename func(string, string) error) (result error) {
 		if err != nil {
 			return err
 		}
-		if exists {
+		if p.environmentOriginal != nil {
+			if !exists || p.checkEnvironmentOriginal() != nil {
+				return errors.New("environment changed since preview")
+			}
+			if _, err := os.Lstat(filepath.Join(p.root, p.environmentBackup)); !os.IsNotExist(err) {
+				return errors.New("backup destination refused")
+			}
+		} else if exists {
 			return errors.New("environment destination appeared since preview")
 		}
 	}
@@ -310,6 +320,7 @@ func (p *Plan) apply(rename func(string, string) error) (result error) {
 	type staged struct {
 		file         snapshot
 		next, backup string
+		owned        os.FileInfo
 	}
 	var stages []staged
 	var temporary []string
@@ -355,7 +366,11 @@ func (p *Plan) apply(rename func(string, string) error) (result error) {
 		if e != nil {
 			return fmt.Errorf("backup %s: %w", f.path, e)
 		}
-		stages = append(stages, staged{f, next, backup})
+		owned, e := os.Lstat(next)
+		if e != nil {
+			return errors.New("stage metadata failed")
+		}
+		stages = append(stages, staged{file: f, next: next, backup: backup, owned: owned})
 	}
 	if p.environment != nil {
 		next, err := stage(snapshot{path: ".env", mode: 0600}, p.environment)
@@ -374,8 +389,47 @@ func (p *Plan) apply(rename func(string, string) error) (result error) {
 			publish = os.Link
 		}
 		destination := filepath.Join(p.root, ".env")
+		recovery := ""
+		if p.environmentOriginal != nil {
+			// The protected public backup is never overwritten or cleaned automatically.
+			recovery, err = stage(snapshot{path: ".env", mode: 0600}, p.environmentOriginal.before)
+			if err != nil {
+				return errors.New("stage environment backup failed")
+			}
+			if err = p.checkEnvironmentOriginal(); err != nil {
+				return err
+			}
+			if err = os.Link(recovery, filepath.Join(p.root, p.environmentBackup)); err != nil {
+				return errors.New("exclusive backup publication failed")
+			}
+			// Keep a separate restoration inode with the original permissions.
+			recovery, err = stage(snapshot{path: ".env", mode: p.environmentOriginal.mode}, p.environmentOriginal.before)
+			if err != nil {
+				return errors.New("stage environment recovery failed")
+			}
+			if err = p.checkEnvironmentOriginal(); err != nil {
+				return err
+			}
+			if err = os.Remove(destination); err != nil {
+				return errors.New("environment replacement refused")
+			}
+		}
+		restore := func() error {
+			if recovery == "" {
+				return nil
+			}
+			if err := os.Link(recovery, destination); err != nil {
+				for k, path := range temporary {
+					if path == recovery {
+						temporary[k] = ""
+					}
+				}
+				return fmt.Errorf("ROLLBACK FAILED .env: protected recovery copy %s; destination preserved", recovery)
+			}
+			return nil
+		}
 		if err = publish(next, destination); err != nil {
-			return errors.New("exclusive environment publication failed")
+			return errors.Join(errors.New("exclusive environment publication failed"), restore())
 		}
 		defer func() {
 			if result == nil {
@@ -383,6 +437,7 @@ func (p *Plan) apply(rename func(string, string) error) (result error) {
 			}
 			current, err := os.Lstat(destination)
 			if os.IsNotExist(err) {
+				result = errors.Join(result, restore())
 				return
 			}
 			if err != nil || !os.SameFile(owned, current) {
@@ -394,6 +449,8 @@ func (p *Plan) apply(rename func(string, string) error) (result error) {
 			}
 			if err != nil {
 				result = errors.Join(result, errors.New("ROLLBACK FAILED .env: remove transaction-owned .env manually"))
+			} else {
+				result = errors.Join(result, restore())
 			}
 		}()
 	}
@@ -409,7 +466,12 @@ func (p *Plan) apply(rename func(string, string) error) (result error) {
 				destination := filepath.Join(p.root, prev.file.path)
 				rollbackErr := safePath(destination)
 				if rollbackErr == nil {
-					rollbackErr = os.Rename(prev.backup, destination)
+					current, err := os.Lstat(destination)
+					if err != nil || !os.SameFile(current, prev.owned) {
+						rollbackErr = errors.New("destination ownership changed")
+					} else {
+						rollbackErr = os.Rename(prev.backup, destination)
+					}
 				}
 				if rollbackErr != nil {
 					// Preserve the recovery copy when restoration fails, rather than deleting it.

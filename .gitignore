@@ -22,6 +22,7 @@ cmd/nexokit/nexokit
 .env
 .env.local
 .env.*.local
+.env.backup-*
 # Protected initializer staging/recovery files (may contain secrets)
 .nexokit-init-*
 

@@ -9,6 +9,172 @@ import (
 	"testing"
 )
 
+func TestConfigureEnvironment(t *testing.T) {
+	for _, existing := range []bool{false, true} {
+		t.Run(map[bool]string{false: "create", true: "rebuild"}[existing], func(t *testing.T) {
+			root := fixture(t)
+			put(t, root, ".env.example", "APP_NAME=nexokit\r\n# invented comment\r\nUNKNOWN=untouched\r\n")
+			old := "# invented original\r\nSECRET=fixture-only\r\n"
+			if existing {
+				put(t, root, ".env", old)
+			}
+			p, err := New(root, "Local App", "example.com/local/app")
+			if err != nil {
+				t.Fatal(err)
+			}
+			password := `a ' " # $HOME $(CMD) \\ x=:`
+			if err = p.ConfigureEnvironment(map[string]string{"DB_PASSWORD": password}); err != nil {
+				t.Fatal(err)
+			}
+			backup := ""
+			for _, change := range p.Changes {
+				if strings.HasPrefix(change.Path, ".env.backup-") {
+					backup = change.Path
+				}
+			}
+			if existing && backup == "" {
+				t.Fatal("missing backup preview")
+			}
+			if backup != "" {
+				if _, err = os.Lstat(filepath.Join(root, backup)); !os.IsNotExist(err) {
+					t.Fatal("planning created backup")
+				}
+			}
+			if existing && get(t, root, ".env") != old {
+				t.Fatal("planning changed original")
+			}
+			if err = p.Apply(); err != nil {
+				t.Fatal(err)
+			}
+			text := get(t, root, ".env")
+			if !strings.Contains(text, "# invented comment\r\nUNKNOWN=untouched\r\n") {
+				t.Fatal("unknown content lost")
+			}
+			values, err := godotenv.Unmarshal(text)
+			if err != nil || values["DB_PASSWORD"] != password || values["APP_ENV"] != "development" || values["DATABASE_URL"] != "" {
+				t.Fatal("round trip failed")
+			}
+			for _, path := range []string{".env", backup} {
+				if path == "" {
+					continue
+				}
+				info, err := os.Stat(filepath.Join(root, path))
+				if err != nil || info.Mode().Perm() != 0600 {
+					t.Fatal("unprotected file")
+				}
+			}
+			if existing && get(t, root, backup) != old {
+				t.Fatal("backup differs")
+			}
+		})
+	}
+}
+
+func TestConfigureEnvironmentRejections(t *testing.T) {
+	for _, scenario := range []string{"collision", "changed", "symlink", "publish", "race", "rollback", "cleanup"} {
+		t.Run(scenario, func(t *testing.T) {
+			root := fixture(t)
+			old := "invented original bytes\r\n"
+			put(t, root, ".env", old)
+			if err := os.Chmod(filepath.Join(root, ".env"), 0640); err != nil {
+				t.Fatal(err)
+			}
+			originalModule := get(t, root, "go.mod")
+			p, err := New(root, "Local App", "example.com/local/app")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if scenario == "symlink" {
+				// Replacing an existing destination with a link is never accepted.
+				if err = os.Rename(filepath.Join(root, ".env"), filepath.Join(root, "saved")); err != nil {
+					t.Fatal(err)
+				}
+				if err = os.Symlink(filepath.Join(root, "saved"), filepath.Join(root, ".env")); err != nil {
+					t.Fatal(err)
+				}
+				if err = p.ConfigureEnvironment(nil); err == nil {
+					t.Fatal("accepted symlink")
+				}
+				return
+			}
+			if err = p.ConfigureEnvironment(nil); err != nil {
+				t.Fatal(err)
+			}
+			backup := ""
+			for _, c := range p.Changes {
+				if strings.HasPrefix(c.Path, ".env.backup-") {
+					backup = c.Path
+				}
+			}
+			if backup == "" {
+				t.Fatal("missing backup preview")
+			}
+			switch scenario {
+			case "collision":
+				put(t, root, backup, "competitor")
+			case "changed":
+				put(t, root, ".env", "competitor")
+			case "race":
+				p.publishEnvironment = func(from, to string) error {
+					if err := os.WriteFile(to, []byte("competitor"), 0600); err != nil {
+						return err
+					}
+					return os.Link(from, to)
+				}
+			case "publish":
+				p.publishEnvironment = func(string, string) error { return errors.New("invented sensitive failure") }
+			case "cleanup":
+				p.removeTemporary = func(string) error { return errors.New("invented sensitive failure") }
+			}
+			// Force identity publication failure without bypassing Apply.
+			if scenario == "rollback" {
+				p.publishEnvironment = func(from, to string) error {
+					if err := os.Link(from, to); err != nil {
+						return err
+					}
+					if err := os.Rename(filepath.Join(root, "README.md"), filepath.Join(root, "moved-readme")); err != nil {
+						return err
+					}
+					return os.Symlink(filepath.Join(root, "moved-readme"), filepath.Join(root, "README.md"))
+				}
+			}
+			err = p.Apply()
+			if err == nil || strings.Contains(err.Error(), "invented sensitive failure") || strings.Contains(err.Error(), old) {
+				t.Fatal("missing or sensitive rejection")
+			}
+			if scenario == "cleanup" {
+				if get(t, root, ".env") == old {
+					t.Fatal("cleanup undid publication")
+				}
+				return
+			}
+			if scenario == "race" {
+				if get(t, root, ".env") != "competitor" || get(t, root, backup) != old {
+					t.Fatal("race recovery lost")
+				}
+				return
+			}
+			if get(t, root, "go.mod") != originalModule {
+				t.Fatal("identity changed on rejection")
+			}
+			want := old
+			if scenario == "changed" {
+				want = "competitor"
+			}
+			if get(t, root, ".env") != want {
+				t.Fatal("original/competitor not preserved")
+			}
+			info, err := os.Stat(filepath.Join(root, ".env"))
+			if err != nil || info.Mode().Perm() != 0640 {
+				t.Fatal("original mode not restored")
+			}
+			if scenario == "collision" && get(t, root, backup) != "competitor" {
+				t.Fatal("backup overwritten")
+			}
+		})
+	}
+}
+
 func TestEnvironmentCreation(t *testing.T) {
 	root := fixture(t)
 	p, err := New(root, "Local App", "example.com/local/app")
