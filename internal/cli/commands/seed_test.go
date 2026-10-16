@@ -12,6 +12,10 @@ import (
 	"github.com/enviniom/nexokit/internal/cli"
 )
 
+func selectedBootstrapValues() map[string]string {
+	return map[string]string{"DATABASE_URL": "", "DB_HOST": "selected.invalid", "DB_PORT": "5439", "DB_NAME": "owned", "DB_USER": "fake", "DB_PASSWORD": "invented #$'\\\\ password", "DB_SSL_MODE": "disable"}
+}
+
 func TestSeedCommand_NoSeedsDir(t *testing.T) {
 	var out bytes.Buffer
 	stdio := cli.Stdio{Out: &out}

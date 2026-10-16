@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"bufio"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -13,22 +12,14 @@ import (
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/cli/projectinit"
-	"github.com/enviniom/nexokit/internal/cli/root"
-	"golang.org/x/term"
 )
 
-// Private seam for public-command tests; no production environment bypass.
-var initSetupPrepare = prepareInitBootstrap
-
-func validateInitSetup(values map[string]string, input root.CreateRootInput) (bootstrapTarget, error) {
-	if err := root.ValidateInput(input); err != nil {
-		return bootstrapTarget{}, errors.New("invalid root credentials; no files written")
-	}
+func validateInitSetup(values map[string]string) (bootstrapTarget, error) {
 	key, err := hex.DecodeString(values["PASETO_KEY"])
 	if err != nil || len(key) != 32 {
 		return bootstrapTarget{}, errors.New("invalid PASETO key; no files written")
 	}
-	_, _, target, err := bootstrapConfig(values)
+	target, err := localConfigTarget(values)
 	if err != nil {
 		return bootstrapTarget{}, errors.New("invalid effective configuration; no files written")
 	}
@@ -37,22 +28,16 @@ func validateInitSetup(values map[string]string, input root.CreateRootInput) (bo
 
 func printInitSetupPreview(stdio cli.Stdio, target bootstrapTarget) {
 	stdio.Printf("Database target: host=%s port=%d database=%s user=%s sslmode=%s\n", target.Host, target.Port, target.Name, target.User, target.SSLMode)
-	stdio.Println("Setup order: migrations -> seeds -> root")
-	stdio.Println("No services provisioned; no transaction spans files and database stages.")
+	stdio.Println("Local files only; database target not contacted. No migrations, seeds or root creation run.")
 }
 
-func executeInitSetup(ctx context.Context, stdio cli.Stdio, plan *projectinit.Plan, selected *projectinit.SelectedEnvironment, input root.CreateRootInput) error {
+func executeInitSetup(ctx context.Context, stdio cli.Stdio, plan *projectinit.Plan, selected *projectinit.SelectedEnvironment) error {
 	if err := ctx.Err(); err != nil {
 		return errors.New("initial setup canceled; no files written")
 	}
 	if err := selected.Check(); err != nil {
 		return err
 	}
-	prepared, err := initSetupPrepare(ctx, selected.Values, input)
-	if err != nil {
-		return errors.New("initial setup preparation failed; no files written")
-	}
-	defer prepared.Close()
 	if err := ctx.Err(); err != nil {
 		return errors.New("initial setup canceled; no files written")
 	}
@@ -60,22 +45,12 @@ func executeInitSetup(ctx context.Context, stdio cli.Stdio, plan *projectinit.Pl
 		return err
 	}
 	if err := plan.Apply(); err != nil {
-		return fmt.Errorf("initial setup file publication failed; database stages not run: %w", err)
+		return fmt.Errorf("initial setup file publication failed: %w", err)
 	}
-	if err := prepared.Run(ctx, stdio); err != nil {
-		stdio.Println("Identity adopted: init cannot rerun. Recover with migrate, seed and create-root maintenance commands. Published environment backups remain recovery artifacts; no automatic database rollback.")
-		return err // Run exposes only its fixed stage name, not driver diagnostics.
-	}
-	if err := prepared.Close(); err != nil {
-		stdio.Println("Identity adopted: init cannot rerun; use maintenance commands for recovery.")
-		return errors.New("initial setup connection close failed")
-	}
-	stdio.Println("Setup complete: application adopted, migrations and seeds applied, root access initialized. cmd/nexokit remains the developer tool.")
+	stdio.Println("Local setup complete: application identity and environment ready.")
+	stdio.Println("Review migrations and seeds before executing them. Then run:")
+	stdio.Println("  make migrate-up\n  make seed\n  make create-root\n  make dev")
 	return nil
-}
-
-func initRootFromEnvironment() root.CreateRootInput {
-	return root.CreateRootInput{Name: os.Getenv("ROOT_USER_NAME"), Email: os.Getenv("ROOT_USER_EMAIL"), Password: os.Getenv("ROOT_USER_PASSWORD")}
 }
 
 // Flag mode has no wizard or inherited URL override. Require explicit selected
@@ -117,34 +92,4 @@ func validInitSSL(value string) bool {
 		return true
 	}
 	return false
-}
-
-func readInitRootPassword(ctx context.Context, stdio cli.Stdio, reader *bufio.Reader) (string, error) {
-	fail := errors.New("root password input failed; no files written")
-	if ctx.Err() != nil {
-		return "", fail
-	}
-	stdio.Printf("Root password (hidden): ")
-	var value string
-	if file, ok := stdio.In.(*os.File); ok && term.IsTerminal(int(file.Fd())) {
-		if reader.Buffered() != 0 {
-			return "", fail
-		}
-		data, err := term.ReadPassword(int(file.Fd()))
-		stdio.Println("")
-		if err != nil {
-			return "", fail
-		}
-		value = string(data)
-	} else {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			return "", fail
-		}
-		value = strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r")
-	}
-	if ctx.Err() != nil || !safeLocalValue(value) {
-		return "", fail
-	}
-	return value, nil
 }

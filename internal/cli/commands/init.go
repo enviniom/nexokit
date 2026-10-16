@@ -17,7 +17,7 @@ type InitCommand struct{}
 
 func (*InitCommand) Name() string { return "init" }
 func (*InitCommand) Description() string {
-	return "Initialize once: identity, environment, migrations, seeds and root (flags preview by default)"
+	return "Initialize local identity and environment once (flags preview by default)"
 }
 func (*InitCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) error {
 	if len(args) == 0 {
@@ -27,7 +27,7 @@ func (*InitCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) err
 	flags.SetOutput(stdio.Err)
 	name := flags.String("name", "", "Application display name")
 	module := flags.String("module", "", "Independent Go module path")
-	apply := flags.Bool("apply", false, "Perform complete one-time setup; requires explicit settings and ROOT_USER_NAME/ROOT_USER_EMAIL/ROOT_USER_PASSWORD process inputs")
+	apply := flags.Bool("apply", false, "Apply one-time local identity and environment setup; requires explicit local settings")
 	envAction := flags.String("env-action", "", "Existing environment choice: keep or rebuild (required with --apply when present)")
 	flags.Bool("dry-run", false, "Explicit preview without writes")
 	seen := map[string]bool{}
@@ -94,14 +94,13 @@ func (*InitCommand) Run(ctx context.Context, args []string, stdio cli.Stdio) err
 	if e != nil {
 		return e
 	}
-	input := initRootFromEnvironment()
-	target, e := validateInitSetup(selected.Values, input)
+	target, e := validateInitSetup(selected.Values)
 	if e != nil {
 		return e
 	}
 	printInitPreview(stdio, plan)
 	printInitSetupPreview(stdio, target)
-	return executeInitSetup(ctx, stdio, plan, selected, input)
+	return executeInitSetup(ctx, stdio, plan, selected)
 }
 
 func printInitPreview(stdio cli.Stdio, plan *projectinit.Plan) {

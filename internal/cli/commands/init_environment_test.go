@@ -12,20 +12,13 @@ import (
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/cli/projectinit"
-	"github.com/enviniom/nexokit/internal/cli/root"
 	"github.com/joho/godotenv"
 )
 
 func TestInitCommandCreatesLocalEnvironment(t *testing.T) {
-	old := initSetupPrepare
-	t.Cleanup(func() { initSetupPrepare = old })
-	initSetupPrepare = func(context.Context, map[string]string, root.CreateRootInput) (*preparedInitBootstrap, error) {
-		return &preparedInitBootstrap{}, nil
-	}
-
 	initFixture(t)
 	var out bytes.Buffer
-	input := "My API\nuser-name\n\n\n\n\n  invented password  \n\n\n\n\nRoot\nroot@example.test\nInventedRoot123\ny\n"
+	input := "My API\nuser-name\n\n\n\n\n  invented password  \n\n\n\n\ny\n"
 	if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader(input), Out: &out, Err: &out}); err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +94,7 @@ func TestInitCommandCancelAndEntropyFailure(t *testing.T) {
 		t.Run("cancel "+answer, func(t *testing.T) {
 			initFixture(t)
 			var out bytes.Buffer
-			input := "App\nuser\n" + strings.Repeat("\n", 9) + "Root\nroot@example.test\nInventedRoot123\n" + answer
+			input := "App\nuser\n" + strings.Repeat("\n", 9) + answer
 			if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader(input), Out: &out}); err != nil {
 				t.Fatal(err)
 			}
@@ -163,7 +156,7 @@ func TestInitCommandKeptEnvironmentSkipsWizardEntropy(t *testing.T) {
 	initEntropy = failingInput{}
 	t.Cleanup(func() { initEntropy = previous })
 	var out bytes.Buffer
-	if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader("App\nuser\nkeep\nRoot\nroot@example.test\nInventedRoot123\nn\n"), Out: &out}); err != nil {
+	if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader("App\nuser\nkeep\nn\n"), Out: &out}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "Keeping existing") || strings.Contains(out.String(), "DB_PASSWORD") || strings.Contains(out.String(), "synthetic-only") {

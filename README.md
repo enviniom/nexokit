@@ -23,29 +23,53 @@ The codebase is organized as a modular monolith: `cmd/` entrypoints wire `intern
 
 ## Quick start
 
-Prerequisites: installed Go 1.26.3+ (the current `go.mod` requirement), dependencies
-available to Go, and an already reachable PostgreSQL instance with an appropriate
-empty database and credentials permitted to migrate it. Setup does not provision
-PostgreSQL or other services. Redis is optional: use `CACHE_DRIVER=none` and the
-default in-memory rate limiter unless you deliberately configure Redis.
-
-From a fresh clone/fork root:
+Prerequisites: installed Go 1.26.3+ (the current `go.mod` requirement) and project
+dependencies available to Go. Run `make init` immediately after cloning/forking:
+it prepares only local project files and does not require a running database.
 
 ```bash
 make init
-# After setup completes:
+# Adapt the initial migrations, seeds and modules before applying any schema.
 go build ./...
 go test ./...
+```
+
+When you are ready to prepare the database, use an appropriate empty PostgreSQL
+database with migration permissions. You can use the service already defined in
+`docker-compose.yml`; a separate PostgreSQL installation is not required:
+
+```bash
+docker compose up -d postgres
+docker compose ps postgres
+# Wait until PostgreSQL is healthy, then execute these deliberate steps:
+make migrate-up
+make seed
+make create-root
 make dev
 ```
 
-`make init` is the single, once-only setup entrypoint. It collects project identity,
-local configuration (or an explicit keep/backup-and-rebuild choice for an existing
-`.env`) and root credentials, previews the nonsecret database target, then asks for
-**one confirmation, default No**. On approval it applies identity/environment,
-runs **migrations → seeds → root creation**, and only then reports completion.
-Enter the root password at the protected terminal prompt, never in command arguments
-or dotenv. Start the full application only after these stages succeed.
+Redis is optional: use `CACHE_DRIVER=none` and the default in-memory rate limiter
+unless you deliberately configure Redis. Neither `init` nor Make provisions services
+automatically. Only edit initial migrations before their first application; use new
+forward migrations for databases that already have applied migration history.
+
+With the Compose defaults, enter `DB_HOST=localhost`, `DB_PORT=5432`,
+`DB_NAME=nexokit`, `DB_USER=nexokit`, `DB_PASSWORD=nexokit` and
+`DB_SSL_MODE=disable` in the initializer. These are local-development defaults,
+not production credentials. If `.env`, exported `DB_*` variables or an existing
+database volume use different settings, enter the actual connection values instead.
+The initializer's proposed database name/user may differ from the Compose defaults.
+
+`make init` is the once-only local initialization entrypoint. It collects project
+identity and configuration (or an explicit keep/backup-and-rebuild choice for an
+existing `.env`), previews the configured nonsecret database target without
+contacting it, then asks for **one confirmation, default No**. Approval applies
+only identity/environment files. It does not run migrations or seeds, create a
+root user, or request root credentials. It prints the later manual commands instead.
+Create the root after migrations and seeds with `make create-root`; prefer protected
+`ROOT_USER_*` process inputs rather than password arguments or dotenv. The separate
+create-root command's interactive password prompt is not hidden. Start the full
+application only after schema, seeds and root are ready.
 
 The API boots on `http://localhost:8080` (or the selected `APP_PORT`). Do not rerun
 `init` on an adopted project; see [setup and recovery](docs/starter-template.md).
@@ -59,12 +83,12 @@ configuration; it may require deliberate validation/configuration updates before
 | `make dev` | Run the API server in development mode |
 | `make build` | Build `bin/api` and `bin/nexokit` |
 | `make test` | Run all tests |
-| `make init` | Adopt and complete initial setup once; not a maintenance command |
-| `make migrate-up` | Explicit maintenance/recovery: apply pending migrations |
+| `make init` | Adopt identity/configuration once, without contacting the database |
+| `make migrate-up` | Apply reviewed migrations explicitly, after local initialization |
 | `make migrate-down` | Rollback the last migration batch |
 | `make migrate-create` | Create a new migration file |
-| `make seed` | Explicit maintenance/recovery: run seed files from `seeds/` |
-| `make create-root` | Explicit recovery: create a missing root; refuses an existing root |
+| `make seed` | Run reviewed Go seeds explicitly, after migrations |
+| `make create-root` | Create the root after seeds; skips an existing root without changing it |
 | `make fmt` | Format all Go files |
 | `make lint` | Run `go vet` + module boundary checks |
 
@@ -93,7 +117,7 @@ IAM owns authentication under `internal/modules/iam/slices/auth`, including cred
 
 ## Using NexoKit as a starter
 
-Use the interactive `make init` quick start above for complete setup. For a safe,
+Use the interactive `make init` quick start above for local project initialization. For a safe,
 stdin-free and write-free identity preview:
 
 ```bash
@@ -104,11 +128,10 @@ go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --dry-r
 Bare `init` derives the module from display name and GitHub username; it creates
 no GitHub repository and requests no GitHub credentials. Flag calls require both
 `--name` and `--module`. Their default is preview; `--dry-run` is explicit preview
-and cannot be combined with `--apply`. Flag `--apply` performs complete initial
-setup without stdin: provide selected configuration and explicit process inputs
-`ROOT_USER_NAME`, `ROOT_USER_EMAIL`, `ROOT_USER_PASSWORD` through protected secret
-injection, not literal shell-history examples or password arguments. For an
-existing environment, applying requires `--env-action keep` or `--env-action rebuild` explicitly.
+and cannot be combined with `--apply`. Flag `--apply` applies identity/environment
+without stdin or a database connection: provide the local configuration process
+inputs for a new/rebuilt environment, not root credentials. For an existing
+environment, applying requires `--env-action keep` or `--env-action rebuild` explicitly.
 
 Backup/rebuild retains a protected `.env.backup-<32 lowercase hex characters>`
 (mode `0600`, ignored by a narrow Git pattern) and creates a new `0600` environment

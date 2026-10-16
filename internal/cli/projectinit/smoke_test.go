@@ -108,14 +108,24 @@ func TestInitializedSourceCopy(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	put(t, target, ".env.example", "APP_NAME=nexokit\n")
+	put(t, target, ".env.example", "APP_NAME=nexokit\nDB_SSL_MODE=disable\n")
+	// Synthetic settings belong to init, not the nested ordinary suite.
+	// Preserve the caller's integration-test opt-in instead of inventing one.
+	nestedEnvironment := os.Environ()
+	for key, value := range map[string]string{"DB_HOST": "unreachable.invalid", "DB_PORT": "5439", "DB_NAME": "synthetic", "DB_USER": "fake", "DB_PASSWORD": "invented", "DB_SSL_MODE": "disable", "APP_PORT": "8081", "APP_URL": "http://localhost:8081", "CORS_ALLOWED_ORIGINS": "http://localhost:3001"} {
+		t.Setenv(key, value)
+	}
 	run := func(wantSuccess bool, args ...string) string {
 		t.Helper()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, "go", args...)
 		cmd.Dir = target
-		cmd.Env = append(os.Environ(), "GOWORK=off", "GOPROXY=off", "GOSUMDB=off", "NEXOKIT_INIT_SMOKE=1")
+		environment := os.Environ()
+		if len(args) > 0 && args[0] == "test" {
+			environment = nestedEnvironment
+		}
+		cmd.Env = append(append([]string{}, environment...), "GOWORK=off", "GOPROXY=off", "GOSUMDB=off", "NEXOKIT_INIT_SMOKE=1")
 		output, e := cmd.CombinedOutput()
 		if (e == nil) != wantSuccess {
 			t.Fatalf("go %v: %v\n%s", args, e, output)
@@ -129,18 +139,10 @@ func TestInitializedSourceCopy(t *testing.T) {
 	if get(t, target, "go.mod") != before {
 		t.Fatal("CLI preview wrote")
 	}
-	// Full CLI setup now requires explicit configuration and root credentials.
-	// This offline source-adoption smoke must not connect to a database.
-	run(false, append(args, "--apply")...)
-	if get(t, target, "go.mod") != before {
-		t.Fatal("missing setup inputs wrote identity")
-	}
-	plan, err := New(target, "Starter Smoke", "example.com/team/starter-smoke")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := plan.Apply(); err != nil {
-		t.Fatal(err)
+	// Public apply is offline even with an unreachable database target.
+	applied := run(true, append(args, "--apply")...)
+	if !strings.Contains(applied, "make migrate-up") || !strings.Contains(get(t, target, "go.mod"), "module example.com/team/starter-smoke") {
+		t.Fatal("local apply did not adopt identity and explain manual database steps")
 	}
 	run(true, "run", "./cmd/nexokit", "help")
 	output := run(false, args...)

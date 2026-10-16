@@ -10,7 +10,6 @@ import (
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/cli/projectinit"
-	"github.com/enviniom/nexokit/internal/cli/root"
 )
 
 func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
@@ -106,20 +105,7 @@ func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 	if err != nil {
 		return err
 	}
-	rootName, err := read("Root name: ")
-	if err != nil {
-		return errors.New("root input failed; no files written")
-	}
-	rootEmail, err := read("Root email: ")
-	if err != nil {
-		return errors.New("root input failed; no files written")
-	}
-	rootPassword, err := readInitRootPassword(ctx, stdio, reader)
-	if err != nil {
-		return err
-	}
-	input := root.CreateRootInput{Name: rootName, Email: rootEmail, Password: rootPassword}
-	target, err := validateInitSetup(selected.Values, input)
+	target, err := validateInitSetup(selected.Values)
 	if err != nil {
 		return err
 	}
@@ -138,7 +124,7 @@ func runInteractiveInit(ctx context.Context, stdio cli.Stdio) error {
 	if !strings.EqualFold(answer, "yes") && !strings.EqualFold(answer, "y") {
 		return errors.New("invalid confirmation; no files written")
 	}
-	return executeInitSetup(ctx, stdio, plan, selected, input)
+	return executeInitSetup(ctx, stdio, plan, selected)
 }
 
 func validGitHubUsername(username string) bool {

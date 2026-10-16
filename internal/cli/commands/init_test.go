@@ -10,7 +10,6 @@ import (
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/cli/projectinit"
-	"github.com/enviniom/nexokit/internal/cli/root"
 )
 
 func TestInitCommandFlags(t *testing.T) {
@@ -28,13 +27,6 @@ func TestInitCommandFlags(t *testing.T) {
 func TestInitCommandPreviewAndApply(t *testing.T) {
 	initSetupProcessSettings(t)
 	t.Setenv("DB_SSL_MODE", "disable")
-	calls := 0
-	old := initSetupPrepare
-	t.Cleanup(func() { initSetupPrepare = old })
-	initSetupPrepare = func(context.Context, map[string]string, root.CreateRootInput) (*preparedInitBootstrap, error) {
-		calls++
-		return &preparedInitBootstrap{}, nil
-	}
 	root := t.TempDir()
 	for path, text := range map[string]string{"go.mod": "module " + projectinit.OriginalModule() + "\n", "README.md": "# NexoKit\n", ".env.example": "APP_NAME=nexokit\n", "cmd/nexokit/main.go": "package main\nimport _ \"" + projectinit.OriginalModule() + "/internal/cli\"\n"} {
 		full := filepath.Join(root, path)
@@ -65,9 +57,6 @@ func TestInitCommandPreviewAndApply(t *testing.T) {
 				t.Fatal("preview wrote or missing output")
 			}
 		}
-	}
-	if calls != 1 {
-		t.Fatalf("previews/apply prepared %d times; want exactly one", calls)
 	}
 	var out bytes.Buffer
 	if e := (&InitCommand{}).Run(context.Background(), args, cli.Stdio{Out: &out, Err: &out}); e == nil {

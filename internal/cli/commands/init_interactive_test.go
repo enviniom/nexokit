@@ -16,7 +16,6 @@ import (
 
 	"github.com/enviniom/nexokit/internal/cli"
 	"github.com/enviniom/nexokit/internal/cli/projectinit"
-	"github.com/enviniom/nexokit/internal/cli/root"
 )
 
 func initFixture(t *testing.T) {
@@ -35,12 +34,7 @@ func initFixture(t *testing.T) {
 }
 
 func TestInitCommandInteractive(t *testing.T) {
-	old := initSetupPrepare
-	t.Cleanup(func() { initSetupPrepare = old })
-	initSetupPrepare = func(context.Context, map[string]string, root.CreateRootInput) (*preparedInitBootstrap, error) {
-		return &preparedInitBootstrap{}, nil
-	}
-	prefix := "My API\nuser-name\nkeep\nRoot\nroot@example.test\nInventedRoot123\n"
+	prefix := "My API\nuser-name\nkeep\n"
 
 	for _, tc := range []struct {
 		name, input string
@@ -292,25 +286,11 @@ func TestInteractiveSourceCopy(t *testing.T) {
 	}
 
 	t.Chdir(target)
-	oldPrepare := initSetupPrepare
-	t.Cleanup(func() { initSetupPrepare = oldPrepare })
-	var phases []string
-	initSetupPrepare = func(context.Context, map[string]string, root.CreateRootInput) (*preparedInitBootstrap, error) {
-		p := &preparedInitBootstrap{}
-		for _, name := range []string{"migrations", "seeds", "root"} {
-			stage := name
-			p.stages = append(p.stages, bootstrapStage{name: stage, run: func(context.Context) error { phases = append(phases, stage); return nil }})
-		}
-		return p, nil
-	}
-	commandInput := "My API\nuser-name\n" + strings.Repeat("\n", 9) + "Root\nroot@example.test\nInventedRoot123\n"
+	commandInput := "My API\nuser-name\n" + strings.Repeat("\n", 9)
 	for _, answer := range []string{"n\n", "\n"} {
 		var out bytes.Buffer
 		if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader(commandInput + answer), Out: &out, Err: &out}); err != nil {
 			t.Fatal(err)
-		}
-		if len(phases) != 0 {
-			t.Fatal("cancellation ran database stages")
 		}
 		for path, original := range identity {
 			after, err := os.ReadFile(filepath.Join(target, path))
@@ -323,8 +303,8 @@ func TestInteractiveSourceCopy(t *testing.T) {
 	if err := (&InitCommand{}).Run(context.Background(), nil, cli.Stdio{In: strings.NewReader(commandInput + "y\n"), Out: &initOut, Err: &initOut}); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(phases, ",") != "migrations,seeds,root" || !strings.Contains(initOut.String(), "Setup complete") {
-		t.Fatal("public setup did not complete in order")
+	if !strings.Contains(initOut.String(), "Local setup complete") || !strings.Contains(initOut.String(), "make migrate-up") {
+		t.Fatal("public local setup did not provide manual next steps")
 	}
 	after, err := os.ReadFile(filepath.Join(target, "go.mod"))
 	if err != nil || !strings.Contains(string(after), "module github.com/user-name/my-api\n") {

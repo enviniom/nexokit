@@ -4,9 +4,10 @@ Fork or clone the repository into your namespace; it is a starting application, 
 
 ## Quick path
 
-Prerequisites: Go 1.26.3+ (current `go.mod`) and the project dependencies available to Go. PostgreSQL is
-required during `init`: use an already reachable instance and an appropriate empty
-database with migration permissions. The initializer provisions no services.
+Prerequisites: Go 1.26.3+ (current `go.mod`) and the project dependencies available
+to Go. Run `make init` immediately after cloning/forking; it prepares only local
+files and needs no running PostgreSQL. Start PostgreSQL later, after reviewing the
+initial migrations and seeds. The initializer provisions no services.
 Redis/Valkey is optional: `CACHE_DRIVER=none` and the default in-memory rate limiter
 need no Redis. Configuring Redis is a deliberate separate choice.
 
@@ -21,12 +22,12 @@ go test ./...
 
 Interactive `init` asks for display name and GitHub username, deriving
 `github.com/user-name/my-api` from `My API` and `user-name`. It creates no GitHub
-repository and requests no GitHub credentials. It collects environment choices,
-configuration and root credentials, shows a redacted plan with the effective
-nonsecret database target, then requests one confirmation, default No. Declining
-leaves files and database unchanged. Approval applies identity/environment, then
-runs **migrations → seeds → root creation** before reporting success. It does not
-start the full application before tables, seeds and root exist.
+repository and requests no GitHub credentials. It collects environment choices
+and local configuration, shows a redacted plan with the configured database target
+without contacting it, then requests one confirmation, default No. Declining
+leaves files unchanged. Approval applies only identity/environment files. Init
+never connects to the database, runs migrations or seeds, creates root, or asks
+for root credentials. Its completion message lists the later manual commands.
 
 2. Application identity changes in the root README heading and example `APP_NAME`;
    Go module imports, embedded generator templates, seed runner and generated-test
@@ -41,11 +42,26 @@ start the full application before tables, seeds and root exist.
    creates fresh development configuration from the example (details below).
    Review CORS/rate limits deliberately; local defaults are not production
    safeguards. See [deployment configuration](deployment.md#configuration-and-secrets).
-4. Start the application only after successful setup and validation:
+4. Adapt initial migrations, seeds and modules to your application before applying
+   any schema. When ready, use an appropriate empty PostgreSQL database with
+   migration permissions. The bundled Docker Compose service is an option:
 
 ```bash
+docker compose up -d postgres
+docker compose ps postgres
+# Wait until PostgreSQL is healthy, then run explicitly:
+make migrate-up
+make seed
+make create-root
 make dev
 ```
+
+With Compose defaults, configure `localhost:5432`, database/user/password `nexokit`
+and `DB_SSL_MODE=disable` during init. These are local-development defaults, not
+production credentials; overrides or existing volumes require their actual values.
+The wizard's proposed database name/user may differ. Root creation comes after
+seeds because it requires the root role. Prefer protected `ROOT_USER_*` process
+inputs: the separate create-root command's interactive password prompt is not hidden.
 
 Make delegates `.env` loading to the application, not Make or shell evaluation.
 Use dotenv quoting for credentials containing spaces, quotes, `#` or `$`;
@@ -55,9 +71,9 @@ The wrappers do not print environment values. Bare `make` still runs `make dev`;
 
 5. Check `/health/live` and `/health/ready`, then exercise login and a protected route. Root user routes require `X-Company-ID`; see [request flow](references/runtime/request-flow.md).
 
-These are commands for the adopter to run. `init` runs migrations, seeds and root
-creation, but never provisions a database, executes Git operations or changes
-`go.sum`/dependencies. It is once-only, not a maintenance/upgrade command. Local
+These are deliberate commands for the adopter to run. `init` only prepares local
+identity/configuration; it never provisions or contacts a database, executes Git
+operations or changes `go.sum`/dependencies. It is once-only, not a maintenance/upgrade command. Local
 private adoption does not select public distribution license terms.
 
 ## Local-development questionnaire
@@ -78,10 +94,9 @@ pretype passwords: already buffered terminal input is refused. Cancellation is
 checked before/after synchronous reads, not while waiting for input. A fresh
 32-byte random key is encoded as 64 hex characters in memory; password/key are
 never previewed. Invalid input or entropy failure writes nothing. One default-No
-confirmation covers identity/environment and database setup together. Root name
-and email are required; email must parse as a mail address. The root password is
-required, at least 8 bytes, with uppercase, lowercase and a digit (the domain
-validator's rules). There is no default root password. Never store it in dotenv,
+confirmation covers only local identity/environment changes. Root credentials
+are not collected or required by init. The later `make create-root` command
+validates its own name, email and password; never store its password in dotenv,
 command arguments or committed demo scripts.
 
 The initializer creates `.env` from its snapshotted, identity-updated example,
@@ -119,10 +134,9 @@ go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api
 go run ./cmd/nexokit init --name mi-api --module example.com/team/mi-api --dry-run
 ```
 
-`--apply` performs complete initial setup without stdin. It requires selected
-configuration and explicit process inputs `ROOT_USER_NAME`, `ROOT_USER_EMAIL`,
-`ROOT_USER_PASSWORD`; supply secrets through protected process injection, not
-literal shell commands/history or password argv. Applying with an existing
+`--apply` performs local identity/environment initialization without stdin or any
+database connection. New/rebuilt configuration requires the selected local process
+inputs; root credentials are neither required nor used. Applying with an existing
 environment requires `--env-action keep` or `--env-action rebuild`. `--apply` plus `--dry-run` is an
 error. Unknown/duplicate flags and positional arguments are refused. The current
 root must retain the starter module, README heading, example APP_NAME and CLI
@@ -144,17 +158,18 @@ recovery; no automatic repair or repeated-init/upgrade framework is provided.
 
 ## Failure recovery and maintenance
 
-Setup stops at the failing stage; later stages do not run. Configuration/identity
-preflight failure before apply leaves the project unadopted. Once identity has
-been applied, a database-stage failure requires manual recovery, **not another
-init**: the adoption guard refuses repeated setup. Goose failures are reported
-generically without exposing connection secrets.
+Local configuration/identity validation failure before apply leaves the project
+unadopted. Publication errors retain the file transaction's rollback/recovery
+diagnostics and protected recovery paths. Inspect backups locally without printing
+secrets; init is not a filesystem lock or power-loss recovery mechanism. After
+successful adoption, the one-time guard refuses another init.
 
-There is no universal atomic rollback across files, migrations, arbitrary seed
-code and root creation. Migrations or seeds may already have persisted changes.
-Retain and inspect protected recovery backups locally without displaying secrets;
-check the failing stage and actual database state before choosing the appropriate
-existing maintenance command:
+Database preparation is separate and manual. Review migrations and seeds first;
+then execute migrations, seeds and root creation in that order. If one of those
+commands fails, stop and inspect its result before running the next command.
+Database changes may already have persisted: there is no universal transaction
+across these separate commands or arbitrary seeds. Use the appropriate existing
+command for deliberate recovery, not another init:
 
 | Command | Deliberate recovery/maintenance action |
 |---|---|
@@ -163,8 +178,9 @@ existing maintenance command:
 | `make seed` / `nexokit seed` | Execute reviewed seeds; consider prior side effects |
 | `make create-root` / `nexokit create-root` | Create a missing root after seeds; refuses an existing root, never resets its password |
 
-These are distinct explicit operations, not extra quick-start steps or permission
-to rerun init. Start `make dev` only after schema, seeds and root are ready.
+These are the explicit database-preparation steps after local init and schema
+review, and also maintenance/recovery tools. They are not permission to rerun init.
+Start `make dev` only after schema, seeds and root are ready.
 
 ## Choose capabilities deliberately
 
